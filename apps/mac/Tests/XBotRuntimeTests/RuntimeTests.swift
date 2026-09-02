@@ -176,6 +176,22 @@ struct RuntimeControllerTests {
         #expect(endpoint.host == "127.0.0.1")
     }
 
+    @Test func aSavedPortIsPreferredOnTheNextStart() async {
+        defer { UserDefaults.standard.removeObject(forKey: EnginePortStore.key) }
+        EnginePortStore.save(49_200)
+
+        let driver = FakeDriver()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in true }
+        )
+        await controller.start(environment: environment)
+
+        let spec = await driver.startedSpecs.first
+        #expect(spec?.ports.keys.first == 49_200)
+    }
+
     @Test func aMissingImageIsPulledFirst() async {
         let controller = controller(script: FakeDriver.Script(imagePresent: false))
         await controller.start(environment: environment)
