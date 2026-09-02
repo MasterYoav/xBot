@@ -75,8 +75,10 @@ public struct EngineEnvironment: Sendable {
     public static func compose(_ inputs: Inputs) -> [String: String] {
         var environment: [String: String] = [
             // The embedded database. One container, one port, one process tree.
+            // Do not pass DATABASE_URL: postgres-init generates a password on first boot and
+            // writes the URL into s6's container environment. A hardcoded URL here would override
+            // that and the API would fail authentication against its own database.
             "EMBEDDED_POSTGRES": "on",
-            "DATABASE_URL": "postgres://openbot:openbot@127.0.0.1:5432/openbot",
 
             // Both, and identical: upstream refuses to start if they disagree.
             "PORT": "\(inputs.port)",

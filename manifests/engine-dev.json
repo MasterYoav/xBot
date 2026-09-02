@@ -1,0 +1,6 @@
+{
+  "channel": "dev",
+  "version": "0.0.5",
+  "image": "xbot/engine@sha256:1ac4aa828b7d54e4ac11c1bb0bf99cd5939ad249da39b934a2448347c0c54c23",
+  "note": "Local build from scripts/build-engine-image.sh. Not served over HTTPS; dev only until M3 publishes stable."
+}

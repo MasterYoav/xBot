@@ -120,6 +120,11 @@ struct EngineEnvironmentTests {
         #expect(EngineEnvironment.compose(draft)["XBOT_ENGINE_TOKEN"] == "test-token")
     }
 
+    @Test func embeddedPostgresDoesNotSetDatabaseURL() {
+        // The container generates the URL with a random password on first boot.
+        #expect(EngineEnvironment.compose(inputs())["DATABASE_URL"] == nil)
+    }
+
     @Test(arguments: [
         (UInt64(8) * 1_073_741_824, 1),
         (UInt64(16) * 1_073_741_824, 2),
