@@ -50,6 +50,53 @@ public final class AppState {
     /// here is right for a window that shows a single conversation at a time.
     private var turn: Task<Void, Never>?
 
+    // MARK: - The right panel
+
+    public enum PanelSection: String, CaseIterable, Identifiable, Sendable {
+        case screen, activity, routines, settings
+        public var id: String { rawValue }
+
+        public var title: String {
+            switch self {
+            case .screen: String(localized: "Screen")
+            case .activity: String(localized: "Activity")
+            case .routines: String(localized: "Routines")
+            case .settings: String(localized: "Agent settings")
+            }
+        }
+
+        public var symbol: String {
+            switch self {
+            case .screen: "display"
+            case .activity: "list.bullet.rectangle"
+            case .routines: "clock.arrow.circlepath"
+            case .settings: "slider.horizontal.3"
+            }
+        }
+    }
+
+    public var isPanelVisible = true {
+        didSet { retuneScreen() }
+    }
+    public var panelSection: PanelSection = .screen {
+        didSet { retuneScreen() }
+    }
+
+    /// Held in the client for the open conversation, and gone on reload.
+    ///
+    /// A window, not a record. The record is the audit trail, server-side — the panel says so, and
+    /// this property being in-memory is that sentence expressed as a design rather than a caption.
+    public private(set) var activity: [ActivityEntry] = []
+
+    public private(set) var screenFrame: ScreenFrame?
+    public private(set) var control: ScreenControl = .agent
+    public private(set) var models: [ModelSelection] = []
+
+    private var screenTask: Task<Void, Never>?
+
+    /// True while a turn is in flight, which is what makes the screen poll fast.
+    private var isTurnRunning = false
+
     public init(engine: any EngineClient) {
         self.engine = engine
     }
@@ -70,6 +117,8 @@ public final class AppState {
             channels = try await engine.channels()
             if selectedAgentID == nil { selectedAgentID = agents.first?.id }
             await loadMessages()
+            await loadPanel()
+            models = (try? await engine.availableModels()) ?? []
             status = nil
         } catch {
             // Honest degradation: the rail is empty because the engine is down, and the composer
@@ -86,7 +135,72 @@ public final class AppState {
         turn?.cancel()
         turn = nil
         messages = []
-        Task { await loadMessages() }
+        activity = []
+        screenFrame = nil
+        Task {
+            await loadMessages()
+            await loadPanel()
+        }
+    }
+
+    private func loadPanel() async {
+        guard let agent = selectedAgentID else { return }
+        activity = (try? await engine.activity(for: agent)) ?? []
+        retuneScreen()
+    }
+
+    /// Match the polling cadence to what is actually on screen.
+    ///
+    /// Stopped when the panel is hidden or showing something else — an app that keeps requesting
+    /// screenshots nobody is looking at is the reason laptops get warm, and this is the product
+    /// whose whole pitch is that it runs on your own machine.
+    private func retuneScreen() {
+        screenTask?.cancel()
+        guard let agent = selectedAgentID else { return }
+
+        let cadence: ScreenCadence =
+            (isPanelVisible && panelSection == .screen)
+            ? (isTurnRunning ? .active : .idle)
+            : .stopped
+        guard cadence.interval != nil else {
+            screenTask = nil
+            return
+        }
+
+        screenTask = Task { [engine] in
+            for await frame in engine.screen(for: agent, cadence: cadence) {
+                if Task.isCancelled { return }
+                screenFrame = frame
+            }
+        }
+    }
+
+    /// Take the browser, or hand it back.
+    ///
+    /// Optimistic, like sending: the overlay flips immediately because the user pressed the button,
+    /// and reverts if the engine refuses. Waiting for a round trip to show that a click registered
+    /// is exactly the latency the design system opens by forbidding.
+    public func setControl(_ next: ScreenControl) {
+        let previous = control
+        control = next
+        Task { [engine, selectedAgentID] in
+            guard let agent = selectedAgentID else { return }
+            do {
+                try await engine.setControl(next, for: agent)
+            } catch {
+                control = previous
+            }
+        }
+    }
+
+    public func updateSelectedAgent(_ patch: AgentPatch) {
+        guard let id = selectedAgentID else { return }
+        Task { [engine] in
+            guard let updated = try? await engine.updateAgent(id, patch) else { return }
+            if let index = agents.firstIndex(where: { $0.id == id }) {
+                agents[index] = updated
+            }
+        }
     }
 
     private func loadMessages() async {
@@ -110,7 +224,13 @@ public final class AppState {
 
         let agentID = selectedAgentID ?? ""
         turn?.cancel()
+        isTurnRunning = true
+        retuneScreen()
         turn = Task { [engine] in
+            defer {
+                isTurnRunning = false
+                retuneScreen()
+            }
             var replyID: String?
             do {
                 for try await event in engine.send(trimmed, to: channel) {

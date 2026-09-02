@@ -9,8 +9,9 @@ import Foundation
 /// without unplugging anything.
 public actor StubEngineClient: EngineClient {
     private var messagesByChannel: [Channel.ID: [Message]]
-    private let fixedAgents: [Agent]
+    private var fixedAgents: [Agent]
     private let fixedChannels: [Channel]
+    private var control: ScreenControl = .agent
 
     /// How long a stubbed token takes to arrive.
     ///
@@ -85,6 +86,81 @@ public actor StubEngineClient: EngineClient {
     }
 
     public func agents() async throws -> [Agent] { fixedAgents }
+
+    public func activity(for agent: Agent.ID) async throws -> [ActivityEntry] {
+        guard agent == "orchestrator" else { return [] }
+        // Newest first, as the panel renders it.
+        return [
+            ActivityEntry(
+                id: "a3",
+                kind: .fileWrite(path: "/workspace/notes/lisbon.md", bytes: 1_284),
+                summary: "Wrote lisbon.md",
+                at: Date(timeIntervalSinceNow: -395)
+            ),
+            ActivityEntry(
+                id: "a2",
+                kind: .command(exitCode: 0),
+                summary: "curl -s api.airline.example/booking/8812",
+                detail: "{\"refundable\":true,\"until\":\"2026-09-04\"}",
+                at: Date(timeIntervalSinceNow: -405)
+            ),
+            ActivityEntry(
+                id: "a1",
+                kind: .navigate(url: "https://airline.example/bookings"),
+                summary: "Opened airline.example/bookings",
+                at: Date(timeIntervalSinceNow: -410)
+            ),
+        ]
+    }
+
+    public nonisolated func screen(
+        for agent: Agent.ID,
+        cadence: ScreenCadence
+    ) -> AsyncStream<ScreenFrame> {
+        AsyncStream { continuation in
+            guard let interval = cadence.interval else {
+                // Stopped is not an empty stream that hangs; it is a stream that ends. A view
+                // awaiting frames from a hidden panel must not be left suspended forever.
+                continuation.finish()
+                return
+            }
+            let task = Task {
+                while !Task.isCancelled {
+                    // No pixels from a stub. The panel renders its empty state, which is the
+                    // state that actually needs designing.
+                    try? await Task.sleep(for: interval)
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    public func setControl(_ control: ScreenControl, for agent: Agent.ID) async throws {
+        self.control = control
+    }
+
+    public func updateAgent(_ id: Agent.ID, _ patch: AgentPatch) async throws -> Agent {
+        guard let index = fixedAgents.firstIndex(where: { $0.id == id }) else {
+            throw EngineError.unknownChannel(id)
+        }
+        var agent = fixedAgents[index]
+        if let name = patch.name { agent.name = name }
+        if let label = patch.label { agent.label = label }
+        if let model = patch.model { agent.model = model }
+        fixedAgents[index] = agent
+        return agent
+    }
+
+    public func availableModels() async throws -> [ModelSelection] {
+        [
+            ModelSelection(provider: "Anthropic", model: "Claude Sonnet 4.5", capabilities: ["vision", "tools"]),
+            ModelSelection(provider: "Anthropic", model: "Claude Opus 4.1", capabilities: ["vision", "tools"]),
+            ModelSelection(provider: "OpenAI", model: "gpt-4.1", capabilities: ["vision", "tools"]),
+            ModelSelection(provider: "xAI", model: "grok-4", capabilities: ["tools"]),
+            ModelSelection(provider: "Ollama", model: "llama3.1", capabilities: ["tools"]),
+        ]
+    }
     public func channels() async throws -> [Channel] { fixedChannels }
 
     public func messages(in channel: Channel.ID) async throws -> [Message] {
