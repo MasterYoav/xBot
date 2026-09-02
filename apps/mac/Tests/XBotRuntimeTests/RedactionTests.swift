@@ -102,7 +102,8 @@ struct RedactionTests {
                     gatewayWsURL: "wss://realtime.intelligence.copilotkit.ai",
                     apiKey: "sk-live-abcdefghijklmnopqrstuvwx",
                     licenseToken: "ck_live_9f8e7d6c5b4a39281706"
-                )
+                ),
+                engineToken: "engine-bearer-secret"
             )
         )
         let scrubbed = Redaction.scrub(environment: environment)
@@ -111,7 +112,7 @@ struct RedactionTests {
         #expect(scrubbed["KEY_ENCRYPTION_KEY"] == Redaction.placeholder)
         #expect(scrubbed["INTELLIGENCE_API_KEY"] == Redaction.placeholder)
         #expect(scrubbed["COPILOTKIT_LICENSE_TOKEN"] == Redaction.placeholder)
-        #expect(scrubbed["DATABASE_URL"] == Redaction.placeholder)
+        #expect(scrubbed["XBOT_ENGINE_TOKEN"] == Redaction.placeholder)
         #expect(scrubbed["PORT"] == "49152")
         #expect(scrubbed["OPENBOT_SINGLE_USER"] == "true")
 
