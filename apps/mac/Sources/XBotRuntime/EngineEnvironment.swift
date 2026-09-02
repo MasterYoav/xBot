@@ -18,6 +18,8 @@ public struct EngineEnvironment: Sendable {
         public var auditRetentionDays: Int?
         /// Off unless the user asked in Advanced. See the warning below.
         public var allowPrivateHosts: Bool
+        /// Bearer token the engine requires when xBot owns the deployment.
+        public var engineToken: String?
 
         public init(
             port: UInt16,
@@ -27,7 +29,8 @@ public struct EngineEnvironment: Sendable {
             intelligence: Intelligence? = nil,
             maxBrowsers: Int = 1,
             auditRetentionDays: Int? = nil,
-            allowPrivateHosts: Bool = false
+            allowPrivateHosts: Bool = false,
+            engineToken: String? = nil
         ) {
             self.port = port
             self.keyEncryptionKey = keyEncryptionKey
@@ -37,6 +40,7 @@ public struct EngineEnvironment: Sendable {
             self.maxBrowsers = maxBrowsers
             self.auditRetentionDays = auditRetentionDays
             self.allowPrivateHosts = allowPrivateHosts
+            self.engineToken = engineToken
         }
     }
 
@@ -118,6 +122,10 @@ public struct EngineEnvironment: Sendable {
             environment["AGENT_COMPUTER_ALLOW_PRIVATE_HOSTS"] = "true"
         }
 
+        if let engineToken = inputs.engineToken {
+            environment["XBOT_ENGINE_TOKEN"] = engineToken
+        }
+
         return environment
     }
 
@@ -127,6 +135,7 @@ public struct EngineEnvironment: Sendable {
         "INTELLIGENCE_API_KEY",
         "COPILOTKIT_LICENSE_TOKEN",
         "DATABASE_URL",
+        "XBOT_ENGINE_TOKEN",
         "COMPUTER_TOKEN",
         "SUPERVISOR_TOKEN",
         "AGENT_TOOL_TOKEN",

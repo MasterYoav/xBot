@@ -12,6 +12,8 @@ import {
   recordAuditEvent,
 } from "./audit";
 import { createDevRequireUser } from "./auth/dev-actor";
+import { xbotBearerAuth } from "./xbot/bearer-auth";
+import { xbotHealthPayload } from "./xbot/health";
 import {
   type AppVariables,
   type AuthService,
@@ -206,7 +208,15 @@ export function createApp(
 ) {
   const app = new Hono<{ Variables: AppVariables }>();
 
-  app.get("/health", (context) => context.json({ status: "ok" }));
+  if (config.xbotEngineToken) {
+    app.use("*", xbotBearerAuth(config.xbotEngineToken));
+  }
+
+  app.get("/health", (context) =>
+    context.json(
+      config.xbotEngineToken ? xbotHealthPayload() : { status: "ok" },
+    ),
+  );
   // Projected, never the raw runtime. config.runtime carries the Intelligence contract, including
   // INTELLIGENCE_API_KEY and the licence token, and this endpoint is reachable by anyone. Returning
   // the object wholesale would serve deployment secrets to the browser. Add fields here explicitly.

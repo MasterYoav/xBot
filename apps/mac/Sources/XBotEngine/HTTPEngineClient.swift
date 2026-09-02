@@ -33,6 +33,7 @@ public actor HTTPEngineClient: EngineClient {
             let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return false }
         return object["status"] as? String == "ok"
+            && object["product"] as? String == "xBot"
     }
 
     // MARK: - REST

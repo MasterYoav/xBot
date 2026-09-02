@@ -265,6 +265,25 @@ struct HTTPEngineClientTests {
         #expect(thrown == .unknownChannel("channel-1"))
     }
 
+    // MARK: - health
+
+    @Test func healthRequiresTheXBotProductField() async {
+        let host = "stub-\(UUID().uuidString).test"
+        StubURLProtocol.register(
+            .init(body: Self.json(["status": "ok", "product": "xBot"])),
+            forHost: host,
+            path: "/health"
+        )
+        #expect(await client(host: host).isHealthy())
+
+        StubURLProtocol.register(
+            .init(body: Self.json(["status": "ok"])),
+            forHost: host,
+            path: "/health"
+        )
+        #expect(await client(host: host).isHealthy() == false)
+    }
+
     // MARK: - fixtures
 
     private static func json(_ object: [String: Any]) -> Data {

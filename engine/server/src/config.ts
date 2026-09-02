@@ -287,6 +287,11 @@ export type DeploymentConfig = {
    * door for them standing open.
    */
   workerSharedSecret?: string;
+  /**
+   * Bearer token the Mac app sends on every request. Generated on first run, held in the Keychain,
+   * passed into the container at start. Absent in upstream deployments and in dev without xBot.
+   */
+  xbotEngineToken?: string;
 };
 
 type Environment = Record<string, string | undefined>;
@@ -916,5 +921,10 @@ export function loadConfig(
       ? { agentToolToken: optional(environment, "AGENT_TOOL_TOKEN") as string }
       : {}),
     ...(workerSharedSecret ? { workerSharedSecret } : {}),
+    ...(optional(environment, "XBOT_ENGINE_TOKEN")
+      ? {
+          xbotEngineToken: optional(environment, "XBOT_ENGINE_TOKEN") as string,
+        }
+      : {}),
   };
 }

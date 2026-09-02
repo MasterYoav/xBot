@@ -114,6 +114,12 @@ struct EngineEnvironmentTests {
         #expect(EngineEnvironment.compose(inputs())["AUDIT_RETENTION_DAYS"] == nil)
     }
 
+    @Test func engineTokenIsPassedThroughWhenPresent() {
+        var draft = inputs()
+        draft.engineToken = "test-token"
+        #expect(EngineEnvironment.compose(draft)["XBOT_ENGINE_TOKEN"] == "test-token")
+    }
+
     @Test(arguments: [
         (UInt64(8) * 1_073_741_824, 1),
         (UInt64(16) * 1_073_741_824, 2),
