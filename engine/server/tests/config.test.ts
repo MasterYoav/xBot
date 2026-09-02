@@ -89,9 +89,10 @@ describe("deployment configuration", () => {
     expect(config.auth).toBeUndefined();
   });
 
-  // The product does not have a mode without Intelligence, so each of these is a refusal to boot
-  // rather than a degraded capability. Named individually because a deployment that sets three of
-  // four is the likeliest real mistake, and the message has to say which one is missing.
+  // A PARTIAL set is still a refusal to boot. xBot added a second mode — history in this
+  // deployment's own database (ADR-0001) — but that is what NONE of the four means, not what three
+  // of four means. Named individually because three of four is the likeliest real mistake, and the
+  // message has to say which one is missing.
   test.each([
     "INTELLIGENCE_API_URL",
     "INTELLIGENCE_GATEWAY_WS_URL",
@@ -104,19 +105,35 @@ describe("deployment configuration", () => {
     delete environment[name];
 
     expect(() => loadConfig(environment)).toThrow(
-      `CopilotKit Intelligence is required and is not configured. Missing: ${name}`,
+      `CopilotKit Intelligence is partly configured, which is neither of the two things this deployment can do.`,
     );
+    expect(() => loadConfig(environment)).toThrow(`Missing: ${name}`);
   });
 
-  test("refuses to start when Intelligence is absent entirely, rather than degrading", () => {
-    expect(() =>
-      loadConfig({
-        DATABASE_URL: baseEnvironment.DATABASE_URL,
-        KEY_ENCRYPTION_KEY: baseEnvironment.KEY_ENCRYPTION_KEY,
-        MANAGED_AGENT_AG_UI_URL: baseEnvironment.MANAGED_AGENT_AG_UI_URL,
-        MANAGED_AGENT_TOKEN: baseEnvironment.MANAGED_AGENT_TOKEN,
-      }),
-    ).toThrow("CopilotKit Intelligence is required and is not configured");
+  // THIS IS THE ONE THAT FLIPPED. Upstream refuses to boot here; xBot boots into local mode,
+  // which is the whole of ADR-0001 expressed as one assertion. Absent entirely is now a choice —
+  // and the default one — rather than a misconfiguration.
+  test("runs on local history when Intelligence is absent entirely", () => {
+    const config = loadConfig({
+      DATABASE_URL: baseEnvironment.DATABASE_URL,
+      KEY_ENCRYPTION_KEY: baseEnvironment.KEY_ENCRYPTION_KEY,
+      MANAGED_AGENT_AG_UI_URL: baseEnvironment.MANAGED_AGENT_AG_UI_URL,
+      MANAGED_AGENT_TOKEN: baseEnvironment.MANAGED_AGENT_TOKEN,
+      // An independent gate, and it fires whether or not Intelligence is configured. It only
+      // looks new here because the old version of this test expected a throw and got the
+      // Intelligence one first; with that gone, this is the next thing loadConfig insists on.
+      OPENBOT_SINGLE_USER: "true",
+    });
+
+    expect(config.runtime.mode).toBe("local");
+    // Local, not absent: the deployment still remembers, it just remembers for itself.
+    expect(config.runtime.durableHistory).toBe(true);
+  });
+
+  test("still uses Intelligence when all four are set", () => {
+    const config = loadConfig(baseEnvironment);
+
+    expect(config.runtime.mode).toBe("intelligence");
   });
 
   test("rejects incomplete OAuth client configuration", () => {

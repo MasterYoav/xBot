@@ -7,6 +7,7 @@ import {
   CopilotRuntime,
 } from "@copilotkit/runtime/v2";
 import { createCopilotHonoHandler } from "@copilotkit/runtime/v2/hono";
+import { createLocalIntelligence } from "./history/local-intelligence";
 import type { Observable } from "rxjs";
 import { defer, from, switchMap } from "rxjs";
 import { z } from "zod";
@@ -1024,7 +1025,7 @@ export function mountCopilotRuntime(
    */
   onRunBusy?: (input: { threadId: string; busy: boolean }) => void,
 ) {
-  const { intelligence } = config.runtime;
+  const capabilities = config.runtime;
 
   /**
    * The same Bot a person's run would get, built without a request.
@@ -1073,11 +1074,16 @@ export function mountCopilotRuntime(
    * One client, used by the runtime and by anything reading a thread beside it, so a hop reads the
    * history a person's run would read rather than a second view of it that could disagree.
    */
-  const intelligenceClient = new IntelligenceKnowingANewThread({
-    apiUrl: intelligence.apiUrl,
-    wsUrl: intelligence.gatewayWsUrl,
-    apiKey: intelligence.apiKey,
-  });
+  const intelligenceClient =
+    capabilities.mode === "intelligence"
+      ? new IntelligenceKnowingANewThread({
+          apiUrl: capabilities.intelligence.apiUrl,
+          wsUrl: capabilities.intelligence.gatewayWsUrl,
+          apiKey: capabilities.intelligence.apiKey,
+        })
+      : createLocalIntelligence({
+          selfUrl: config.appUrl ?? "http://127.0.0.1:3001",
+        });
 
   const runtime = new CopilotRuntime({
     // `mode` is inferred from the presence of `intelligence`; passing it is a type error.
@@ -1089,7 +1095,12 @@ export function mountCopilotRuntime(
     // The subclass, not the base: a thread nobody has run yet reads as empty rather than as a 500.
     // See IntelligenceKnowingANewThread.
     intelligence: intelligenceClient,
-    licenseToken: intelligence.licenseToken,
+    // Telemetry only: the runtime stores it and derives a telemetry id from it, and validates
+    // nothing. A local deployment is not a licensed user of Intelligence and sends none.
+    licenseToken:
+      capabilities.mode === "intelligence"
+        ? capabilities.intelligence.licenseToken
+        : undefined,
     // Carried on the events the runtime already sends, so OpenBot's traffic is separable from any
     // other deployment's. Adds no events of its own.
     ...(config.accessibility

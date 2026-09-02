@@ -7,11 +7,18 @@ import { singleUserEnabled } from "./auth/dev-actor";
 import type { ActionPolicy } from "./computer/policy";
 import { parseActionPolicy } from "./computer/policy-store";
 
-export type RuntimeCapabilities = {
-  mode: "intelligence";
-  durableHistory: true;
-  intelligence: IntelligenceSettings;
-};
+export type RuntimeCapabilities =
+  | {
+      mode: "intelligence";
+      durableHistory: true;
+      intelligence: IntelligenceSettings;
+    }
+  /**
+   * Threads and memory in this deployment's own database. The xBot default (ADR-0001).
+   *
+   * `durableHistory` is still true: it says the deployment remembers, not who remembers for it.
+   */
+  | { mode: "local"; durableHistory: true };
 
 /** The Intelligence contract. Every field is required; see runtimeCapabilities. */
 export type IntelligenceSettings = {
@@ -556,11 +563,17 @@ function oktaAuth(
 }
 
 /**
- * Resolve the Intelligence contract, or refuse to start.
+ * Resolve where durable history lives: this deployment's own database, or Intelligence.
  *
- * All four values are required together. A partial set is the more dangerous shape than none at all:
- * it means somebody intended to configure Intelligence and got it wrong, so failing on the partial
- * set alone (as this did) let a completely unconfigured deployment through as if that were a choice.
+ * Upstream refuses to start unless all four Intelligence values are set, because Intelligence owns
+ * threads and memory there and a deployment without it forgets every conversation. xBot has a
+ * second answer to that — a local provider — so the absence of all four is now a choice rather
+ * than a misconfiguration, and it is the default one. See ADR-0001.
+ *
+ * A PARTIAL SET STILL THROWS, and for upstream's original reason, which local mode does not
+ * weaken: somebody who set two of the four intended Intelligence and got it wrong, and silently
+ * putting their conversations in a local database instead would answer a mistake with a different
+ * deployment than the one they asked for. All four, or none.
  */
 function runtimeCapabilities(environment: Environment): RuntimeCapabilities {
   const settings = {
@@ -579,9 +592,13 @@ function runtimeCapabilities(environment: Environment): RuntimeCapabilities {
     .filter(([, value]) => !value)
     .map(([name]) => name);
 
+  if (missing.length === 4) {
+    return { mode: "local", durableHistory: true };
+  }
+
   if (missing.length > 0) {
     throw new Error(
-      `CopilotKit Intelligence is required and is not configured. Missing: ${missing.join(", ")}`,
+      `CopilotKit Intelligence is partly configured, which is neither of the two things this deployment can do. Set all of INTELLIGENCE_API_URL, INTELLIGENCE_GATEWAY_WS_URL, INTELLIGENCE_API_KEY and COPILOTKIT_LICENSE_TOKEN to use Intelligence, or none of them to keep history in this deployment's own database. Missing: ${missing.join(", ")}`,
     );
   }
 

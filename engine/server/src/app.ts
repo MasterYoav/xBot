@@ -36,6 +36,7 @@ import { createComputerRoutes } from "./computer/routes";
 import { configuredAuthProviders, type DeploymentConfig } from "./config";
 import type { CredentialAdminService, CredentialInput } from "./credentials";
 import { createIntelligenceClient } from "./intelligence-client";
+import { createLocalIntelligence } from "./history/local-intelligence";
 import type { OnboardingStore } from "./people/onboarding";
 import type { PeopleStore } from "./people/store";
 import { createPluginRoutes } from "./plugins/routes";
@@ -1052,13 +1053,17 @@ export function createApp(
       createThreadRoutes(
         threadIdentity,
         requireUser,
-        // config.ts refuses to boot without the full Intelligence contract (see copilot.ts's
-        // header comment), so `config.runtime.intelligence` is never missing here. Built from it
-        // rather than assumed, though: this is the one place besides the runtime mount itself that
-        // needs to reach Intelligence, and it should keep working unmodified if that guarantee ever
-        // loosens and a deployment can legitimately have no reader to build.
+        // The guarantee this comment used to rest on has loosened, exactly as it anticipated:
+        // config.ts no longer refuses to boot without the Intelligence contract, because a local
+        // deployment legitimately has none (ADR-0001). `createThreadReader` is duck-typed on a
+        // single `getThread` method rather than on the vendor class, so it takes whichever client
+        // this deployment has without knowing which one that is.
         createThreadReader(
-          createIntelligenceClient(config.runtime.intelligence),
+          config.runtime.mode === "intelligence"
+            ? createIntelligenceClient(config.runtime.intelligence)
+            : createLocalIntelligence({
+                selfUrl: config.appUrl ?? "http://127.0.0.1:3001",
+              }),
         ),
       ),
     );
