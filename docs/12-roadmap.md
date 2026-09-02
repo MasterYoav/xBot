@@ -149,13 +149,13 @@ present.
 
 The two halves meet. As of this writing the **client half is in**: the app owns `RuntimeController`,
 swaps `UnavailableEngineClient` for `HTTPEngineClient` when the runtime reports `.running`, creates
-agents from the palette, streams turns, and takes/releases the browser. What is not in is a
-published `xbot/engine` image — without it Start walks the real state machine and stops at a
-sentence-bearing `.failed`, which is correct rather than a fake success.
+agents from the palette, streams turns, and takes/releases the browser. A dev-built `xbot/engine:1`
+(`scripts/build-engine-image.sh`) unblocks local testing; the published digest manifest is still
+the ship criterion.
 
 **Still to close this milestone against a live container:**
 
-- App drives a real engine end to end (needs M3's image).
+- App drives a real engine end to end (dev image + `XBOT_USE_RUNTIME=1`; first boot ~2 min for Postgres).
 - Live streaming into the conversation (client ready; needs a running engine).
 - Live screen from the polled screenshot endpoint (client ready; needs a computer).
 - Handover: take control, release control (client ready; needs a computer).
