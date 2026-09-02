@@ -152,8 +152,9 @@ Key mappings from upstream's `.env` surface:
 
 | Upstream setting | xBot source |
 | --- | --- |
-| `DATABASE_URL` | Generated. Embedded Postgres, loopback |
+| `DATABASE_URL` | **Not passed from the app.** Embedded Postgres generates a password on first boot and writes the URL into the container's own environment |
 | `EMBEDDED_POSTGRES` | `on` in v1 |
+| `XBOT_ENGINE_TOKEN` | Generated on first run → **Keychain**. Required on every request except `/health` |
 | `KEY_ENCRYPTION_KEY` | Generated on first run → **Keychain**. Upstream's example key is public and refused in production; we generate |
 | `PORT` / `SERVER_PORT` | Negotiated. Both set to the same value — upstream refuses to start if they disagree |
 | `OPENBOT_SINGLE_USER` | `true`. Plus our bearer token — see [10-security.md](10-security.md) |
