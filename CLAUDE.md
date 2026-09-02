@@ -150,12 +150,16 @@ model per agent, from a settings pane, and expect it to take effect on the next 
 Use `superpowers:verification-before-completion`. Concretely:
 
 ```sh
-# Engine
-cd engine && bun run format:check && bun run lint && bun run typecheck && bun run test
+# Engine. The suite needs a real pgvector database; dev-db.sh starts one on 55432,
+# because a Homebrew Postgres usually already owns 5432 and the engine then connects
+# to the wrong database. Use test:ci, not test — it enforces a test-count floor, so an
+# import-time failure that skips a whole file cannot pass as green.
+eval "$(scripts/dev-db.sh)"
+cd engine && bun run format:check && bun run lint && bun run typecheck && bun run test:ci
 
 # Mac app
 cd apps/mac && swift build && swift test
-xcodebuild -scheme XBot -destination 'platform=macOS' test
+xcodebuild -scheme XBot -destination 'platform=macOS' test   # from M4, once the Xcode target exists
 ```
 
 **Never say "done", "fixed", or "passing" without having run the command and read the output.**
