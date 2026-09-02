@@ -35,7 +35,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "XBotApp",
-            dependencies: ["XBotUI", "XBotCore", "XBotOnboarding"],
+            dependencies: ["XBotUI", "XBotCore", "XBotOnboarding", "XBotRuntime"],
             swiftSettings: strict
         ),
 

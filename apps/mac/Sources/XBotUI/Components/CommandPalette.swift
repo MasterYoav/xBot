@@ -2,7 +2,7 @@ import SwiftUI
 import XBotCore
 import XBotEngine
 
-/// ⌘K. Fuzzy search over name and label; ⏎ opens.
+/// ⌘K. Fuzzy search over name and label; ⏎ opens; the first row always creates.
 ///
 /// The footer states the verbs, because a keyboard affordance nobody knows about does not exist.
 public struct CommandPalette: View {
@@ -31,10 +31,12 @@ public struct CommandPalette: View {
                     .bodyText()
                     .focused($focused)
                     .padding(Space.m)
-                    .onSubmit(open)
+                    .onSubmit(commit)
                     .onChange(of: query) { highlighted = 0 }
 
                 Divider().overlay(Palette.separator)
+
+                createRow
 
                 ForEach(Array(matches.enumerated()), id: \.element.id) { index, agent in
                     HStack(spacing: Space.s) {
@@ -47,19 +49,19 @@ public struct CommandPalette: View {
                                 .lineLimit(1)
                         }
                         Spacer()
-                        if index < 9 {
-                            Text("⌘\(index + 1)")
+                        if index < 8 {
+                            Text("⌘\(index + 2)")
                                 .captionText()
                                 .foregroundStyle(Palette.textTertiary)
                         }
                     }
                     .padding(.horizontal, Space.m)
                     .padding(.vertical, Space.s)
-                    .background(index == highlighted ? Palette.elevatedSurface : .clear)
+                    .background(index + 1 == highlighted ? Palette.elevatedSurface : .clear)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        highlighted = index
-                        open()
+                        highlighted = index + 1
+                        commit()
                     }
                 }
 
@@ -86,6 +88,36 @@ public struct CommandPalette: View {
         .onExitCommand { isOpen = false }
     }
 
+    private var createRow: some View {
+        HStack(spacing: Space.s) {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Palette.textSecondary)
+                .frame(width: 22, height: 22)
+            Text(createTitle).bodyText()
+            Spacer()
+            Text("⌘1")
+                .captionText()
+                .foregroundStyle(Palette.textTertiary)
+        }
+        .padding(.horizontal, Space.m)
+        .padding(.vertical, Space.s)
+        .background(highlighted == 0 ? Palette.elevatedSurface : .clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            highlighted = 0
+            commit()
+        }
+    }
+
+    private var createTitle: String {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return String(localized: "Create new agent")
+        }
+        return String(localized: "Create “\(trimmed)”")
+    }
+
     private var matches: [Agent] {
         guard !query.isEmpty else { return state.agents }
         let needle = query.lowercased()
@@ -94,9 +126,14 @@ public struct CommandPalette: View {
         }
     }
 
-    private func open() {
-        guard highlighted < matches.count else { return }
-        state.select(matches[highlighted].id)
+    private func commit() {
+        if highlighted == 0 {
+            state.createAgent(named: query)
+        } else {
+            let index = highlighted - 1
+            guard index < matches.count else { return }
+            state.select(matches[index].id)
+        }
         isOpen = false
     }
 }

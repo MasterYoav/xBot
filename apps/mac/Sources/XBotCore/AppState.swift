@@ -1,5 +1,6 @@
 import Foundation
 import XBotEngine
+import XBotRuntime
 
 /// What the whole app reads from, and sends intents to.
 ///
@@ -14,7 +15,14 @@ import XBotEngine
 @Observable
 @MainActor
 public final class AppState {
-    private let engine: any EngineClient
+    private var engine: any EngineClient
+
+    /// Set only when `AppState` owns the engine's lifecycle rather than being handed a fixed
+    /// client. Nil for `StubEngineClient` and for tests that construct `AppState(engine:)` directly.
+    private let runtime: RuntimeController?
+    private let environmentFactory: (@Sendable (UInt16, String) -> [String: String])?
+    private let engineFactory: (@Sendable (EngineEndpoint) -> any EngineClient)?
+    private var runtimeObservation: Task<Void, Never>?
 
     public private(set) var agents: [Agent] = []
     public private(set) var channels: [Channel] = []
@@ -97,8 +105,38 @@ public final class AppState {
     /// True while a turn is in flight, which is what makes the screen poll fast.
     private var isTurnRunning = false
 
+    /// The agent currently answering, if any. The rail draws its working ring from this.
+    public var workingAgentID: Agent.ID? {
+        isTurnRunning ? selectedAgentID : nil
+    }
+
     public init(engine: any EngineClient) {
         self.engine = engine
+        self.runtime = nil
+        self.environmentFactory = nil
+        self.engineFactory = nil
+    }
+
+    /// The app's real path: `AppState` owns nothing about *how* the engine runs, only that it
+    /// watches `runtime` and swaps in a live client the moment one is reachable.
+    ///
+    /// `engine` starts as `UnavailableEngineClient()` — not an optional — so every existing call
+    /// site keeps working unchanged whether the engine has never started, just stopped, or is
+    /// running for real. `environment` is `RuntimeController.start(environment:)`'s own closure
+    /// shape, kept at the call site rather than assembled here: building an `EngineEnvironment`
+    /// needs a key-encryption key, and that is a security decision this type should not be the one
+    /// making.
+    public init(
+        runtime: RuntimeController,
+        environment: @escaping @Sendable (UInt16, String) -> [String: String],
+        engineFactory: @escaping @Sendable (EngineEndpoint) -> any EngineClient = {
+            HTTPEngineClient(baseURL: $0.baseURL)
+        }
+    ) {
+        self.engine = UnavailableEngineClient()
+        self.runtime = runtime
+        self.environmentFactory = environment
+        self.engineFactory = engineFactory
     }
 
     public var selectedAgent: Agent? {
@@ -111,7 +149,26 @@ public final class AppState {
     }
 
     public func load() async {
-        status = .startingUp
+        guard let runtime else {
+            status = .startingUp
+            await refreshFromEngine()
+            return
+        }
+        // Applied directly, before subscribing — not left to the background observation task's
+        // first event. `Task { for await event in await runtime.events { ... } }` starting is not
+        // ordered against `load()` returning, and a caller that reads `composerBlock` the instant
+        // `load()` completes (every test in RuntimeConnectedTests does exactly that) would see it
+        // one event behind. `observeRuntime()` still re-applies this same state as its own first
+        // event when it subscribes; that is redundant, not wrong.
+        _ = await runtime.detect()
+        await apply(await runtime.state)
+        observeRuntime()
+    }
+
+    /// Agents, channels, the current conversation, and the model list — the one thing `load()`
+    /// and a fresh `.running` transition both need, so they say so identically rather than by
+    /// agreement between two separate copies of the same five calls.
+    private func refreshFromEngine() async {
         do {
             agents = try await engine.agents()
             channels = try await engine.channels()
@@ -125,6 +182,86 @@ public final class AppState {
             // says so. Never an empty state that implies there is simply nothing here.
             status = .reconnecting
             composerBlock = .engineNotRunning
+        }
+    }
+
+    /// Start watching the runtime's state machine, once. Every state it can report already has a
+    /// UI representation (docs/07-container-runtime.md) — this is only the translation into what
+    /// `Conversation` and `Composer` already know how to render.
+    private func observeRuntime() {
+        guard runtimeObservation == nil, let runtime else { return }
+        runtimeObservation = Task { [weak self] in
+            for await event in await runtime.events {
+                guard case .stateChanged(let runtimeState) = event else { continue }
+                guard let self else { return }
+                await self.apply(runtimeState)
+            }
+        }
+    }
+
+    private func apply(_ runtimeState: RuntimeState) async {
+        switch runtimeState {
+        case .notDetected, .stopped, .failed:
+            // Not detected, stopped, and failed all read the same to the composer: there is no
+            // engine to talk to, and the one thing to do about it is press Start. A more specific
+            // sentence per case (docs/12-roadmap.md leaves this as later work) needs a
+            // `ComposerBlock` case each, not a bigger switch here.
+            engine = UnavailableEngineClient()
+            composerBlock = .engineNotRunning
+            status = nil
+        case .pulling, .starting:
+            status = .startingUp
+        case .running(let endpoint):
+            guard let engineFactory else { return }
+            engine = engineFactory(endpoint)
+            composerBlock = nil
+            await refreshFromEngine()
+        case .degraded:
+            // The conversation stays readable and usable — docs/09-ui-spec.md is explicit that a
+            // health blip must not yank away what is already loaded.
+            status = .reconnecting
+        }
+    }
+
+    /// Bring the engine up. A no-op without a runtime to ask — `AppState(engine:)` has none, and
+    /// its composer is never in the `.engineNotRunning` state that would call this anyway.
+    public func startEngine() {
+        guard let runtime, let environmentFactory else { return }
+        Task { await runtime.start(environment: environmentFactory) }
+    }
+
+    /// What the composer's inline action button does, keyed by the same reason that put it there.
+    public func handleComposerBlockAction() {
+        switch composerBlock {
+        case .engineNotRunning:
+            startEngine()
+        case .humanHoldsControl:
+            setControl(.agent)
+        case .noModelConnected, nil:
+            // Settings isn't a scene yet (M6/M7) — there is nowhere to send this tap.
+            break
+        }
+    }
+
+    /// Create an agent and open it. Optimistic on the rail: the row exists before the channel
+    /// round-trip finishes, so the fill never waits on a second request.
+    public func createAgent(named name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let draft = AgentDraft(
+            name: trimmed.isEmpty ? String(localized: "New agent") : trimmed,
+            label: ""
+        )
+        Task { [engine] in
+            guard let agent = try? await engine.createAgent(draft) else { return }
+            agents.append(agent)
+            select(agent.id)
+            if let channel = try? await engine.createChannel(agentIds: [agent.id]) {
+                channels.append(channel)
+                if selectedAgentID == agent.id {
+                    await loadMessages()
+                    await loadPanel()
+                }
+            }
         }
     }
 
@@ -182,13 +319,22 @@ public final class AppState {
     /// is exactly the latency the design system opens by forbidding.
     public func setControl(_ next: ScreenControl) {
         let previous = control
+        let previousBlock = composerBlock
         control = next
+        // Holding the browser is a composer-level reason, not a toast: the field sits where
+        // the user is looking, and "Give it back" is the one action that unblocks it.
+        if next == .human {
+            composerBlock = .humanHoldsControl
+        } else if composerBlock == .humanHoldsControl {
+            composerBlock = nil
+        }
         Task { [engine, selectedAgentID] in
             guard let agent = selectedAgentID else { return }
             do {
                 try await engine.setControl(next, for: agent)
             } catch {
                 control = previous
+                composerBlock = previousBlock
             }
         }
     }

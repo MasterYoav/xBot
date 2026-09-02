@@ -11,6 +11,14 @@ public protocol EngineClient: Sendable {
     func channels() async throws -> [Channel]
     func messages(in channel: Channel.ID) async throws -> [Message]
 
+    /// Make a new agent. The conversation that belongs to it is a separate `createChannel` —
+    /// upstream stores them as two rows, and collapsing that here would hide a 201 that then
+    /// left the rail pointing at an agent nobody can talk to.
+    func createAgent(_ draft: AgentDraft) async throws -> Agent
+
+    /// Open a conversation that includes these agents. v1 always passes one.
+    func createChannel(agentIds: [Agent.ID]) async throws -> Channel
+
     /// Send, and stream the turn back.
     ///
     /// The stream is the heart of the app. It must be incremental, must survive a truncated
@@ -41,6 +49,17 @@ public protocol EngineClient: Sendable {
     func availableModels() async throws -> [ModelSelection]
 }
 
+/// What creating an agent needs. The rest of the row is generated — avatar seed, id, defaults.
+public struct AgentDraft: Sendable, Hashable {
+    public var name: String
+    public var label: String
+
+    public init(name: String, label: String = "") {
+        self.name = name
+        self.label = label
+    }
+}
+
 /// A partial change to an agent. Only what was edited travels.
 public struct AgentPatch: Sendable, Hashable {
     public var name: String?
@@ -54,7 +73,10 @@ public struct AgentPatch: Sendable, Hashable {
     }
 }
 
-public enum EngineError: Error, Sendable {
+public enum EngineError: Error, Sendable, Equatable {
     case notRunning
     case unknownChannel(Channel.ID)
+    /// The run endpoint answered, but not with a stream. Carries the status so the message
+    /// can say whether this was auth, a bad request, or the engine falling over.
+    case streamRejected(status: Int)
 }

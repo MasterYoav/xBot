@@ -13,7 +13,7 @@ public struct MainWindow: View {
             let panelIsOverlay = geometry.size.width < Metrics.panelCollapsesBelow
 
             HStack(spacing: 0) {
-                Rail()
+                Rail(isPaletteOpen: $isPaletteOpen)
                 Conversation()
                     .overlay(alignment: .topTrailing) { panelToggle }
 

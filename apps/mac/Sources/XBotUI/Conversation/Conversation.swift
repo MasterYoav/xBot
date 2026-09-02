@@ -93,6 +93,11 @@ public struct Conversation: View {
                 .captionText()
                 .foregroundStyle(Palette.textSecondary)
                 .multilineTextAlignment(.center)
+            if let action = emptyAction {
+                Button(action.title, action: action.run)
+                    .buttonStyle(.link)
+                    .font(Typography.caption)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Space.xxl)
@@ -102,6 +107,9 @@ public struct Conversation: View {
         if state.composerBlock == .engineNotRunning {
             return String(localized: "The engine isn't running")
         }
+        if state.agents.isEmpty {
+            return String(localized: "Create your first agent")
+        }
         return String(localized: "Say something to \(state.selectedAgent?.name ?? "your agent")")
     }
 
@@ -109,14 +117,28 @@ public struct Conversation: View {
         if state.composerBlock == .engineNotRunning {
             return String(localized: "Start it to pick up where you left off.")
         }
+        if state.agents.isEmpty {
+            return String(localized: "It will have a browser, files, and a shell — and only the tools you grant it.")
+        }
         return String(localized: "It has a browser, files, and a shell — and only the tools you grant it.")
+    }
+
+    private var emptyAction: (title: String, run: () -> Void)? {
+        if state.composerBlock == .engineNotRunning {
+            return (String(localized: "Start"), { state.handleComposerBlockAction() })
+        }
+        if state.agents.isEmpty {
+            return (String(localized: "Create"), { state.createAgent(named: "") })
+        }
+        return nil
     }
 
     private var composer: some View {
         Composer(
             agentName: state.selectedAgent?.name ?? String(localized: "your agent"),
             block: state.composerBlock,
-            onSend: { state.send($0) }
+            onSend: { state.send($0) },
+            onBlockAction: { state.handleComposerBlockAction() }
         )
         .padding(.horizontal, Space.xl)
         .padding(.vertical, Space.m)

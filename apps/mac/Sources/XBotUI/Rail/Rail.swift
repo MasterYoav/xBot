@@ -4,15 +4,19 @@ import XBotCore
 /// The 68pt vertical rail. Structural, so it takes the heaviest material.
 public struct Rail: View {
     @Environment(AppState.self) private var state
+    @Binding private var isPaletteOpen: Bool
 
-    public init() {}
+    public init(isPaletteOpen: Binding<Bool>) {
+        self._isPaletteOpen = isPaletteOpen
+    }
 
     public var body: some View {
         VStack(spacing: Space.s) {
             ForEach(state.agents) { agent in
                 RailItem(
                     agent: agent,
-                    isSelected: agent.id == state.selectedAgentID
+                    isSelected: agent.id == state.selectedAgentID,
+                    activity: agent.id == state.workingAgentID ? .working : .idle
                 ) {
                     // Selection is applied on the intent, not after the conversation loads. The
                     // fill must never wait on a request.
@@ -21,6 +25,7 @@ public struct Rail: View {
             }
 
             Button {
+                isPaletteOpen = true
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 15, weight: .medium))

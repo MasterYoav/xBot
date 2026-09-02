@@ -10,7 +10,7 @@ import Foundation
 public actor StubEngineClient: EngineClient {
     private var messagesByChannel: [Channel.ID: [Message]]
     private var fixedAgents: [Agent]
-    private let fixedChannels: [Channel]
+    private var fixedChannels: [Channel]
     private var control: ScreenControl = .agent
 
     /// How long a stubbed token takes to arrive.
@@ -86,6 +86,25 @@ public actor StubEngineClient: EngineClient {
     }
 
     public func agents() async throws -> [Agent] { fixedAgents }
+
+    public func createAgent(_ draft: AgentDraft) async throws -> Agent {
+        let id = "agent-\(UUID().uuidString)"
+        let agent = Agent(
+            id: id,
+            name: draft.name,
+            label: draft.label,
+            avatarSeed: id
+        )
+        fixedAgents.append(agent)
+        return agent
+    }
+
+    public func createChannel(agentIds: [Agent.ID]) async throws -> Channel {
+        let channel = Channel(id: "channel-\(UUID().uuidString)", agentIds: agentIds)
+        fixedChannels.append(channel)
+        messagesByChannel[channel.id] = []
+        return channel
+    }
 
     public func activity(for agent: Agent.ID) async throws -> [ActivityEntry] {
         guard agent == "orchestrator" else { return [] }
