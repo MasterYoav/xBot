@@ -46,6 +46,26 @@ path never mentions containers. The Advanced section never hides them.
 This is the product. Everything else in this repository is in service of it. When a design decision
 is close, the tiebreak is whichever option keeps this promise intact.
 
+### What the promise does not cover in v1
+
+An earlier version of this document also promised *"no account"* and *"nothing leaves your machine
+except the calls you choose."* **Neither holds in v1**, and they are corrected here rather than
+quietly reinterpreted. See [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md).
+
+v1 runs on CopilotKit Intelligence for durable threads and memory, which means:
+
+- **Onboarding asks for a CopilotKit key**, entered in the app. No terminal, no CLI — the central
+  promise survives — but it is an account, and calling it anything else would be dishonest.
+- **Conversation history transits and rests on CopilotKit's infrastructure.** Model calls were
+  always outbound. This is different in kind, because it is the transcript rather than the request.
+
+**Onboarding says this in one sentence, before the user types a key.** Not in a privacy policy,
+not afterwards. An app that sells local control cannot be vague about the part that is not local.
+
+The engine already boots without it — the seam is built and measured — so this is a v1 sequencing
+decision, not a permanent shape. Everything else on this page is unchanged: the agents, their
+computers, their browsers, their files, and the model keys are all yours and all local.
+
 Concretely, that means the app owns:
 
 - Detecting whether a container runtime is present, and installing or guiding installation if not.
@@ -62,8 +82,9 @@ it to us. They are never asked to read it.
 
 ## What xBot is not
 
-**Not a hosted service.** There is no xbot.com you sign into. There is no account. Your
-conversations are in a Postgres database on your Mac.
+**Not a hosted service.** There is no xbot.com you sign into, no xBot account, and no subscription
+to us. The engine, the agents, the browsers and the files are on your Mac. In v1 the conversation
+transcript is the exception, and it is named as one above.
 
 **Not a model provider.** xBot ships no intelligence of its own. You supply keys, or you run
 Ollama and supply nothing. This is what makes "every AI" honest rather than a marketing line — we
@@ -100,10 +121,12 @@ is genuinely local and genuinely model-agnostic.
 
 Recorded here rather than discovered in month four.
 
-**⚠️ The engine has a hard cloud dependency we have to remove.** OpenBot's server refuses to start
-without CopilotKit Intelligence, a hosted service that owns threads and memory. This is the single
-largest piece of engineering in the fork. See
-[ADR-0001](decisions/0001-local-history-provider.md).
+**⚠️ The engine has a cloud dependency we are living with in v1.** OpenBot's server refuses to
+start without CopilotKit Intelligence unless the seam described in
+[ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) is used. It is built and the engine
+has been run without an account — but v1 ships on Intelligence, so a third party can change its
+free tier and affect the product. The seam is what keeps that from being fatal rather than
+inconvenient. [ADR-0001](decisions/0001-local-history-provider.md) remains the end state.
 
 **⚠️ Container runtimes on macOS are a licensing and UX minefield.** Docker Desktop requires a paid
 licence above a company-size threshold, is a large install, and is not something we can bundle.
@@ -123,8 +146,12 @@ copy of a security-sensitive codebase within a year.
 
 ## What success looks like
 
-**Milestone-level:** a non-technical person installs xBot, adds an Anthropic key, and has an agent
-book a restaurant in a browser they can watch — with no instruction beyond what is on screen.
+**Milestone-level:** a non-technical person installs xBot, adds their keys, and has an agent book a
+restaurant in a browser they can watch — with no instruction beyond what is on screen.
+
+**The thing being tested is the app, not the engine.** OpenBot already does the hard part; nobody
+outside this repository can currently use it. Success is that the distance between those two
+sentences is closed by a window, an installer, and a first run.
 
 **Product-level:** a developer chooses xBot over running OpenBot directly, because the operational
 surface is not worth owning and the escape hatches are all still there.

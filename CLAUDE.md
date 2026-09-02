@@ -28,7 +28,9 @@ finished. Route it through the app.
 
 ### Non-goals
 
-- No hosted/SaaS version. xBot runs on the user's machine.
+- No hosted/SaaS version of xBot. The app, the engine, the agents and their browsers run on the
+  user's machine. **In v1 the conversation transcript is the exception** — it lives in CopilotKit
+  Intelligence, and onboarding says so before the user types a key. See ADR-0007.
 - No Mac App Store build. See `docs/decisions/0005-distribution-outside-app-store.md`.
 - No Windows or Linux client in v1. The engine is portable; the client is not.
 - No model of our own. xBot supplies no intelligence — the user brings keys or runs Ollama.
@@ -61,24 +63,38 @@ a week.
 
 ---
 
-## Two things about the upstream engine you must internalise
+## Three things about the engine you must internalise
 
-These are the two facts that shape most of the work. Both are documented at length in
-`docs/03-openbot-fork.md`; the summary is here because getting them wrong is expensive.
+These shape most of the work. All are documented at length in `docs/03-openbot-fork.md`; the
+summary is here because getting them wrong is expensive.
 
-### 1. Upstream requires a cloud service. We are removing that.
+### 0. We wrap OpenBot. We do not re-engineer it.
 
-OpenBot's server calls `runtimeCapabilities()` in `server/src/config.ts` and **throws on startup**
-unless all four of `INTELLIGENCE_API_URL`, `INTELLIGENCE_GATEWAY_WS_URL`, `INTELLIGENCE_API_KEY`,
-and `COPILOTKIT_LICENSE_TOKEN` are set. CopilotKit Intelligence is a hosted service that owns
-durable threads and memory. Upstream says plainly: *"There is no degraded mode."*
+**This is the most important line in this file.** Where the engine already does something, your job
+is to surface it well. Before writing anything into `engine/`, check whether upstream already does
+it — it usually does, and better than a first attempt would.
 
-That is incompatible with "runs on your Mac, no account required." xBot introduces a
-**history provider interface** with a local Postgres/pgvector implementation as the default.
+- ADR: `docs/decisions/0007-wrap-openbot-keep-intelligence.md`
+- The value we add is the native client. The engine is driven, not rewritten.
+- New xBot code goes in **new files**. A moved or heavily edited upstream file is a permanent merge
+  conflict.
 
-- ADR: `docs/decisions/0001-local-history-provider.md`
-- Scope at fork time: ~64 references across 8 server files.
-- **Never add a new direct call to the Intelligence client.** Go through the provider interface.
+### 1. v1 runs on CopilotKit Intelligence, and the seam to leave it is already built.
+
+OpenBot's `runtimeCapabilities()` in `server/src/config.ts` used to **throw on startup** unless all
+four of `INTELLIGENCE_API_URL`, `INTELLIGENCE_GATEWAY_WS_URL`, `INTELLIGENCE_API_KEY` and
+`COPILOTKIT_LICENSE_TOKEN` were set. It now selects a mode: all four means Intelligence, **none**
+means local history, and a partial set still throws — for upstream's original reason, that somebody
+who set two of four intended Intelligence and got it wrong.
+
+**v1 sets all four.** The local mode exists, boots, and serves, but `LocalIntelligence` is a spike
+that records which methods are reached and throws; it is not a provider yet.
+
+- ADRs: `docs/decisions/0007-...` (the decision), `docs/decisions/0001-...` (the eventual design)
+- Measured scope: `grep` says 156 references across 18 files; the **compiler** says 5 across 4.
+  Trust the compiler. Widen the `RuntimeCapabilities` union and let it tell you.
+- `COPILOTKIT_LICENSE_TOKEN` is telemetry only. The runtime validates nothing.
+- **Never add a new direct call to the Intelligence client.** Go through the seam.
 
 ### 2. The model provider is a process-wide environment variable. We are making it per-agent.
 

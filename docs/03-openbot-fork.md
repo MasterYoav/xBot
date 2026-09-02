@@ -2,9 +2,15 @@
 
 Read this one carefully. It is the difference between a three-month project and a nine-month one.
 
-**Fork point:** OpenBot `v0.0.5` + `main`, MIT licensed, © 2026 CopilotKit.
-Upstream describes itself as *"a template, not a product"* and *"alpha, and under active
-development."* Both are accurate and both are relevant.
+**Fork point:** OpenBot `main` @ `257c128`, vendored into `engine/` with `git subtree`, MIT
+licensed, © 2026 CopilotKit. Upstream describes itself as *"a template, not a product"* and
+*"alpha, and under active development."* Both are accurate and both are relevant.
+
+> **The stance, since [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md): we wrap this
+> engine, we do not re-engineer it.** Where OpenBot already does something, our job is to surface
+> it well. The two sections below were written as *blockers* before anyone had run the code; both
+> turned out to be smaller than they read, and neither is on the critical path for v1. They are
+> kept because the analysis is still correct and the work is still coming — just not first.
 
 ---
 
@@ -122,9 +128,34 @@ Two implementations:
 - **`IntelligenceHistoryProvider`** — the existing behaviour, retained behind a setting. Keeping it
   means our diff against upstream stays reviewable and merges stay possible.
 
-### Scope
+### Scope, as measured
 
-At fork time: **~64 references across 8 files.**
+The estimate below said *~64 references across 8 files*. Both numbers are now measured rather than
+surveyed, and they disagree with each other in an instructive way.
+
+| Measure | Result |
+| --- | --- |
+| `grep -i intelligence` over `server/src` | **156 hits across 18 files** |
+| Type errors after widening `RuntimeCapabilities` | **5, across 4 files** |
+| Lines actually changed to boot without an account | **136, across 4 files** |
+
+The grep number is the one that looks like scope and is not. The compiler number is the real
+structural coupling; the rest are comments, identifiers, and calls on an already-injected client.
+
+Three places upstream had already done the work:
+
+- `index.ts` carried the note *"If a second mode is ever added, THIS is the line that has to grow a
+  guard, and the routine runner must then be left off `createApp` entirely."*
+- `channels/thread-status.ts` is duck-typed on one `getThread` method, not the vendor class.
+- `routines/run-turn.ts` exports `IntelligenceLike` and `RunnerLike` — narrow structural types — so
+  a local implementation needs no edit to that file at all.
+
+**And `COPILOTKIT_LICENSE_TOKEN` is telemetry, not a licence gate.** `runtime.mjs` stores it and
+derives a telemetry id; nothing validates it. The only hard requirement is OpenBot's own throw.
+
+The original survey, for reference:
+
+**~64 references across 8 files.**
 
 | File | Nature of the work |
 | --- | --- |
@@ -141,10 +172,15 @@ At fork time: **~64 references across 8 files.**
 subtle part — upstream uses a websocket to a hosted service for live thread status, and locally that
 becomes an in-process emitter plus SSE to the client. Simpler, but every consumer has to be found.
 
-**Risk if we skip it:** we cannot ship. There is no partial version of this.
+**Risk if we skip it:** the two promises named in [01-vision.md](01-vision.md) — no account, and
+nothing leaving the machine — do not hold, and a third party can affect the product by changing its
+free tier. That is a real cost, and v1 accepts it deliberately.
 
-**Do this first.** It is the highest-uncertainty work in the project and it gates everything else.
-Milestone M1 in [12-roadmap.md](12-roadmap.md) is exactly this and nothing else.
+**Do this when the client exists, not before.** The seam is built and the engine has been run
+without an account, so this is no longer a gate. Doing it first would mean months before anyone
+could judge the product, and it would be built against a *guess* about which methods the native
+client needs. The app uses SSE rather than the browser's Phoenix websocket, so that surface is
+smaller than the vendor's full client — **measure it before estimating this again.**
 
 ---
 
@@ -287,7 +323,7 @@ security-sensitive codebase within a year.
 
 | Work | Estimate | Blocking? |
 | --- | --- | --- |
-| Local history provider (ADR-0001) | 3–5 weeks | **Yes — nothing ships without it** |
+| Local history provider (ADR-0001) | 3–5 weeks | **No, since ADR-0007.** Seam built; deferred past v1 |
 | Model router (ADR-0002) | 2–3 weeks | **Yes — the product is single-model without it** |
 | Vendor adapters beyond OpenAI-compatible | 1–2 weeks | No — compatible mode covers most |
 | Local-token auth | 3–4 days | Yes |

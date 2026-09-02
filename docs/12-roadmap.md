@@ -6,6 +6,27 @@ finding out it does not work in month one is cheap and finding out in month five
 Durations assume roughly one focused person plus Claude Code. They are estimates, not commitments,
 and the ones marked ⚠️ have the widest error bars.
 
+> **Re-ordered by [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md).** The original plan
+> put M1 — replacing Intelligence — in front of everything as "the gate". Having run the engine,
+> that turned out to be neither the riskiest work nor a gate: the seam took 136 lines and the
+> engine boots without an account. The real risk was always the part nobody had started, which is
+> the app. **M1 is deferred past v1; the client moves to the front.**
+>
+> Ordering is now: engine running → client → connected → onboarding → ship.
+
+## Status
+
+| | Milestone | State |
+| --- | --- | --- |
+| M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
+| M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
+| M2 | Model router | Not started |
+| M3 | Engine runs headless | Partly — the app can compose and drive it; image not built |
+| M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
+| M5 | Connected | In progress — SSE parser and AG-UI decoder done |
+| M6 | Onboarding | Not started |
+| M7 | Ship v1.0 | Not started |
+
 ---
 
 ## M0 — Groundwork
@@ -26,12 +47,24 @@ Set up so the rest can move.
 
 ---
 
-## M1 — The local history provider ⚠️
+## M1 — The local history provider ⚠️ — **DEFERRED PAST v1**
 
-**3–5 weeks. The gate.**
+**3–5 weeks, and no longer first.** See
+[ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) for why, and
+[ADR-0001](decisions/0001-local-history-provider.md) for the design, which still stands.
 
-Nothing ships without this. It is also the highest-uncertainty work in the project, which is why it
-is first. See [ADR-0001](decisions/0001-local-history-provider.md).
+**What is already done:** `RuntimeCapabilities` has both modes, the three call sites are guarded,
+and `history/local-intelligence.ts` enumerates what a local provider must answer. The engine has
+been booted and driven with no `INTELLIGENCE_*` variables set at all.
+
+**What is not:** the provider itself — threads, messages, pgvector recall, and the in-process
+emitter that replaces the hosted realtime gateway.
+
+**Before estimating this again, measure.** The native client uses SSE, not the browser's Phoenix
+websocket, so the method surface it actually reaches is smaller than the vendor client's. That
+measurement does not exist until M5 is connected, which is the real reason this comes later.
+
+The rest of this section is the original plan, unchanged and still correct.
 
 - `HistoryProvider` interface.
 - Schema: threads, messages, memory (pgvector).
@@ -167,11 +200,12 @@ help.
 
 ## Total to v1.0
 
-**~18–24 weeks**, with M2/M3 and M4 overlapping. Call it **five to six months** for one focused
-person.
+**~10–14 weeks** with M1 deferred, down from ~18–24. Call it **three to four months** for one
+focused person.
 
-The two numbers that move it most are M1 (⚠️ if the Intelligence coupling is worse than it reads) and
-M6 (⚠️ if the runtime install path proves fragile across macOS versions and Docker states).
+The number that moves it most is now M6 (⚠️ if the runtime install path proves fragile across macOS
+versions and Docker states). With M1 off the critical path, onboarding is the widest error bar in
+the project — and it is the one that decides whether a non-technical person can use this at all.
 
 ---
 
@@ -179,29 +213,35 @@ M6 (⚠️ if the runtime install path proves fragile across macOS versions and 
 
 Ordered by value, not by ease.
 
-### v1.1 — Per-agent computers
+### v1.1 — Local history (ADR-0001)
+
+The deferred gate, done with a measurement behind it instead of an estimate. This is what makes
+"no account" and "nothing leaves your machine" true, and until it lands both are stated as
+limitations in onboarding and in the UI.
+
+### v1.2 — Per-agent computers
 
 The upstream compose topology with the supervisor: one container, one workspace, one browser profile
 per agent. **This is the fix for the honest limitation v1 ships with**, and it is the highest-value
 thing after launch. gVisor where the host supports it.
 
-### v1.2 — Native audit viewer
+### v1.3 — Native audit viewer
 
 The product's central trust claim should not be a webview. Filter by agent, by decision, by date.
 Export.
 
-### v1.3 — Multi-agent channels
+### v1.4 — Multi-agent channels
 
 The `Tab` verb in the command palette already implies this and the engine already supports channels.
 Several agents in one conversation, with handoff grants between them. The *Orchestrator* agent in the
 reference screenshots is exactly this shape.
 
-### v1.4 — The CLI
+### v1.5 — The CLI
 
 `xbot` talking to the same local API. Send a message, list agents, tail activity, start and stop the
 engine. This is the developer audience's version of the promise: the GUI is not the only way in.
 
-### v1.5 — Skills and MCP, natively
+### v1.6 — Skills and MCP, natively
 
 Upstream has plugins and MCP. Expose them in native settings rather than the admin webview, including
 one-click MCP server install.

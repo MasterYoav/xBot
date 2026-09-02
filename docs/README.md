@@ -6,8 +6,12 @@ last section of [`CLAUDE.md`](../CLAUDE.md).
 
 ## Reading order
 
-Read 01 → 03 in order. They establish the problem, the shape of the answer, and the two hard
-constraints everything else works around. After that, read by area.
+Read [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) first. It re-orders the project
+after the engine was actually run, and several documents here were written before that and are
+annotated rather than rewritten.
+
+Then 01 → 03 in order. They establish the problem, the shape of the answer, and the constraints
+everything else works around. After that, read by area.
 
 ### Foundations
 
@@ -52,6 +56,7 @@ Architecture Decision Records. Each one exists because the decision looks wrong 
 | [0004](decisions/0004-native-vs-webview.md) | Native SwiftUI for the product surface, embedded web for admin |
 | [0005](decisions/0005-distribution-outside-app-store.md) | Developer ID and a DMG, not the Mac App Store |
 | [0006](decisions/0006-naming-and-trademark.md) | Open questions about the name and the visual reference |
+| [0007](decisions/0007-wrap-openbot-keep-intelligence.md) | **Wrap OpenBot rather than re-engineer it, and keep Intelligence for v1.** Defers 0001 and re-orders the roadmap — read it before 01 or 03 |
 
 ## Conventions in these documents
 

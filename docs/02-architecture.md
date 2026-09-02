@@ -177,13 +177,39 @@ shape that separation does not exist — the database is a sibling process on th
 That is the second reason v1 is a stepping stone, and it is stated in
 [10-security.md](10-security.md).
 
+## What the engine already does, and what the app does with it
+
+The largest single fact about this architecture is how little of it we wrote. OpenBot ships the
+whole agent platform; xBot's work is a native surface for it, plus a small number of seams. Read
+this table as the product backlog — every row on the left already works, and the value we add is
+entirely in the right-hand column.
+
+| The engine already has | The app's job |
+| --- | --- |
+| Per-agent containers with their own browser profile and workspace | Make "each agent has its own logins" visible and true, and let the user watch |
+| The action gateway: resolve → decide → audit → act | Never expose it as a concept. It is why the product can be trusted, not a feature to explain |
+| A fail-closed CEL policy engine | Settings → Computer: the rules in plain language, with the raw editor one level deeper |
+| An append-only audit trail | A native viewer before v1.0. The central trust claim should not be a webview |
+| Control handover as first-class audited events | Take control · Give it back, on the live screen, with the honest sentence about refusal |
+| Secret requests on a channel separate from chat | A card with a secure field. **Never a normal message** |
+| Routines — recurring scheduled turns | The panel's Routines section, schedules in plain language |
+| MCP plugins and connected accounts | Native settings, one-click install, rather than the admin webview |
+| Generative UI from the agent | Sandboxed `WKWebView` in the conversation, fixed height, expandable |
+| AG-UI: any agent endpoint, any framework | "Bring your own agent" as a settings pane for the developer audience |
+| Multi-agent channels with handoff grants | The palette's `Tab` verb — several agents in one conversation |
+| SPIFFE workload identity, optional gVisor | Nothing. It should be invisible and simply on where the host supports it |
+
+**The pattern:** the engine decides, records, and enforces; the app explains, surfaces, and asks.
+Where those blur — an app that decided policy locally, or an engine that shaped a screen — the
+boundary has been drawn wrong.
+
 ## Where xBot diverges from upstream
 
 Summary; details in [03-openbot-fork.md](03-openbot-fork.md).
 
 | Area | Upstream | xBot |
 | --- | --- | --- |
-| Threads & memory | Hosted CopilotKit Intelligence, **mandatory** | Local Postgres provider, default |
+| Threads & memory | Hosted CopilotKit Intelligence, **mandatory** | **v1: Intelligence, kept.** Local provider seam built and deferred — [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) |
 | Model selection | `BOT_PROVIDER` env var, process-wide, 3 vendors | Per-agent, runtime, every vendor + Ollama |
 | Auth | OAuth/SAML/OIDC, or single-user mode | Single local user. Keychain-backed token |
 | Configuration | `.env` file | App settings → generated env → container |

@@ -4,6 +4,31 @@ Screen by screen. The interaction model is taken from the Grok Bot reference scr
 [ADR-0006](decisions/0006-naming-and-trademark.md) on where the line sits between borrowing an
 interaction model and copying trade dress.
 
+**This document is the product.** Since [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md)
+the engine is wrapped rather than rebuilt, which makes everything below the actual work rather than
+the reward at the end of it. OpenBot already does what the agents do; nobody outside a terminal can
+use it. This is that gap, written down.
+
+## What exists today
+
+Built against `StubEngineClient`, so it runs with no engine and no container runtime.
+
+| Surface | State |
+| --- | --- |
+| The rail | Built — selection on pointer-down, ⌘1–⌘9. Badges specified, not wired |
+| Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up |
+| Message bubbles | Built for text. Tool calls, images, handover and secret cards not yet |
+| The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason, optimistic send |
+| The right panel | Built — Screen, Activity, Routines, Agent settings incl. the model picker |
+| Command palette | Built for search and open. `Tab` to add an agent is not wired |
+| Design system | Built — all tokens, with Reduce Motion and Reduce Transparency inside them |
+| Settings scene | Not started |
+| Onboarding | Not started — M6, and the widest error bar left in the project |
+| Admin webview | Not started |
+
+**Not yet built and deliberately so:** anything that needs a live engine. The stub is what lets the
+whole surface be designed, tested and argued about before it is connected.
+
 ## The main window
 
 Three regions. Familiar, because a chat app should be.
