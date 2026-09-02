@@ -33,9 +33,11 @@ public struct Composer: View {
                 // toast: a toast is gone before somebody reading the field has looked up.
                 HStack(spacing: Space.s) {
                     Text(block.sentence).captionText().foregroundStyle(Palette.textSecondary)
-                    Button(block.actionTitle, action: onBlockAction)
-                        .buttonStyle(.link)
-                        .font(Typography.caption)
+                    if !block.actionTitle.isEmpty {
+                        Button(block.actionTitle, action: onBlockAction)
+                            .buttonStyle(.link)
+                            .font(Typography.caption)
+                    }
                     Spacer()
                 }
             }

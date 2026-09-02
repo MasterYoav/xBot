@@ -47,6 +47,19 @@ struct SendTests {
         #expect(!reply.isFromUser)
         #expect(reply.state == .complete)
         #expect(reply.text.contains("stub engine"))
+        #expect(reply.toolCalls.isEmpty)
+    }
+
+    @Test func aToolCallIsARowNotText() async throws {
+        let state = state()
+        await state.load()
+
+        state.send("browse the flights")
+        try await settle(state)
+
+        let reply = try #require(state.messages.last)
+        #expect(reply.toolCalls.contains { $0.name == "browser.navigate" && $0.target == "flights" })
+        #expect(!reply.text.contains("browser.navigate"))
     }
 
     @Test func aFailedTurnKeepsTheTextAndIsMarkedFailed() async throws {

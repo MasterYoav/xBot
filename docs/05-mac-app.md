@@ -220,5 +220,7 @@ Not a phase. Built in from the first component.
 | End to end | XCUITest against a real engine in CI: onboard → create agent → send → receive |
 
 **The stub engine is a first-class deliverable.** `XBotEngine` ships a `StubEngineClient` conforming
-to the same protocol, serving fixtures. It is how the client team works while the fork is in flight,
-how snapshot tests stay deterministic, and how a designer runs the app without Docker.
+to the same protocol as `HTTPEngineClient`, serving fixtures. Tests and snapshot work stay
+deterministic, and a designer can run the conversation without Docker. Production `XBotApp` no
+longer constructs the stub — it constructs `RuntimeController` + `DockerDriver` and holds
+`UnavailableEngineClient` until the runtime is `.running`.

@@ -201,13 +201,23 @@ public final class AppState {
 
     private func apply(_ runtimeState: RuntimeState) async {
         switch runtimeState {
-        case .notDetected, .stopped, .failed:
-            // Not detected, stopped, and failed all read the same to the composer: there is no
-            // engine to talk to, and the one thing to do about it is press Start. A more specific
-            // sentence per case (docs/12-roadmap.md leaves this as later work) needs a
-            // `ComposerBlock` case each, not a bigger switch here.
+        case .notDetected(let probe):
+            engine = UnavailableEngineClient()
+            status = nil
+            switch probe {
+            case .absent:
+                composerBlock = .runtimeUnavailable
+            case .installedNotRunning, .ready:
+                // Ready-but-notDetected is a brief probe race; treat it as "start me."
+                composerBlock = .engineNotRunning
+            }
+        case .stopped:
             engine = UnavailableEngineClient()
             composerBlock = .engineNotRunning
+            status = nil
+        case .failed(let error):
+            engine = UnavailableEngineClient()
+            composerBlock = .engineFailed(reason: error.sentence)
             status = nil
         case .pulling, .starting:
             status = .startingUp
@@ -233,12 +243,12 @@ public final class AppState {
     /// What the composer's inline action button does, keyed by the same reason that put it there.
     public func handleComposerBlockAction() {
         switch composerBlock {
-        case .engineNotRunning:
+        case .engineNotRunning, .engineFailed:
             startEngine()
         case .humanHoldsControl:
             setControl(.agent)
-        case .noModelConnected, nil:
-            // Settings isn't a scene yet (M6/M7) — there is nowhere to send this tap.
+        case .runtimeUnavailable, .noModelConnected, nil:
+            // Runtime install is M6. Settings isn't a scene yet (M6/M7).
             break
         }
     }
@@ -390,7 +400,7 @@ public final class AppState {
                     case .textDelta(let id, let text):
                         append(text, to: id)
                     case .toolCall(let id, let name, let target):
-                        append("\n[\(name) → \(target)]\n", to: id)
+                        recordTool(name: name, target: target, on: id)
                     case .finished(let id):
                         mark(id, as: .complete)
                     case .failed(let id, let reason):
@@ -406,6 +416,13 @@ public final class AppState {
     private func append(_ text: String, to id: Message.ID) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index].text += text
+    }
+
+    private func recordTool(name: String, target: String, on id: Message.ID) {
+        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+        messages[index].toolCalls.append(
+            Message.ToolCall(id: "\(id)-\(messages[index].toolCalls.count)", name: name, target: target)
+        )
     }
 
     private func mark(_ id: Message.ID, as state: Message.State) {

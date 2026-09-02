@@ -21,9 +21,9 @@ and the ones marked ⚠️ have the widest error bars.
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
 | M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
 | M2 | Model router | Not started |
-| M3 | Engine runs headless | Partly — the app can compose and drive it; image not built |
+| M3 | Engine runs headless | Partly — the app composes environment, allocates ports, and can `docker run`; **image not built** |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
-| M5 | Connected | In progress — SSE parser and AG-UI decoder done |
+| M5 | Connected | **Client done, live container blocked on M3.** HTTP client, runtime swap, create agent, send/stream, take/release control, tool-call rows, honest engine-down states |
 | M6 | Onboarding | Not started |
 | M7 | Ship v1.0 | Not started |
 
@@ -146,17 +146,23 @@ present.
 
 **2 weeks**
 
-The two halves meet.
+The two halves meet. As of this writing the **client half is in**: the app owns `RuntimeController`,
+swaps `UnavailableEngineClient` for `HTTPEngineClient` when the runtime reports `.running`, creates
+agents from the palette, streams turns, and takes/releases the browser. What is not in is a
+published `xbot/engine` image — without it Start walks the real state machine and stops at a
+sentence-bearing `.failed`, which is correct rather than a fake success.
 
-- App drives a real engine end to end.
-- Live streaming into the conversation.
-- Live screen from the polled screenshot endpoint.
-- Handover: take control, release control.
-- Agent creation and settings, including the model picker.
-- Activity panel.
+**Still to close this milestone against a live container:**
+
+- App drives a real engine end to end (needs M3's image).
+- Live streaming into the conversation (client ready; needs a running engine).
+- Live screen from the polled screenshot endpoint (client ready; needs a computer).
+- Handover: take control, release control (client ready; needs a computer).
+- Agent creation and settings, including the model picker (creation is in; picker has no real model list until M2).
+- Activity panel (stub fixtures; live activity still empty on HTTP).
 
 **Done when:** create an agent in the app, send a message, watch it browse, take control, hand it
-back — all native.
+back — all native. That last mile is M3, not more Swift.
 
 ---
 

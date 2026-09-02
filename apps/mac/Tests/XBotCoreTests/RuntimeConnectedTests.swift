@@ -51,13 +51,26 @@ struct RuntimeConnectedTests {
         #expect(state.composerBlock == .engineNotRunning)
     }
 
-    @Test func noRuntimeFoundAtAllStillReadsAsEngineNotRunning() async {
-        // `.notDetected` and `.stopped` are different sentences in docs/07-container-runtime.md's
-        // state machine, but the composer only has one thing to say about either: press Start.
+    @Test func noRuntimeFoundAtAllStillReadsAsUnavailable() async {
+        // `.absent` and `.stopped` are different sentences: one needs an install (M6), the other
+        // is a Start. Collapsing them into one button that cannot possibly work is a lie.
         let (state, _) = state(script: FakeDriver.Script(probe: .absent))
         await state.load()
 
-        #expect(state.composerBlock == .engineNotRunning)
+        #expect(state.composerBlock == .runtimeUnavailable)
+    }
+
+    @Test func aFailedStartSaysSoRatherThanPretendingTheEngineIsMerelyOff() async throws {
+        let (state, _) = state(script: FakeDriver.Script(runFails: true))
+        await state.load()
+        state.startEngine()
+
+        try await until {
+            if case .engineFailed = state.composerBlock { return true }
+            return false
+        }
+        guard case .engineFailed(let reason) = state.composerBlock else { return }
+        #expect(reason == String(localized: "The engine couldn't start"))
     }
 
     @Test func startingTheEngineEventuallyUnblocksTheComposer() async throws {

@@ -104,8 +104,17 @@ public struct Conversation: View {
     }
 
     private var emptyTitle: String {
-        if state.composerBlock == .engineNotRunning {
+        switch state.composerBlock {
+        case .engineNotRunning:
             return String(localized: "The engine isn't running")
+        case .runtimeUnavailable:
+            return String(localized: "A container runtime isn't available")
+        case .engineFailed:
+            return String(localized: "The engine couldn't start")
+        case .noModelConnected:
+            return String(localized: "Connect a model to start")
+        case .humanHoldsControl, nil:
+            break
         }
         if state.agents.isEmpty {
             return String(localized: "Create your first agent")
@@ -114,8 +123,17 @@ public struct Conversation: View {
     }
 
     private var emptySubtitle: String {
-        if state.composerBlock == .engineNotRunning {
+        switch state.composerBlock {
+        case .engineNotRunning:
             return String(localized: "Start it to pick up where you left off.")
+        case .runtimeUnavailable:
+            return String(localized: "Install Docker Desktop, OrbStack, or Colima, then open xBot again.")
+        case .engineFailed(let reason):
+            return reason
+        case .noModelConnected:
+            return String(localized: "Add a provider key in Settings before you send a message.")
+        case .humanHoldsControl, nil:
+            break
         }
         if state.agents.isEmpty {
             return String(localized: "It will have a browser, files, and a shell — and only the tools you grant it.")
@@ -124,10 +142,10 @@ public struct Conversation: View {
     }
 
     private var emptyAction: (title: String, run: () -> Void)? {
-        if state.composerBlock == .engineNotRunning {
-            return (String(localized: "Start"), { state.handleComposerBlockAction() })
+        if let block = state.composerBlock, !block.actionTitle.isEmpty {
+            return (block.actionTitle, { state.handleComposerBlockAction() })
         }
-        if state.agents.isEmpty {
+        if state.agents.isEmpty, state.composerBlock == nil {
             return (String(localized: "Create"), { state.createAgent(named: "") })
         }
         return nil

@@ -73,19 +73,36 @@ public struct Message: Identifiable, Hashable, Sendable {
     public let id: String
     public let author: Author
     public var text: String
+    /// Compact rows, not text. Tool calls are a different content type from the sentence
+    /// around them — stuffing `[name → target]` into `text` made them look like the model talking.
+    public var toolCalls: [ToolCall]
     public var state: State
     public let sentAt: Date
+
+    public struct ToolCall: Identifiable, Hashable, Sendable {
+        public let id: String
+        public var name: String
+        public var target: String
+
+        public init(id: String, name: String, target: String) {
+            self.id = id
+            self.name = name
+            self.target = target
+        }
+    }
 
     public init(
         id: String,
         author: Author,
         text: String,
+        toolCalls: [ToolCall] = [],
         state: State = .complete,
         sentAt: Date = Date()
     ) {
         self.id = id
         self.author = author
         self.text = text
+        self.toolCalls = toolCalls
         self.state = state
         self.sentAt = sentAt
     }
@@ -116,20 +133,31 @@ public enum TurnEvent: Sendable {
 /// disabled control with no explanation is the thing this type exists to make impossible.
 public enum ComposerBlock: Hashable, Sendable {
     case engineNotRunning
+    /// Docker (or equivalent) is not on this Mac. Install is M6 — until then we say so, and we
+    /// do not offer a Start that would fail for the same reason.
+    case runtimeUnavailable
+    /// Start ran and did not reach `.running`. The sentence is already written for a person.
+    case engineFailed(reason: String)
     case noModelConnected
     case humanHoldsControl
 
     public var sentence: String {
         switch self {
         case .engineNotRunning: String(localized: "The engine isn't running")
+        case .runtimeUnavailable:
+            String(localized: "xBot needs Docker Desktop, OrbStack, or Colima to run the engine")
+        case .engineFailed(let reason): reason
         case .noModelConnected: String(localized: "Connect a model to start")
         case .humanHoldsControl: String(localized: "You're controlling the browser")
         }
     }
 
+    /// Empty means no button. The composer hides it rather than drawing a no-op.
     public var actionTitle: String {
         switch self {
         case .engineNotRunning: String(localized: "Start")
+        case .runtimeUnavailable: ""
+        case .engineFailed: String(localized: "Try again")
         case .noModelConnected: String(localized: "Open Settings")
         case .humanHoldsControl: String(localized: "Give it back")
         }

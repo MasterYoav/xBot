@@ -100,6 +100,22 @@ public enum RuntimeError: Error, Sendable, Equatable {
     case commandFailed(command: String, exitCode: Int, message: String)
     case healthTimedOut(seconds: Int)
     case noFreePort(range: ClosedRange<UInt16>)
+
+    /// A sentence for the composer. Never the command, never stderr — those belong in diagnostics.
+    public var sentence: String {
+        switch self {
+        case .daemonUnavailable:
+            String(localized: "Docker isn't running")
+        case .commandFailed:
+            // The image is not published yet (M3), a port clash, a volume error — all of them
+            // look like this from the driver's point of view. The details are in Copy diagnostics.
+            String(localized: "The engine couldn't start")
+        case .healthTimedOut:
+            String(localized: "The engine took too long to become ready")
+        case .noFreePort:
+            String(localized: "Couldn't find a free port for the engine")
+        }
+    }
 }
 
 /// The whole surface the app needs from a container runtime.

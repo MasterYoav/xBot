@@ -39,8 +39,14 @@ vendor.
 
 ## Status
 
-**Pre-implementation.** This repository currently contains the design documents. Start at
-[`docs/README.md`](docs/README.md).
+**In development.** The native Mac client exists: rail, conversation, composer, panel, and
+command palette, wired to a real `RuntimeController` and `HTTPEngineClient`. On a machine without
+Docker it says so and offers Start. Creating an agent, sending a message, and taking/releasing
+browser control are implemented. A published engine image (milestone M3) is still required before
+a live conversation against a container.
+
+Start at [`docs/README.md`](docs/README.md). The current milestone table is in
+[`docs/12-roadmap.md`](docs/12-roadmap.md).
 
 ## Documentation
 

@@ -194,6 +194,17 @@ struct RuntimeControllerTests {
         }
     }
 
+    @Test func aFailedStartNeverEchoesTheCommand() {
+        // The composer shows this sentence. A raw `docker run` line, or stderr, is diagnostics
+        // material and must not become the thing a person reads.
+        let error = RuntimeError.commandFailed(
+            command: "run", exitCode: 125, message: "port is already allocated"
+        )
+        #expect(error.sentence == String(localized: "The engine couldn't start"))
+        #expect(!error.sentence.contains("run"))
+        #expect(!error.sentence.contains("allocated"))
+    }
+
     @Test func healthLostBecomesDegradedAndRecovers() async {
         let controller = controller()
         await controller.start(environment: environment)

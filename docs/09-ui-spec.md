@@ -11,23 +11,22 @@ use it. This is that gap, written down.
 
 ## What exists today
 
-Built against `StubEngineClient`, so it runs with no engine and no container runtime.
+The app drives a `RuntimeController` and `HTTPEngineClient` in production, and still has
+`StubEngineClient` for tests and for UI work without Docker.
 
 | Surface | State |
 | --- | --- |
-| The rail | Built — selection on pointer-down, ⌘1–⌘9. Badges specified, not wired |
-| Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up |
-| Message bubbles | Built for text. Tool calls, images, handover and secret cards not yet |
-| The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason, optimistic send |
-| The right panel | Built — Screen, Activity, Routines, Agent settings incl. the model picker |
-| Command palette | Built for search and open. `Tab` to add an agent is not wired |
+| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring while a turn is in flight. Unread and attention badges specified, not wired |
+| Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up. Empty states distinguish engine-down, runtime-missing, failed-start, and no-agents |
+| Message bubbles | Built for text and compact tool-call rows. Images, handover and secret cards not yet |
+| The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
+| The right panel | Built — Screen, Activity, Routines, Agent settings incl. the model picker. Take control / give it back |
+| Command palette | Built for search, open, and **create**. `Tab` to add an agent to a channel is not wired |
+| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine. Live container still needs M3's image |
 | Design system | Built — all tokens, with Reduce Motion and Reduce Transparency inside them |
 | Settings scene | Not started |
 | Onboarding | Not started — M6, and the widest error bar left in the project |
 | Admin webview | Not started |
-
-**Not yet built and deliberately so:** anything that needs a live engine. The stub is what lets the
-whole surface be designed, tested and argued about before it is connected.
 
 ## The main window
 
