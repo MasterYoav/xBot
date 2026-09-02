@@ -29,7 +29,11 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 echo "Building ${IMAGE} from engine/Dockerfile (this takes several minutes on first run)…"
-docker build "${CACHE[@]}" -t "${IMAGE}" "${ROOT}/engine"
+if ((${#CACHE[@]})); then
+  docker build "${CACHE[@]}" -t "${IMAGE}" "${ROOT}/engine"
+else
+  docker build -t "${IMAGE}" "${ROOT}/engine"
+fi
 
 echo ""
 echo "Done. ${IMAGE} is ready."
