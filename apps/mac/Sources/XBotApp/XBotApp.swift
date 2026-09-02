@@ -14,6 +14,19 @@ struct XBotApp: App {
     @State private var state: AppState
 
     init() {
+        #if DEBUG
+        // Default in debug builds: the stub, so `swift run` shows the designed conversation
+        // without Docker. Set XBOT_USE_RUNTIME=1 to exercise the real runtime path instead.
+        if ProcessInfo.processInfo.environment["XBOT_USE_RUNTIME"] != "1" {
+            _state = State(wrappedValue: AppState(engine: StubEngineClient()))
+            return
+        }
+        #endif
+        _state = State(wrappedValue: Self.productionState())
+    }
+
+    /// Release always takes this path. Debug takes it when `XBOT_USE_RUNTIME=1`.
+    private static func productionState() -> AppState {
         let runtime = RuntimeController(
             driver: DockerDriver(),
             // A placeholder repository and tag. M3's pinned-digest manifest (docs/10-security.md)
@@ -29,22 +42,20 @@ struct XBotApp: App {
         let keyEncryptionKey = Data((0..<32).map { _ in UInt8.random(in: .min ... .max) })
             .base64EncodedString()
 
-        _state = State(
-            wrappedValue: AppState(
-                runtime: runtime,
-                environment: { port, hostGateway in
-                    EngineEnvironment.compose(
-                        EngineEnvironment.Inputs(
-                            port: port,
-                            keyEncryptionKey: keyEncryptionKey,
-                            hostGateway: hostGateway,
-                            appOrigin: "xbot://app"
-                            // No `intelligence:` — local-history mode, which ADR-0007's M1 seam
-                            // already verified boots on its own, with no CopilotKit account.
-                        )
+        return AppState(
+            runtime: runtime,
+            environment: { port, hostGateway in
+                EngineEnvironment.compose(
+                    EngineEnvironment.Inputs(
+                        port: port,
+                        keyEncryptionKey: keyEncryptionKey,
+                        hostGateway: hostGateway,
+                        appOrigin: "xbot://app"
+                        // No `intelligence:` — local-history mode, which ADR-0007's M1 seam
+                        // already verified boots on its own, with no CopilotKit account.
                     )
-                }
-            )
+                )
+            }
         )
     }
 

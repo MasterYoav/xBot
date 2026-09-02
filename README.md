@@ -48,6 +48,17 @@ a live conversation against a container.
 Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 [`docs/12-roadmap.md`](docs/12-roadmap.md).
 
+### Run the Mac app locally
+
+```sh
+cd apps/mac && swift run          # debug: stub engine, full UI, no Docker
+cd apps/mac && XBOT_USE_RUNTIME=1 swift run   # debug: real runtime path
+cd apps/mac && swift test         # 72 unit tests
+```
+
+Release builds always use the runtime path. There is no Xcode project yet — the Swift package
+executable is the way in.
+
 ## Documentation
 
 | | |

@@ -221,6 +221,7 @@ Not a phase. Built in from the first component.
 
 **The stub engine is a first-class deliverable.** `XBotEngine` ships a `StubEngineClient` conforming
 to the same protocol as `HTTPEngineClient`, serving fixtures. Tests and snapshot work stay
-deterministic, and a designer can run the conversation without Docker. Production `XBotApp` no
-longer constructs the stub — it constructs `RuntimeController` + `DockerDriver` and holds
-`UnavailableEngineClient` until the runtime is `.running`.
+deterministic. **Debug builds default to the stub** so `swift run` shows the designed conversation
+without Docker; set `XBOT_USE_RUNTIME=1` to exercise `RuntimeController` + `DockerDriver` instead.
+Release builds always construct the runtime path and hold `UnavailableEngineClient` until the
+runtime is `.running`.
