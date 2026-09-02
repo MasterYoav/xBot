@@ -37,6 +37,7 @@ public actor RuntimeController {
         self.driver = driver
         self.image = image
         self.health = health
+        self.allocatedPort = EnginePortStore.load()
     }
 
     public var events: AsyncStream<RuntimeEvent> {
@@ -94,6 +95,7 @@ public actor RuntimeController {
                 range: 49_152...49_400
             )
             allocatedPort = port
+            EnginePortStore.save(port)
             let endpoint = EngineEndpoint(port: port)
 
             state = .starting(.container)

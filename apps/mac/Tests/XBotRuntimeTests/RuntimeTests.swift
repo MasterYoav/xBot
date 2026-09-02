@@ -133,6 +133,12 @@ struct EngineEnvironmentTests {
     func browserLimitFollowsTheMachine(memory: UInt64, expected: Int) {
         #expect(EngineEnvironment.browserLimit(forPhysicalMemory: memory) == expected)
     }
+
+    @Test func enginePortSurvivesRelaunch() {
+        defer { UserDefaults.standard.removeObject(forKey: EnginePortStore.key) }
+        EnginePortStore.save(49_180)
+        #expect(EnginePortStore.load() == 49_180)
+    }
 }
 
 /// The state machine, driven against a fake so every failure is reachable on demand.
