@@ -52,14 +52,14 @@ Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 
 ```sh
 cd apps/mac && swift run          # debug: stub engine, full UI, no Docker
-cd apps/mac && XBOT_USE_RUNTIME=1 swift run   # debug: real runtime path
+cd apps/mac && XBOT_USE_RUNTIME=1 swift run   # debug: real runtime path — Start in the UI
 cd apps/mac && swift test         # 74 unit tests
 scripts/build-engine-image.sh     # dev: build xbot/engine:1 for the runtime path
 ```
 
-Release builds always use the runtime path. There is no Xcode project yet — the Swift package
-executable is the way in. The runtime path needs a local `xbot/engine:1` image until M3 publishes
-a pinned digest manifest.
+Release builds always use the runtime path. The runtime path needs a local `xbot/engine:1` image
+(built above) until M3 publishes a pinned digest manifest. Bearer token and encryption key are
+generated on first run and held in the Keychain.
 
 ## Documentation
 
