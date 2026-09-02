@@ -60,7 +60,9 @@ scripts/check-engine-health.sh    # dev: read-only /health check once the engine
 
 Release builds always use the runtime path. The runtime path needs a local `xbot/engine:1` image
 (built above) until M3 publishes a pinned digest manifest. Bearer token and encryption key are
-generated on first run and held in the Keychain.
+generated on first run and held in the Keychain. First Start can take up to ~2 minutes while
+Postgres initializes. If a start fails mid-boot, `docker rm -f xbot-engine` clears the container
+for a clean retry (volumes are kept).
 
 ## Documentation
 
