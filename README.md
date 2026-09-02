@@ -1,0 +1,71 @@
+<div align="center">
+
+# xBot
+
+**Your own AI coworkers, on your own Mac.**
+
+Create agents, give them a computer, watch them work, and take the wheel when you want to.
+Bring any model — OpenAI, Anthropic, Google, xAI, or a model running locally through Ollama.
+Nothing leaves your machine except the calls you choose to make.
+
+</div>
+
+---
+
+## What it is
+
+xBot is a native macOS app. You download a `.dmg`, drag it to Applications, and open it. It walks
+you through everything else.
+
+Behind the app, a full agent platform runs in containers on your Mac: each agent gets its own
+computer with its own browser, its own files, and only the tools you grant it. Every action an agent
+takes is decided against a policy before it happens and recorded after.
+
+You never open a terminal. You never edit a configuration file. You never read a log.
+
+## Why it exists
+
+Two good things existed separately.
+
+[**OpenBot**](https://github.com/CopilotKit/openbot) is a serious, well-built, self-hosted agent
+platform — per-agent isolation, an action gateway, a real audit trail. It is also a developer
+template: you clone a repository, copy an `.env`, fill in credentials, and run a shell script.
+
+**Grok Bot** showed what the consumer shape of this looks like — a chat app with a rail of agents,
+a live view of what each one is doing, and settings you can actually find.
+
+xBot is the fusion: OpenBot's engine, a native Mac experience, and no lock-in to any single model
+vendor.
+
+## Status
+
+**Pre-implementation.** This repository currently contains the design documents. Start at
+[`docs/README.md`](docs/README.md).
+
+## Documentation
+
+| | |
+| --- | --- |
+| [Vision](docs/01-vision.md) | What we are building, for whom, and what we are not building |
+| [Architecture](docs/02-architecture.md) | Services, ports, data flow |
+| [The OpenBot fork](docs/03-openbot-fork.md) | What we inherit and what we have to change |
+| [Model providers](docs/04-model-providers.md) | Per-agent model selection across every vendor |
+| [The Mac app](docs/05-mac-app.md) | Swift target layout and module boundaries |
+| [Onboarding](docs/06-onboarding.md) | The first-run flow, screen by screen |
+| [Container runtime](docs/07-container-runtime.md) | Driving containers without the user knowing |
+| [Design system](docs/08-design-system.md) | Tokens, type, motion, materials |
+| [UI specification](docs/09-ui-spec.md) | Every screen |
+| [Security](docs/10-security.md) | Keys, secrets, isolation, what never gets written down |
+| [Packaging](docs/11-packaging-and-updates.md) | Signing, notarization, updates |
+| [Roadmap](docs/12-roadmap.md) | Milestones |
+| [Decisions](docs/decisions/) | ADRs — read these before disagreeing with anything above |
+
+## Built on OpenBot
+
+xBot's engine is a fork of [OpenBot](https://github.com/CopilotKit/openbot) by
+[CopilotKit](https://copilotkit.ai), used under the MIT licence. Copyright © 2026 CopilotKit.
+See [`NOTICE`](NOTICE).
+
+## Licence
+
+MIT.

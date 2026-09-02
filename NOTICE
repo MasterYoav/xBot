@@ -1,0 +1,23 @@
+xBot
+Copyright (c) 2026 xBot contributors
+
+This product includes software developed by CopilotKit.
+
+--------------------------------------------------------------------------------
+
+xBot's engine is a derivative work of OpenBot.
+
+    OpenBot
+    https://github.com/CopilotKit/openbot
+    Copyright (c) 2026 CopilotKit
+    Licensed under the MIT License.
+
+The full text of the MIT License as it applies to OpenBot is reproduced in
+engine/LICENSE. Modifications made by the xBot project are recorded in
+CHANGELOG.md and are described in docs/03-openbot-fork.md.
+
+--------------------------------------------------------------------------------
+
+xBot is not affiliated with, endorsed by, or sponsored by CopilotKit, xAI,
+X Corp., Anthropic, OpenAI, Google, or any other model provider. Provider names
+and logos are used nominatively to identify the services a user may connect.
