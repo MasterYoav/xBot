@@ -53,7 +53,7 @@ Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 ```sh
 cd apps/mac && swift run          # debug: stub engine, full UI, no Docker
 cd apps/mac && XBOT_USE_RUNTIME=1 swift run   # debug: real runtime path — Start in the UI
-cd apps/mac && swift test         # 75 unit tests
+cd apps/mac && swift test         # 76 unit tests
 scripts/build-engine-image.sh     # dev: build xbot/engine:1 for the runtime path
 scripts/check-engine-health.sh    # dev: read-only /health check once the engine is up
 ```
