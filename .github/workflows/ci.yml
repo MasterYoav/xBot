@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege by default.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# engine/.github/workflows/ is upstream's own CI. GitHub only reads the root, so it never
+# fires — it is kept because docs/03-openbot-fork.md forbids reorganising engine/ (a moved
+# file is a permanent merge conflict). This file is the one that runs, and it deliberately
+# covers less: the chart, image and deployables jobs come back at M3 when we ship the image.
+jobs:
+  engine-static:
+    name: engine — format, lint, types
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun run format:check
+      - run: bun run lint
+      - run: bun run typecheck
+
+  engine-test:
+    name: engine — tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    # pgvector rather than plain postgres: the knowledge schema uses the extension.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: openbot
+          POSTGRES_USER: openbot
+          POSTGRES_PASSWORD: openbot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openbot -d openbot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://openbot:openbot@localhost:5432/openbot
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      # The Bots are not root workspaces and keep their own lockfiles. The startup tests spawn
+      # the real entrypoint, and the LangGraph history tests import from that Bot's own tree.
+      - run: bun install --frozen-lockfile
+        working-directory: engine/agent-bot
+      - run: bun install --frozen-lockfile
+        working-directory: engine/agent-langgraph
+      # Not db:migrate: that script loads ../.env, which does not exist in CI.
+      - run: bunx drizzle-kit migrate --config=drizzle.config.ts
+        working-directory: engine/server
+      - run: bun run test:ci
+
+  mac:
+    name: mac — build, test
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/mac
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: swift build
+      - run: swift test
