@@ -21,7 +21,7 @@ and the ones marked ⚠️ have the widest error bars.
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
 | M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
 | M2 | Model router | Not started |
-| M3 | Engine runs headless | Partly — the app composes environment, allocates ports, and can `docker run`; **image not built** |
+| M3 | Engine runs headless | Partly — the app composes environment, allocates ports, and can `docker run`; **image not published** (dev build: `scripts/build-engine-image.sh`) |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
 | M5 | Connected | **Client done, live container blocked on M3.** HTTP client, runtime swap, create agent, send/stream, take/release control, tool-call rows, honest engine-down states |
 | M6 | Onboarding | Not started |
