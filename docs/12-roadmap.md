@@ -121,7 +121,8 @@ Everything needed for the app to own the engine.
 - The upstream `.env` → xBot settings mapping table, filled in and committed.
 
 **Done when:** `docker run` with generated environment and three volumes brings up a working engine,
-and `/health` answers correctly.
+and `/health` answers correctly. As of this writing a dev build (`scripts/build-engine-image.sh`)
+produces `xbot/engine:1` locally; the published digest manifest is still open.
 
 ---
 
