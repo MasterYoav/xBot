@@ -172,6 +172,7 @@ Three stores, deliberately separate:
 | --- | --- | --- |
 | Conversations, agents, audit | **Engine Postgres** | The engine owns product data. The app is a client |
 | Window state, selection, appearance | `UserDefaults` | Trivial, non-secret, per-machine |
+| Engine loopback port | `UserDefaults` | Stable across relaunch so bookmarks and the admin webview do not drift |
 | API keys, engine token, DB encryption key | **macOS Keychain** | See [10-security.md](10-security.md) |
 
 **The app has no local database.** Tempting — offline history, faster launch — and wrong. Two
