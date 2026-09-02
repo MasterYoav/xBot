@@ -6,11 +6,8 @@ import XBotUI
 
 @main
 struct XBotApp: App {
-    /// M5's swap: the app now drives a real `RuntimeController`, not `StubEngineClient`. What is
-    /// still missing is M3's — an actual published `xbot/engine` image, so `DockerDriver` has
-    /// something to pull, and the Keychain-backed encryption key from docs/10-security.md, so the
-    /// one generated below survives a relaunch. Until both land, this walks the real state machine
-    /// honestly and stops at a real, sentence-bearing failure rather than a fake success.
+    /// M5's swap: the app drives a real `RuntimeController`. M3's published digest manifest is still
+    /// open; the dev image (`scripts/build-engine-image.sh`) covers local runtime testing.
     @State private var state: AppState
 
     init() {
@@ -35,12 +32,13 @@ struct XBotApp: App {
             health: { endpoint in await HTTPEngineClient(baseURL: endpoint.baseURL).isHealthy() }
         )
 
-        // Generated per launch, held only in memory. This is a known, called-out gap rather than a
-        // silent one: nothing yet encrypts a credential vault with it, because the vault itself
-        // (M2, the model router) hasn't landed either. It stops being fine the day M2 does, and the
-        // fix is the Keychain-backed key docs/10-security.md already specifies, not a change here.
-        let keyEncryptionKey = Data((0..<32).map { _ in UInt8.random(in: .min ... .max) })
-            .base64EncodedString()
+        let keyEncryptionKey: String
+        do {
+            keyEncryptionKey = try KeyEncryptionKeyStore.key()
+        } catch {
+            keyEncryptionKey = Data((0..<32).map { _ in UInt8.random(in: .min ... .max) })
+                .base64EncodedString()
+        }
 
         let engineToken: String
         do {
