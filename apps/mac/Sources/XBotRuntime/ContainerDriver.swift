@@ -30,14 +30,50 @@ public enum ProbeResult: Sendable, Equatable {
 
 public struct ImageReference: Sendable, Hashable {
     public let repository: String
-    public let tag: String
+    /// Set when the reference uses `repository:tag`. Mutually exclusive with `digest`.
+    public let tag: String?
+    /// Includes the `sha256:` prefix when present.
+    public let digest: String?
 
     public init(repository: String, tag: String) {
         self.repository = repository
         self.tag = tag
+        self.digest = nil
     }
 
-    public var full: String { "\(repository):\(tag)" }
+    public init(repository: String, digest: String) {
+        self.repository = repository
+        self.tag = nil
+        self.digest = digest.hasPrefix("sha256:") ? digest : "sha256:\(digest)"
+    }
+
+    public var full: String {
+        if let digest {
+            let normalized = digest.hasPrefix("sha256:") ? digest : "sha256:\(digest)"
+            return "\(repository)@\(normalized)"
+        }
+        return "\(repository):\(tag ?? "latest")"
+    }
+
+    /// Parses `repository:tag` or `repository@sha256:…` as emitted by the engine manifest.
+    public init?(parsing reference: String) {
+        let trimmed = reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let digestMarker = trimmed.range(of: "@sha256:") {
+            repository = String(trimmed[..<digestMarker.lowerBound])
+            digest = String(trimmed[digestMarker.upperBound...])
+            tag = nil
+            guard !repository.isEmpty, !digest!.isEmpty else { return nil }
+            return
+        }
+
+        guard let colon = trimmed.lastIndex(of: ":") else { return nil }
+        repository = String(trimmed[..<colon])
+        tag = String(trimmed[trimmed.index(after: colon)...])
+        digest = nil
+        guard !repository.isEmpty, let tag, !tag.isEmpty else { return nil }
+    }
 }
 
 public struct PullProgress: Sendable, Equatable {

@@ -33,6 +33,7 @@ public enum EngineBootstrap {
         RuntimeController(
             driver: DockerDriver(executable: RuntimePaths.preferredDockerExecutable()),
             image: devImage,
+            imageResolver: EngineImageResolver(),
             health: { endpoint in
                 await HTTPEngineClient(baseURL: endpoint.baseURL).health()
             }

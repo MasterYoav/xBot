@@ -133,6 +133,18 @@ struct EngineEnvironmentTests {
         #expect(EngineEnvironment.compose(draft)["XBOT_ENGINE_TOKEN"] == "test-token")
     }
 
+    @Test func toolURLIncludesTheAgentToolsPath() {
+        let env = EngineEnvironment.compose(
+            EngineEnvironment.Inputs(
+                port: 3001,
+                keyEncryptionKey: "k",
+                hostGateway: "host.docker.internal",
+                appOrigin: "xbot://app"
+            )
+        )
+        #expect(env["OPENBOT_TOOL_URL"] == "http://host.docker.internal:3001/api/agent-tools/call")
+    }
+
     @Test func embeddedPostgresDoesNotSetDatabaseURL() {
         // The container generates the URL with a random password on first boot.
         #expect(EngineEnvironment.compose(inputs())["DATABASE_URL"] == nil)
@@ -231,6 +243,22 @@ struct RuntimeControllerTests {
 
         guard case .failed = await controller.state else {
             Issue.record("expected failed, got \(await controller.state)")
+            return
+        }
+    }
+
+    @Test func healthTimeoutFailsWithTimedOutError() async {
+        let controller = RuntimeController(
+            driver: FakeDriver(),
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in nil },
+            startHealthDeadlineSeconds: 2,
+            ports: isolatedPortStore()
+        )
+        await controller.start(environment: environment)
+
+        guard case .failed(.healthTimedOut(seconds: 2)) = await controller.state else {
+            Issue.record("expected health timeout, got \(await controller.state)")
             return
         }
     }
@@ -343,6 +371,87 @@ struct RuntimeControllerTests {
         await controller.start(environment: environment)
         await controller.stop()
         #expect(await controller.state == .stopped)
+    }
+
+    @Test func upgradePullsNewImageAndRecreatesContainer() async {
+        let driver = FakeDriver()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+        await controller.start(environment: environment)
+        #expect(await controller.currentImageReference.full == "xbot/engine:1")
+        #expect(await driver.startedSpecs.count == 1)
+
+        let next = ImageReference(
+            repository: "ghcr.io/masteryoav/xbot-engine",
+            digest: "sha256:abc123def456"
+        )
+        let previous = ImageReference(repository: "xbot/engine", tag: "1")
+        let outcome = await controller.upgrade(
+            to: next,
+            rollingBackTo: previous,
+            environment: environment
+        )
+
+        guard case .running = await controller.state else {
+            Issue.record("expected running after upgrade, got \(await controller.state)")
+            return
+        }
+        #expect(outcome == .succeeded)
+        #expect(await controller.currentImageReference == next)
+        #expect(await driver.startedSpecs.count == 2)
+        #expect(await driver.startedSpecs.last?.image == next)
+        #expect(!(await driver.removedHandles.isEmpty))
+    }
+
+    @Test func upgradeRollsBackWhenNewImageFailsHealth() async {
+        final class HealthScript: @unchecked Sendable {
+            private let lock = NSLock()
+            var failNextLaunch = false
+
+            func answer() -> EngineHealth? {
+                lock.lock()
+                defer { lock.unlock() }
+                if failNextLaunch {
+                    failNextLaunch = false
+                    return nil
+                }
+                return EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000")
+            }
+        }
+
+        let healthScript = HealthScript()
+        let driver = FakeDriver()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in healthScript.answer() },
+            startHealthDeadlineSeconds: 1,
+            ports: isolatedPortStore()
+        )
+        await controller.start(environment: environment)
+
+        let next = ImageReference(
+            repository: "ghcr.io/masteryoav/xbot-engine",
+            digest: "sha256:deadbeef"
+        )
+        let previous = ImageReference(repository: "xbot/engine", tag: "1")
+        healthScript.failNextLaunch = true
+        let outcome = await controller.upgrade(
+            to: next,
+            rollingBackTo: previous,
+            environment: environment
+        )
+
+        guard case .running = await controller.state else {
+            Issue.record("expected running after rollback, got \(await controller.state)")
+            return
+        }
+        #expect(outcome == .rolledBack)
+        #expect(await controller.currentImageReference == previous)
     }
 }
 

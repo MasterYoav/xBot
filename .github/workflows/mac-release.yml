@@ -37,9 +37,14 @@ jobs:
       - name: Create DMG
         run: scripts/create-dmg.sh
 
-      # Signing and notarization require CI secrets — see docs/11-packaging-and-updates.md
-      # - run: codesign --deep --force --options runtime --sign "$MACOS_SIGNING_IDENTITY" apps/mac/XBot.app
-      # - run: xcrun notarytool submit dist/xBot.dmg --wait --apple-id ... --team-id ... --password ...
+      - name: Sign and notarize
+        if: env.MACOS_SIGNING_IDENTITY != ''
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: scripts/sign-mac-app.sh
 
       - uses: actions/upload-artifact@v4
         with:

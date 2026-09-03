@@ -75,21 +75,22 @@ public enum ModelProviderCatalog: Sendable {
     /// How a catalogue row reaches the engine's router: a provider id, and a base URL when the
     /// router needs one.
     ///
-    /// The two vocabularies differ on purpose. The catalogue is what a person picks from — "xAI",
-    /// "Ollama" — while the router has one `openai-compatible` adapter that reaches both, and a
-    /// dozen others, through a base URL. Mapping here rather than in the engine keeps the router's
-    /// provider list short and keeps vendor branding out of it.
-    ///
-    /// ⚠️ Ollama's address is the host's, seen from inside the container: `localhost` there is the
-    /// container's own loopback, not the Mac's. `host.docker.internal` is what Docker Desktop and
-    /// Colima provide, and the runtime driver already passes it as the tool callback host. Apple's
-    /// Containerization framework networks differently — tracked in docs/07-container-runtime.md.
-    public static func engineRouting(for providerID: String) -> (id: String, baseURL: String?)? {
+    /// `hostGateway` is the address the container uses to reach the Mac — from
+    /// `ContainerDriver.hostGatewayAddress()`. Ollama listens on the host at port 11434; inside the
+    /// container `localhost` is wrong.
+    public static func ollamaBaseURL(hostGateway: String = "host.docker.internal") -> String {
+        "http://\(hostGateway):11434/v1"
+    }
+
+    public static func engineRouting(
+        for providerID: String,
+        hostGateway: String = "host.docker.internal"
+    ) -> (id: String, baseURL: String?)? {
         switch providerID {
         case "anthropic", "openai", "google": (id: providerID, baseURL: nil)
         case "xai": (id: "openai-compatible", baseURL: "https://api.x.ai/v1")
         case "ollama":
-            (id: "openai-compatible", baseURL: "http://host.docker.internal:11434/v1")
+            (id: "openai-compatible", baseURL: ollamaBaseURL(hostGateway: hostGateway))
         default: nil
         }
     }
@@ -112,11 +113,14 @@ public enum ModelProviderCatalog: Sendable {
     }
 
     /// Picker rows when the engine has not published a model list yet (M5 fallback).
-    public static func selections(forConnectedProviders providerIDs: Set<String>) -> [ModelSelection] {
+    public static func selections(
+        forConnectedProviders providerIDs: Set<String>,
+        hostGateway: String = "host.docker.internal"
+    ) -> [ModelSelection] {
         providerIDs.compactMap { id in
             guard let option = option(id: id),
                   let model = modelChoices(forConnectedProviders: [id]).first,
-                  let routing = engineRouting(for: id)
+                  let routing = engineRouting(for: id, hostGateway: hostGateway)
             else { return nil }
             return ModelSelection(
                 provider: option.name,
@@ -131,8 +135,10 @@ public enum ModelProviderCatalog: Sendable {
     /// Every model the agent picker can offer: the connected vendors, plus what was added by hand.
     public static func selections(
         forConnectedProviders providerIDs: Set<String>,
-        custom: [CustomProvider]
+        custom: [CustomProvider],
+        hostGateway: String = "host.docker.internal"
     ) -> [ModelSelection] {
-        selections(forConnectedProviders: providerIDs) + custom.map(selection(for:))
+        selections(forConnectedProviders: providerIDs, hostGateway: hostGateway)
+            + custom.map(selection(for:))
     }
 }

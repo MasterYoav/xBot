@@ -63,7 +63,7 @@ generates support mail from people who cannot describe it.
 
 ## Build pipeline (today)
 
-Unsigned local releases are scripted; signing and Sparkle remain open (M7). Step-by-step:
+Unsigned local releases are scripted; signing runs when CI secrets are set (M7). Step-by-step:
 [`scripts/README-packaging.md`](../scripts/README-packaging.md).
 
 | Script | Purpose |
@@ -73,14 +73,16 @@ Unsigned local releases are scripted; signing and Sparkle remain open (M7). Step
 | `scripts/create-dmg.sh` | Unsigned DMG with Applications alias |
 | `scripts/build-engine-image.sh` | Local dev image `xbot/engine:1` |
 | `scripts/generate-engine-manifest.sh` | Pinned digest manifest for updates |
+| `scripts/sign-mac-app.sh` | Developer ID sign + optional notarization when env vars are set |
 | `scripts/build-engine-manifest.py` | Assembles that JSON from environment values |
 | `scripts/read-health-field.py` | Reads one field from a `/health` response |
 | `scripts/verify-m5-handoff.sh` | Smoke check against a live engine |
 
 CI: `.github/workflows/mac-release.yml` builds and uploads an unsigned artifact;
 `.github/workflows/engine-image.yml` builds the engine image, **pushes it to
-`ghcr.io/masteryoav/xbot-engine`**, and uploads a manifest pinning the pushed digest. Developer ID
-signing, notarization, and Sparkle appcast generation are **not wired yet**.
+`ghcr.io/masteryoav/xbot-engine`**, and uploads a manifest pinning the pushed digest. Sparkle is
+linked in the app but inactive until release `Info.plist` keys and an appcast exist; signing runs
+when `mac-release` CI secrets are set.
 
 ### Two ordering rules in CI that are not obvious
 

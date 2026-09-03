@@ -22,10 +22,10 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 | The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
 | The right panel | Built — Screen, Activity, Routines, Agent settings (model picker, **What it can reach**, Connection, Handoff grants) |
 | Command palette | Built — search, open, create. **`Tab` adds an agent to the current channel** (creates a multi-agent channel). Footer shows both verbs |
-| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine, container adoption. A stopped-but-installed runtime is now **started** rather than reported as missing. Image published to ghcr; the app still names the local `xbot/engine:1` tag rather than reading the manifest |
+| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine, container adoption. A stopped-but-installed runtime is now **started** rather than reported as missing. Image published to ghcr; the app fetches `manifests/engine-stable.json` for a pinned digest before each pull |
 | Design system | Built — tokens, aurora field, frosted glass, Reduce Motion and Reduce Transparency inside tokens |
 | Onboarding | **Built (M6 in progress)** — five steps, Colima install-for-me, engine adoption, provider keys, handoff to main window. VM clean-machine validation still open |
-| Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General (engine status, version, address, start/stop/restart, diagnostics), Models (providers, custom providers), Advanced (Plugins, uninstall). Agents, Computer, Usage, Updates **not yet** |
+| Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General (engine status, version, address, start/stop/restart, diagnostics), Models (providers, custom providers), Updates (check + install), Advanced (Plugins, uninstall). Agents, Computer, Usage **not yet** |
 | Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). Other admin surfaces (audit, credentials, playground, …) **not embedded** |
 
 ## The main window
@@ -280,8 +280,7 @@ footer states both, because a keyboard affordance nobody knows about does not ex
 
 A standard macOS `Settings` scene. Tabs, not a sidebar-in-a-sheet.
 
-**Shipped today:** General (placeholder copy) and Advanced (opens Plugins admin). All other tabs below
-are spec — not built yet.
+**Shipped today:** General, Models, Updates (Sparkle scaffold — active when appcast keys are bundled; engine check on launch + install with health rollback; blocked while a turn is streaming; schema migration dump still open), and Advanced (Plugins, uninstall). Agents, Computer, Usage **not yet**.
 
 | Tab | Contents |
 | --- | --- |
@@ -291,7 +290,7 @@ are spec — not built yet.
 | **Computer** | What agents may reach. Policy rules in plain language, with an advanced editor |
 | **Usage** | Tokens and estimated cost, per agent and per provider. **No percentage meter** — see [04](04-model-providers.md) |
 | **Advanced** | Engine state, ports, volumes, resource limits, admin surfaces, diagnostics, reset |
-| **Updates** | App and engine versions, channel, check now |
+| **Updates** | App and engine versions, channel, check now, install when a newer digest is published (blocked while a turn is streaming) |
 
 ### General
 

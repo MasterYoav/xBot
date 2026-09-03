@@ -38,14 +38,37 @@ Before each release candidate, on a snapshot with **no Homebrew, no Docker, no d
 5. Take control → release control
 6. Copy diagnostics from a forced failure — confirm no keys in clipboard
 
-# Sparkle updates (M7 — not wired yet)
+# Sparkle updates
 
-When CI has an EdDSA key, add Sparkle 2 to `XBotApp` per `docs/11-packaging-and-updates.md`:
+Sparkle 2 is linked through SwiftPM (`Package.swift`). It stays **inert** until a release
+`Info.plist` includes `SUFeedURL` and `SUPublicEDKey` (EdDSA public key from
+`generate_keys` / `generate_appcast`).
 
-- Appcast URL: `https://releases.example.com/xbot/appcast.xml`
-- `SUPublicEDKey` in Info.plist
-- `SPUStandardUpdaterController` in app delegate
-- Never prompt during an active agent turn
+Release Info.plist keys (injected at CI pack time, not committed with secrets):
 
-Until then, ship via signed DMG only (`scripts/create-dmg.sh`).
+```xml
+<key>SUFeedURL</key>
+<string>https://releases.example.com/xbot/appcast.xml</string>
+<key>SUPublicEDKey</key>
+<string>base64-public-key</string>
+<key>SUEnableAutomaticChecks</key>
+<true/>
+<key>SUAutomaticallyUpdate</key>
+<false/>
+```
+
+`scripts/bundle-mac-app.sh` embeds `Sparkle.framework` when present. Settings → Updates exposes
+**Check for app update**; checks are deferred while a turn is streaming.
+
+When CI has signing credentials:
+
+```sh
+export MACOS_SIGNING_IDENTITY="Developer ID Application: …"
+export APPLE_ID=…
+export APPLE_TEAM_ID=…
+export APPLE_APP_PASSWORD=…
+scripts/sign-mac-app.sh
+```
+
+Until appcast + EdDSA key exist in CI, ship via signed DMG only.
 

@@ -23,6 +23,9 @@ let package = Package(
     products: [
         .executable(name: "XBot", targets: ["XBotApp"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+    ],
     targets: [
         .target(name: "XBotEngine", swiftSettings: strict),
         .target(name: "XBotRuntime", dependencies: ["XBotEngine"], swiftSettings: strict),
@@ -40,10 +43,17 @@ let package = Package(
         ),
         .executableTarget(
             name: "XBotApp",
-            dependencies: ["XBotUI", "XBotCore", "XBotOnboarding", "XBotRuntime"],
+            dependencies: [
+                "XBotUI",
+                "XBotCore",
+                "XBotOnboarding",
+                "XBotRuntime",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             resources: [
                 .copy("Resources/Assets.car"),
                 .copy("Resources/xBot.icns"),
+                .copy("Resources/engine-manifest-fallback.json"),
             ],
             swiftSettings: strict
         ),

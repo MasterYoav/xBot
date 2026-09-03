@@ -49,9 +49,12 @@ user already has. No key. If it is not installed, the row offers a link, not an 
 | Agent settings model picker | Dropdown in panel, backed by `ModelProviderCatalog` |
 | Settings → Models | **Built.** Provider rows with live connect/disconnect, Ollama detection, and **Add a custom provider** |
 
-**Not built yet:** native Anthropic/OpenAI/Google adapters (compatible mode reaches all three), the
-container-to-host Ollama address (the ⚠️ below), usage accounting, and the live two-vendor smoke
-that closes M2.
+**Not built yet:** native Anthropic/OpenAI/Google adapters (compatible mode reaches all three),
+usage accounting, and the live two-vendor smoke that closes M2.
+
+**Ollama container routing:** the app probes Ollama on the host (`localhost:11434`) and routes
+engine calls through `hostGatewayAddress()` from the runtime driver
+(`http://<gateway>:11434/v1`), not `localhost` inside the container.
 
 ### Two bugs this path shipped with, for anyone reading the history
 
@@ -207,11 +210,9 @@ picker shows a tools badge, and selecting a model without it warns that the agen
 to use its computer. **Silently degrading an agent to text-only is the worst outcome here** — a user
 watching their agent fail to click anything with no explanation will conclude xBot is broken.
 
-**⚠️ Open question:** the container reaching the host's Ollama. Inside a container,
-`localhost:11434` is the container's own loopback. `host.docker.internal` works on Docker Desktop
-and upstream already uses it for the tool callback URL. Apple's Containerization framework networks
-differently. The runtime driver must resolve a host-reachable address at start and hand it to the
-engine as a setting. Tracked in [07-container-runtime.md](07-container-runtime.md).
+**Resolved:** the container reaches the host's Ollama via `hostGatewayAddress()` — passed into
+`ModelProviderCatalog.ollamaBaseURL(hostGateway:)` when building model selections. The app still
+probes `localhost:11434` on the Mac for detection; only the engine-facing URL uses the gateway.
 
 ## Costs and limits
 
