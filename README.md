@@ -2,7 +2,6 @@
 
 <img src="assets/banner.png" alt="xBot" width="100%">
 
-# xBot
 
 **Your own AI coworkers, on your own Mac.**
 
