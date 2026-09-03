@@ -80,7 +80,10 @@ jobs:
 
   mac:
     name: mac — build, test
-    runs-on: macos-15
+    # macos-26, not macos-15: xBot.icon is Icon Composer's format and only Xcode 26's actool can
+    # compile it. On the older image the step ran and reported "actool did not produce Assets.car",
+    # and the Swift build then failed on the resources Package.swift declares.
+    runs-on: macos-26
     defaults:
       run:
         working-directory: apps/mac
