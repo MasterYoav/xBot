@@ -8,6 +8,7 @@ import XBotRuntime
 /// wiring. `FakeDriver` stands in for Docker, the same way it does in `RuntimeControllerTests`, so
 /// every state the container's state machine can reach is exercised without one.
 @MainActor
+@Suite(.serialized)
 struct RuntimeConnectedTests {
     private func controller(
         script: FakeDriver.Script = FakeDriver.Script(),
@@ -16,7 +17,9 @@ struct RuntimeConnectedTests {
         RuntimeController(
             driver: FakeDriver(script: script),
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in healthy }
+            health: { _ in
+                healthy ? EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") : nil
+            }
         )
     }
 
@@ -39,7 +42,10 @@ struct RuntimeConnectedTests {
         let state = AppState(
             runtime: runtime,
             environment: environment,
-            engineFactory: { _ in StubEngineClient(tokenDelay: .zero) }
+            engineFactory: { _ in StubEngineClient(tokenDelay: .zero) },
+            // Its own domain. Resetting the shared one used to race the provider suite, which
+            // reads the same two keys — the composer assertions below are about the runtime.
+            providers: isolatedConnectionStore()
         )
         return (state, runtime)
     }
