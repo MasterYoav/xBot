@@ -61,10 +61,9 @@ struct XBotApp: App {
         }
         .defaultSize(width: 960, height: 720)
 
-        Settings {
-            SettingsRootView()
-                .environment(state)
-        }
+        // No `Settings` scene. Settings live in the main window — see `AppState.isShowingSettings`.
+        // A separate floating panel put them somewhere the person had to go and find, and it hid
+        // the rail, so which agent was selected stopped being visible while its model was changed.
     }
 
     /// Stub debug builds skip onboarding so the main window is reachable without Docker.

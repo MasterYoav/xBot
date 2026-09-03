@@ -37,11 +37,24 @@ public struct Rail: View {
 
             Spacer()
 
-            Image(systemName: "person.crop.circle")
-                .font(.system(size: 22))
-                .foregroundStyle(Palette.textSecondary)
-                .padding(.bottom, Space.m)
-                .accessibilityLabel(String(localized: "You"))
+            // The way into settings, and the only one that does not need a keyboard. This was an
+            // inert `person.crop.circle` — a control-shaped thing that did nothing, which is worse
+            // than no control at all.
+            Button {
+                withAnimation(Motion.panel) { state.isShowingSettings.toggle() }
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 17, weight: .medium))
+                    .symbolVariant(state.isShowingSettings ? .fill : .none)
+                    .foregroundStyle(
+                        state.isShowingSettings ? Palette.textPrimary : Palette.textSecondary
+                    )
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(XBotButtonStyle())
+            .padding(.bottom, Space.m)
+            .accessibilityLabel(String(localized: "Settings"))
+            .accessibilityAddTraits(state.isShowingSettings ? .isSelected : [])
         }
         .padding(.top, Space.m)
         .frame(width: Metrics.railWidth)

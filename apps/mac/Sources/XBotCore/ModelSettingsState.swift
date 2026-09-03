@@ -47,18 +47,26 @@ public struct ProviderRow: Identifiable, Sendable, Equatable {
 public final class ModelSettingsState {
     public private(set) var rows: [ProviderRow] = []
 
+    /// The providers this person added themselves, shown under the vendor list.
+    public private(set) var custom: [CustomProvider] = []
+    /// What is wrong with the "add a custom provider" form, if anything.
+    public private(set) var customProblem: String?
+
     private let validator: ModelProviderValidator
     private let vault: ProviderKeyVault
     private let connections: ProviderConnectionStore
+    private let customStore: CustomProviderStore
 
     public init(
         validator: ModelProviderValidator = ModelProviderValidator(),
         vault: ProviderKeyVault = .keychain,
-        connections: ProviderConnectionStore = .shared
+        connections: ProviderConnectionStore = .shared,
+        customStore: CustomProviderStore = .shared
     ) {
         self.validator = validator
         self.vault = vault
         self.connections = connections
+        self.customStore = customStore
         rows = ModelProviderCatalog.all.map {
             ProviderRow(
                 id: $0.id,
@@ -76,6 +84,7 @@ public final class ModelSettingsState {
     /// connected a provider and then quit before onboarding finished still has a working key, and
     /// a screen that showed it as not connected would invite them to paste it a second time.
     public func load() {
+        custom = customStore.all
         for index in rows.indices where rows[index].needsKey {
             let stored = (try? vault.key(rows[index].id)) ?? nil
             // Zero rather than a remembered count: the number comes from the vendor, and this
@@ -149,5 +158,79 @@ public final class ModelSettingsState {
             return
         }
         rows[index].state = .notConnected
+    }
+
+    /// Add an endpoint the person typed, after checking that it answers.
+    ///
+    /// The endpoint is called before it is stored, the same order a vendor key follows and for the
+    /// same reason: an entry that was never reachable is a provider the agent picker offers and
+    /// every message then fails on.
+    ///
+    /// The key is optional throughout. A model on this machine asks for none, and requiring one
+    /// would rule out the local case the custom row exists to serve.
+    public func addCustomProvider(
+        name: String,
+        baseURL: String,
+        model: String,
+        key: String
+    ) async -> Bool {
+        customProblem = nil
+        let trimmedKey = ProviderKeyStore.normalize(key)
+        if let problem = CustomProviderStore.problem(
+            name: name,
+            baseURL: baseURL,
+            hasKey: !trimmedKey.isEmpty
+        ) {
+            customProblem = Self.sentence(for: problem)
+            return false
+        }
+
+        let trimmedURL = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = await validator.validateCompatible(baseURL: trimmedURL, key: trimmedKey)
+        guard case .valid = result else {
+            if case .invalid(let message) = result { customProblem = message }
+            return false
+        }
+
+        let provider = CustomProvider(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            baseURL: trimmedURL,
+            model: model.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        if !trimmedKey.isEmpty {
+            do {
+                try vault.save(trimmedKey, provider.id)
+            } catch {
+                customProblem = String(localized: "The key couldn't be saved to your Keychain.")
+                return false
+            }
+        }
+        customStore.add(provider)
+        connections.markConnected(provider.id)
+        custom = customStore.all
+        return true
+    }
+
+    /// Forget a custom provider, and its key with it.
+    public func removeCustomProvider(id: String) {
+        // Removed before the record, so a failure here cannot leave a key behind with nothing
+        // naming it — an orphan in the Keychain that no screen can ever show or delete.
+        try? vault.remove(id)
+        customStore.remove(id: id)
+        custom = customStore.all
+    }
+
+    private static func sentence(for problem: CustomProviderProblem) -> String {
+        switch problem {
+        case .nameMissing: String(localized: "Give this provider a name.")
+        case .urlMissing: String(localized: "Add the address of the endpoint.")
+        case .urlMalformed:
+            String(localized: "That doesn't look like a web address. It should start with https://")
+        case .insecureKeyOverPlainHTTP:
+            String(
+                localized:
+                    "This address isn't secure, so a key sent to it could be read by others on the network. Use https:// instead."
+            )
+        }
     }
 }

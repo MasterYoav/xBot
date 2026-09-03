@@ -57,6 +57,28 @@ public struct ModelProviderValidator: Sendable {
         }
     }
 
+    /// Any endpoint speaking the OpenAI API — a gateway, OpenRouter, Groq, LM Studio, vLLM.
+    ///
+    /// `/models` on the base URL, which is the one call every compatible implementation answers.
+    /// The key is optional because a model on the person's own machine asks for none, and sending
+    /// an empty Authorization header to something that wants no key is how a working endpoint gets
+    /// reported as broken.
+    public func validateCompatible(baseURL: String, key: String) async -> ProviderValidationResult {
+        let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Tolerated rather than required: people paste a base URL with and without it, and being
+        // strict here means a correct endpoint is rejected over a character.
+        let root = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        guard let url = URL(string: "\(root)/models") else {
+            return .invalid(message: String(localized: "That doesn't look like a web address."))
+        }
+        let normalized = ProviderKeyStore.normalize(key)
+        return await validateHTTP(
+            url: url,
+            headers: normalized.isEmpty ? [:] : ["Authorization": "Bearer \(normalized)"],
+            countPath: ["data"]
+        )
+    }
+
     public func detectOllama() async -> ProviderValidationResult? {
         switch await validateOllama() {
         case .valid(let count): .valid(modelCount: count)

@@ -94,6 +94,23 @@ public enum ModelProviderCatalog: Sendable {
         }
     }
 
+    /// A provider the person added by hand, as the router sees it.
+    ///
+    /// Always `openai-compatible`: that is the whole point of the custom row. The endpoint carries
+    /// the identity, so the base URL is what distinguishes one from another.
+    public static func selection(for custom: CustomProvider) -> ModelSelection {
+        ModelSelection(
+            provider: custom.name,
+            providerID: "openai-compatible",
+            model: custom.model,
+            baseURL: custom.baseURL,
+            // Not claimed. An arbitrary endpoint's capabilities are not knowable from here, and
+            // docs/04 is explicit that silently degrading an agent to text-only is the worst
+            // outcome — better to promise nothing than to promise tools it may not have.
+            capabilities: []
+        )
+    }
+
     /// Picker rows when the engine has not published a model list yet (M5 fallback).
     public static func selections(forConnectedProviders providerIDs: Set<String>) -> [ModelSelection] {
         providerIDs.compactMap { id in
@@ -109,5 +126,13 @@ public enum ModelProviderCatalog: Sendable {
                 capabilities: ["tools"]
             )
         }
+    }
+
+    /// Every model the agent picker can offer: the connected vendors, plus what was added by hand.
+    public static func selections(
+        forConnectedProviders providerIDs: Set<String>,
+        custom: [CustomProvider]
+    ) -> [ModelSelection] {
+        selections(forConnectedProviders: providerIDs) + custom.map(selection(for:))
     }
 }

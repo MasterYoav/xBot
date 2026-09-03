@@ -15,10 +15,17 @@ public struct MainWindow: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
 
-            Conversation()
-                .frame(minWidth: Metrics.conversationMinimumWidth)
+            if state.isShowingSettings {
+                SettingsRootView()
+                    .frame(minWidth: Metrics.conversationMinimumWidth)
+                    // In from the trailing edge and back out the same way.
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                Conversation()
+                    .frame(minWidth: Metrics.conversationMinimumWidth)
+            }
 
-            if state.isPanelVisible {
+            if state.isPanelVisible, !state.isShowingSettings {
                 Divider().overlay(Palette.separator.opacity(0.35))
                 Panel()
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -67,6 +74,7 @@ public struct MainWindow: View {
         .background(WindowChromeConfigurator())
         .motion(Motion.panel, value: state.isRailVisible)
         .motion(Motion.panel, value: state.isPanelVisible)
+        .motion(Motion.panel, value: state.isShowingSettings)
         .task { await state.load() }
     }
 
@@ -93,6 +101,20 @@ public struct MainWindow: View {
         Group {
             Button("") { isPaletteOpen.toggle() }
                 .keyboardShortcut("k", modifiers: .command)
+
+            // The shortcut people already have in their fingers, kept even though settings are no
+            // longer a separate scene.
+            Button("") {
+                withAnimation(Motion.panel) { state.isShowingSettings.toggle() }
+            }
+            .keyboardShortcut(",", modifiers: .command)
+
+            Button("") {
+                if state.isShowingSettings {
+                    withAnimation(Motion.panel) { state.isShowingSettings = false }
+                }
+            }
+            .keyboardShortcut(.escape, modifiers: [])
 
             ForEach(Array(state.agents.prefix(9).enumerated()), id: \.element.id) { index, agent in
                 Button("") { state.select(agent.id) }

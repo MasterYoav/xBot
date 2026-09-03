@@ -87,6 +87,14 @@ public final class AppState {
         didSet { retuneScreen() }
     }
     /// The agent rail. Toggled from the title bar; hidden state is remembered for the session.
+    /// Whether the settings surface is showing in place of the conversation.
+    ///
+    /// In the window rather than a separate `Settings` scene: xBot's settings are part of using the
+    /// app — connecting a model is step four of onboarding, not an afterthought — and a second
+    /// floating window puts them somewhere the person has to go and find. It also loses the rail,
+    /// so which agent is selected stops being visible while its model is being changed.
+    public var isShowingSettings = false
+
     public var isRailVisible = true
     public var panelSection: PanelSection = .screen {
         didSet { retuneScreen() }
@@ -182,6 +190,9 @@ public final class AppState {
     /// for statically, so this state's behaviour does not depend on the machine it runs on.
     private let providers: ProviderConnectionStore
 
+    /// Endpoints the person added by hand, which the agent picker offers alongside the vendors.
+    private let customProviders = CustomProviderStore.shared
+
     public var selectedAgent: Agent? {
         agents.first { $0.id == selectedAgentID }
     }
@@ -221,7 +232,8 @@ public final class AppState {
             models = (try? await engine.availableModels()) ?? []
             if models.isEmpty {
                 models = ModelProviderCatalog.selections(
-                    forConnectedProviders: providers.connectedProviderIDs
+                    forConnectedProviders: providers.connectedProviderIDs,
+                    custom: customProviders.all
                 )
             }
             status = nil
