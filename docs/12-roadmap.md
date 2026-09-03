@@ -271,6 +271,16 @@ install, connected-account management, and the remaining admin surfaces without 
 - **Local model management.** Detect and surface MLX or llama.cpp alongside Ollama.
 - **Shared agents.** Export an agent as a file another xBot user can import. Not a marketplace — a
   file.
+- **Import agents you already have.** Bring in the agents, projects and custom instructions a person
+  has already built elsewhere — Claude, Gemini, Copilot, ChatGPT — and from an `AGENT.md` /
+  `CLAUDE.md` file on disk. The file case is the one to build first and the one that should ship
+  alone if the others stall: it needs no vendor account, no OAuth, and no API that can be withdrawn,
+  and a repository's own agent file is the format this audience already writes. The account
+  importers are each a separate integration with a separate export format, so they are worth
+  ordering by whichever has a real export endpoint rather than a scrape. **Open question:** what an
+  imported agent inherits — a system prompt maps cleanly onto `roleDescription`, but tools, grants
+  and memory do not, and an import that silently drops the tools an agent had is an agent that
+  quietly stops working. Better to state what did not come across than to import it halfway.
 
 ---
 
