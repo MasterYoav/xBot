@@ -18,37 +18,50 @@ public struct Conversation: View {
     public var body: some View {
         VStack(spacing: 0) {
             header
-            Divider().overlay(Palette.separator)
+            if showModelBanner {
+                modelBanner
+                Divider().overlay(Palette.separator.opacity(0.35))
+            }
+            if state.status != nil {
+                Divider().overlay(Palette.separator.opacity(0.35))
+            }
             messages
             composer
         }
-        .background(Palette.windowBackground)
+        .background(.clear)
+    }
+
+    private var showModelBanner: Bool {
+        state.composerBlock == .noModelConnected && !state.modelBannerDismissed
+    }
+
+    private var modelBanner: some View {
+        HStack(spacing: Space.m) {
+            Text(String(localized: "Connect a model in Settings to send messages."))
+                .captionText()
+                .foregroundStyle(Palette.textSecondary)
+            Spacer()
+            Button(String(localized: "Dismiss")) {
+                state.dismissModelBanner()
+            }
+            .buttonStyle(.link)
+            .font(Typography.caption)
+        }
+        .padding(.horizontal, Space.xl)
+        .padding(.vertical, Space.s)
+        .background(Palette.elevatedSurface.opacity(0.6))
     }
 
     private var header: some View {
-        ZStack {
-            HStack(spacing: Space.s) {
-                if let agent = state.selectedAgent {
-                    AgentAvatar(agent: agent, size: .small)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(agent.name).bodyEmphasis()
-                        Text(agent.label)
-                            .captionText()
-                            .foregroundStyle(Palette.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer()
-            }
-            .padding(.horizontal, Space.l)
-            .padding(.vertical, Space.m)
-
-            // Floating, centred, over the content — not part of the layout.
+        Group {
             if let status = state.status {
-                StatusPill(text: status.sentence)
+                ZStack {
+                    StatusPill(text: status.sentence)
+                }
+                .padding(.vertical, Space.m)
+                .motion(Motion.panel, value: state.status)
             }
         }
-        .motion(Motion.panel, value: state.status)
     }
 
     private var messages: some View {

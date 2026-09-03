@@ -1,7 +1,7 @@
 import SwiftUI
 import XBotCore
 
-/// Rail, conversation, panel.
+/// Rail, conversation, panel — over an aurora field, with chrome in the title bar.
 public struct MainWindow: View {
     @Environment(AppState.self) private var state
     @State private var isPaletteOpen = false
@@ -9,61 +9,84 @@ public struct MainWindow: View {
     public init() {}
 
     public var body: some View {
-        GeometryReader { geometry in
-            let panelIsOverlay = geometry.size.width < Metrics.panelCollapsesBelow
-
-            HStack(spacing: 0) {
+        HStack(spacing: 0) {
+            if state.isRailVisible {
                 Rail(isPaletteOpen: $isPaletteOpen)
-                Conversation()
-                    .overlay(alignment: .topTrailing) { panelToggle }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
 
-                // Below ~1100pt the panel stops being a column and becomes an overlay: at that
-                // width a 320pt column leaves the conversation too narrow to read comfortably,
-                // and a cramped conversation is a worse trade than a covered one.
-                if state.isPanelVisible && !panelIsOverlay {
-                    Divider().overlay(Palette.separator)
-                    Panel()
-                }
+            Conversation()
+                .frame(minWidth: Metrics.conversationMinimumWidth)
+
+            if state.isPanelVisible {
+                Divider().overlay(Palette.separator.opacity(0.35))
+                Panel()
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
-            .overlay(alignment: .trailing) {
-                if state.isPanelVisible && panelIsOverlay {
-                    Panel()
-                        .shadow(color: .black.opacity(0.18), radius: 16, x: -4)
-                }
-            }
-            .motion(Motion.panel, value: state.isPanelVisible)
         }
         .frame(
             minWidth: Metrics.minimumWindow.width,
             minHeight: Metrics.minimumWindow.height
         )
+        .background {
+            AuroraBackground()
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                sidebarToggle(
+                    isVisible: state.isRailVisible,
+                    symbol: "sidebar.left",
+                    label: String(localized: "Toggle agent rail")
+                ) {
+                    state.isRailVisible.toggle()
+                }
+            }
+            ToolbarItem(placement: .principal) {
+                TitleBarAgentTitle()
+            }
+            ToolbarItem(placement: .primaryAction) {
+                sidebarToggle(
+                    isVisible: state.isPanelVisible,
+                    symbol: "sidebar.right",
+                    label: String(localized: "Toggle panel")
+                ) {
+                    state.isPanelVisible.toggle()
+                }
+            }
+        }
+        .toolbarRole(.editor)
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .overlay {
             if isPaletteOpen {
                 CommandPalette(isOpen: $isPaletteOpen)
             }
         }
         .background {
-            // Keyboard shortcuts live on zero-size buttons rather than in a menu, because this
-            // package has no menu bar yet and a shortcut nobody can reach is not a shortcut.
             shortcuts
         }
+        .background(WindowChromeConfigurator())
+        .motion(Motion.panel, value: state.isRailVisible)
+        .motion(Motion.panel, value: state.isPanelVisible)
         .task { await state.load() }
     }
 
-    @ViewBuilder
-    private var panelToggle: some View {
-        if !state.isPanelVisible {
-            Button {
-                state.isPanelVisible = true
-            } label: {
-                Image(systemName: "sidebar.right")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Palette.textSecondary)
-            }
-            .buttonStyle(XBotButtonStyle())
-            .padding(Space.m)
-            .accessibilityLabel(String(localized: "Show panel"))
+    private func sidebarToggle(
+        isVisible: Bool,
+        symbol: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .medium))
+                .symbolVariant(isVisible ? .fill : .none)
+                .foregroundStyle(isVisible ? Palette.textPrimary : Palette.textSecondary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isVisible ? .isSelected : [])
     }
 
     private var shortcuts: some View {
@@ -71,7 +94,6 @@ public struct MainWindow: View {
             Button("") { isPaletteOpen.toggle() }
                 .keyboardShortcut("k", modifiers: .command)
 
-            // ⌘1–⌘9 select an agent, as the command palette advertises.
             ForEach(Array(state.agents.prefix(9).enumerated()), id: \.element.id) { index, agent in
                 Button("") { state.select(agent.id) }
                     .keyboardShortcut(

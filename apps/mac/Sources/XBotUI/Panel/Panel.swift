@@ -26,7 +26,7 @@ public struct Panel: View {
         }
         .frame(width: Metrics.panelWidth.lowerBound)
         .frame(maxHeight: .infinity)
-        .xbotMaterial(Materials.panel, opaqueFallback: Palette.panelBackground)
+        .frostedGlass(opaqueFallback: Palette.panelBackground)
         // Enters and exits to the right, always. A panel that slid in from the right and faded
         // out in place would read as two different objects.
         .transition(.move(edge: .trailing))

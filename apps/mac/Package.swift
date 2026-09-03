@@ -25,22 +25,32 @@ let package = Package(
     ],
     targets: [
         .target(name: "XBotEngine", swiftSettings: strict),
-        .target(name: "XBotRuntime", swiftSettings: strict),
+        .target(name: "XBotRuntime", dependencies: ["XBotEngine"], swiftSettings: strict),
         .target(name: "XBotCore", dependencies: ["XBotEngine", "XBotRuntime"], swiftSettings: strict),
-        .target(name: "XBotUI", dependencies: ["XBotCore"], swiftSettings: strict),
+        .target(
+            name: "XBotUI",
+            dependencies: ["XBotCore"],
+            resources: [.copy("Resources/xBot.icns")],
+            swiftSettings: strict
+        ),
         .target(
             name: "XBotOnboarding",
-            dependencies: ["XBotUI", "XBotEngine", "XBotRuntime"],
+            dependencies: ["XBotUI", "XBotCore", "XBotEngine", "XBotRuntime"],
             swiftSettings: strict
         ),
         .executableTarget(
             name: "XBotApp",
             dependencies: ["XBotUI", "XBotCore", "XBotOnboarding", "XBotRuntime"],
+            resources: [
+                .copy("Resources/Assets.car"),
+                .copy("Resources/xBot.icns"),
+            ],
             swiftSettings: strict
         ),
 
         .testTarget(name: "XBotEngineTests", dependencies: ["XBotEngine"], swiftSettings: strict),
         .testTarget(name: "XBotRuntimeTests", dependencies: ["XBotRuntime"], swiftSettings: strict),
         .testTarget(name: "XBotCoreTests", dependencies: ["XBotCore"], swiftSettings: strict),
+        .testTarget(name: "XBotOnboardingTests", dependencies: ["XBotOnboarding"], swiftSettings: strict),
     ]
 )

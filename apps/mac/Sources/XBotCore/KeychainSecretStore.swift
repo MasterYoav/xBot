@@ -15,6 +15,28 @@ enum KeychainSecretStore {
         return fresh
     }
 
+    /// Read a user-supplied secret. Does not generate one.
+    static func readExisting(service: String, account: String) throws -> String? {
+        try read(service: service, account: account)
+    }
+
+    /// Write or replace a user-supplied secret.
+    static func write(_ value: String, service: String, account: String) throws {
+        try save(value, service: service, account: account)
+    }
+
+    static func remove(service: String, account: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw Error.writeFailed(status)
+        }
+    }
+
     private static func generate() throws -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
         let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)

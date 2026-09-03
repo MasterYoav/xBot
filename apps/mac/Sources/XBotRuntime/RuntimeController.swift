@@ -1,4 +1,5 @@
 import Foundation
+import XBotEngine
 
 /// Owns the container lifecycle, and the state machine the UI renders.
 ///
@@ -16,10 +17,12 @@ public actor RuntimeController {
 
     private let driver: any ContainerDriver
     private let image: ImageReference
-    private let health: @Sendable (EngineEndpoint) async -> Bool
+    private let health: @Sendable (EngineEndpoint) async -> EngineHealth?
+    private let startHealthDeadlineSeconds: Int
 
     private var handle: ContainerHandle?
     private var allocatedPort: UInt16?
+    private var lastHealth: EngineHealth?
     private var history: [String] = []
     private var continuations: [UUID: AsyncStream<RuntimeEvent>.Continuation] = [:]
 
@@ -28,15 +31,18 @@ public actor RuntimeController {
     public static let dataVolume = "xbot-data"
     public static let workspaceVolume = "xbot-workspace"
     public static let profilesVolume = "xbot-profiles"
+    public static let engineContainerName = "xbot-engine"
 
     public init(
         driver: any ContainerDriver,
         image: ImageReference,
-        health: @escaping @Sendable (EngineEndpoint) async -> Bool
+        health: @escaping @Sendable (EngineEndpoint) async -> EngineHealth?,
+        startHealthDeadlineSeconds: Int = 120
     ) {
         self.driver = driver
         self.image = image
         self.health = health
+        self.startHealthDeadlineSeconds = startHealthDeadlineSeconds
         self.allocatedPort = EnginePortStore.load()
     }
 
@@ -87,6 +93,10 @@ public actor RuntimeController {
                 try await driver.createVolume(volume)
             }
 
+            if await adoptExistingEngineIfHealthy() {
+                return
+            }
+
             state = .starting(.ports)
             // Persisted across launches: a port that moves breaks bookmarks, the CLI, and the
             // admin webview, so the previous choice is preferred over a fresh scan.
@@ -101,7 +111,7 @@ public actor RuntimeController {
             state = .starting(.container)
             let gateway = try await driver.hostGatewayAddress()
             let spec = ContainerSpec(
-                name: "xbot-engine",
+                name: Self.engineContainerName,
                 image: image,
                 ports: [port: port],
                 volumes: [
@@ -110,7 +120,9 @@ public actor RuntimeController {
                     Self.profilesVolume: "/profiles",
                 ],
                 environment: environment(port, gateway),
-                memoryLimitBytes: nil
+                memoryLimitBytes: EngineEnvironment.memoryLimitBytes(
+                    forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
+                )
             )
             handle = try await driver.run(spec)
 
@@ -118,7 +130,7 @@ public actor RuntimeController {
             // signal that they finished. That is why the first-run timeout is four times the rest.
             state = .starting(.migrations)
             state = .starting(.health)
-            let deadline = 120
+            let deadline = startHealthDeadlineSeconds
             guard await waitForHealth(endpoint, seconds: deadline) else {
                 state = .failed(.healthTimedOut(seconds: deadline))
                 return
@@ -144,10 +156,69 @@ public actor RuntimeController {
     /// health closure is responsible for checking the body identifies this engine.
     private func waitForHealth(_ endpoint: EngineEndpoint, seconds: Int) async -> Bool {
         for _ in 0..<seconds {
-            if await health(endpoint) { return true }
+            if let health = await health(endpoint) {
+                lastHealth = health
+                return true
+            }
             try? await Task.sleep(for: .seconds(1))
         }
         return false
+    }
+
+    /// Reconnect to an engine container left over from a previous app launch or dev session.
+    ///
+    /// Without this, `docker run --name xbot-engine` fails when the container already exists —
+    /// which is the common case during onboarding retries and local development.
+    private func adoptExistingEngineIfHealthy() async -> Bool {
+        guard let existing = await driver.containerNamed(Self.engineContainerName) else {
+            return false
+        }
+
+        var status = (try? await driver.inspect(existing)) ?? .notFound
+        if case .exited = status {
+            do {
+                try await driver.startContainer(existing)
+                status = (try? await driver.inspect(existing)) ?? .notFound
+            } catch {
+                try? await driver.remove(existing)
+                return false
+            }
+        }
+
+        guard case .running = status else {
+            try? await driver.remove(existing)
+            return false
+        }
+
+        guard let port = await driver.loopbackHostPort(for: existing) else {
+            return false
+        }
+
+        allocatedPort = port
+        EnginePortStore.save(port)
+        handle = existing
+
+        state = .starting(.health)
+        let endpoint = EngineEndpoint(port: port)
+        let deadline = 30
+        guard await waitForHealth(endpoint, seconds: deadline) else {
+            handle = nil
+            try? await driver.remove(existing)
+            return false
+        }
+
+        state = .running(endpoint)
+        return true
+    }
+
+    /// Re-probe while running. Used by diagnostics and the reconnecting pill.
+    public func checkHealth() async -> EngineHealth? {
+        guard case .running(let endpoint) = state else { return lastHealth }
+        if let health = await health(endpoint) {
+            lastHealth = health
+            return health
+        }
+        return nil
     }
 
     public func stop() async {
@@ -189,6 +260,7 @@ public actor RuntimeController {
 
         return Diagnostics(
             appVersion: appVersion,
+            engineVersion: lastHealth?.engineVersion,
             runtime: driver.identifier.displayName,
             architecture: Self.architecture,
             macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,

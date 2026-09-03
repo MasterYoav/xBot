@@ -72,6 +72,22 @@ public struct EngineEnvironment: Sendable {
         }
     }
 
+    /// How much RAM the container may use, derived from what the host has.
+    ///
+    /// Postgres, the engine, and Chromium together need headroom. Capping the container keeps an
+    /// agent-heavy session from evicting the rest of the Mac — which reads as "xBot is heavy"
+    /// rather than "I asked for too much".
+    public static func memoryLimitBytes(forPhysicalMemory bytes: UInt64) -> UInt64 {
+        let gigabytes = Double(bytes) / 1_073_741_824
+        let limitGB = switch gigabytes {
+        case ..<8: 4.0
+        case ..<16: 6.0
+        case ..<32: 8.0
+        default: 12.0
+        }
+        return UInt64(limitGB * 1_073_741_824)
+    }
+
     public static func compose(_ inputs: Inputs) -> [String: String] {
         var environment: [String: String] = [
             // The embedded database. One container, one port, one process tree.

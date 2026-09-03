@@ -3,60 +3,56 @@ import SwiftUI
 
 /// Semantic colour. Every token resolves in light and dark, and no view ever names a value.
 ///
-/// ponytail: defined in code rather than as an asset catalog. The spec writes these as
-/// `Color("WindowBackground")`, which needs one `.colorset` directory and JSON file per token —
-/// twenty-odd of them, hand-authored, for exactly the behaviour `NSColor(name:dynamicProvider:)`
-/// already gives. The rule the spec is protecting is "no view names a raw value", and that holds
-/// either way: the numbers live here and nowhere else. Move to an asset catalog when a designer
-/// needs to edit them without a compiler, which is the only thing this cannot do.
+/// Brand palette (official):
+///   Sakura Mist `#FFF3EC` · Coral Glaze `#FFC9A3` · Ibis Haze `#F08A8C` · Bellflower Purple `#B65E8C`
 public enum Palette {
-    // Surfaces
-    public static let windowBackground = dynamic(light: 0xFFFFFF, dark: 0x1C1C1E)
-    public static let railBackground = dynamic(light: 0xF2F2F7, dark: 0x161618)
-    public static let panelBackground = dynamic(light: 0xFAFAFC, dark: 0x1F1F22)
-    public static let elevatedSurface = dynamic(light: 0xFFFFFF, dark: 0x2C2C2E)
+    // Surfaces — warm sakura base in light, deep plum in dark.
+    public static let windowBackground = dynamic(light: 0xFFF3EC, dark: 0x181014)
+    public static let railBackground = dynamic(light: 0xFFEFE6, dark: 0x120C10)
+    public static let panelBackground = dynamic(light: 0xFFF8F3, dark: 0x1E1418)
+    public static let elevatedSurface = dynamic(light: 0xFFFFFF, dark: 0x261A20)
 
-    // Message bubbles, from the Grok Bot reference: light neutral in, near-black out.
-    public static let bubbleIncoming = dynamic(light: 0xF1F1F4, dark: 0x2C2C2E)
-    public static let bubbleIncomingText = dynamic(light: 0x111113, dark: 0xF5F5F7)
-    public static let bubbleOutgoing = dynamic(light: 0x1A1A1C, dark: 0xE8E8EA)
-    public static let bubbleOutgoingText = dynamic(light: 0xFFFFFF, dark: 0x111113)
+    // Message bubbles
+    public static let bubbleIncoming = dynamic(light: 0xFFE8DC, dark: 0x2A1C22)
+    public static let bubbleIncomingText = dynamic(light: 0x2A1820, dark: 0xFFF3EC)
+    public static let bubbleOutgoing = dynamic(light: 0xB65E8C, dark: 0xC9789E)
+    public static let bubbleOutgoingText = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF)
 
     // Text
-    public static let textPrimary = Color.primary
+    public static let textPrimary = dynamic(light: 0x2A1820, dark: 0xFFF3EC)
     public static let textSecondary = Color.secondary
-    public static let textTertiary = dynamic(light: 0x9A9AA0, dark: 0x77777C)
+    public static let textTertiary = dynamic(light: 0x9A7080, dark: 0xA08090)
 
     // Separators
-    public static let separator = dynamic(light: 0xE3E3E8, dark: 0x2E2E32)
+    public static let separator = dynamic(light: 0xF0D4C8, dark: 0x3A2830)
 
-    // State
-    public static let stateRunning = dynamic(light: 0x2A9E5C, dark: 0x35C36F)
-    public static let stateReconnecting = dynamic(light: 0xC2870B, dark: 0xE0A526)
-    public static let stateStopped = dynamic(light: 0x9A9AA0, dark: 0x77777C)
-    public static let stateFailed = dynamic(light: 0xC2382E, dark: 0xE05A4F)
-    public static let attention = dynamic(light: 0xD9542B, dark: 0xF0764A)
+    // State — functional hues that still sit comfortably on the warm palette.
+    public static let stateRunning = dynamic(light: 0x3D9A62, dark: 0x4CB876)
+    public static let stateReconnecting = dynamic(light: 0xD4844A, dark: 0xE8A060)
+    public static let stateStopped = dynamic(light: 0x9A7080, dark: 0x807080)
+    public static let stateFailed = dynamic(light: 0xD04A52, dark: 0xF08A8C)
+    public static let attention = dynamic(light: 0xF08A8C, dark: 0xF0A0A2)
 
-    /// Agent identity. The avatar palette from the reference picker.
+    // Aurora background — the four official brand colours.
+    public static let auroraBase = dynamic(light: 0xFFF3EC, dark: 0x140C10)
+    public static let auroraCoral = dynamic(light: 0xFFC9A3, dark: 0xA87858)
+    public static let auroraIbis = dynamic(light: 0xF08A8C, dark: 0xB8686A)
+    public static let auroraBellflower = dynamic(light: 0xB65E8C, dark: 0x904A70)
+
+    /// Agent identity — brand-forward with enough variety for the rail.
     public static let agentColors: [Color] = [
-        dynamic(light: 0x1A1A1C, dark: 0xE8E8EA),  // black
-        dynamic(light: 0x6E4A2E, dark: 0x9C7047),  // brown
-        dynamic(light: 0xC2382E, dark: 0xE05A4F),  // red
-        dynamic(light: 0xD9542B, dark: 0xF0764A),  // orange
-        dynamic(light: 0xC2870B, dark: 0xE0A526),  // amber
-        dynamic(light: 0x2A9E5C, dark: 0x35C36F),  // green
-        dynamic(light: 0x1E8E8E, dark: 0x2FB5B5),  // teal
+        dynamic(light: 0xB65E8C, dark: 0xC9789E),  // bellflower
+        dynamic(light: 0xF08A8C, dark: 0xF0A0A2),  // ibis
+        dynamic(light: 0xFFC9A3, dark: 0xE8B898),  // coral
+        dynamic(light: 0x2A1820, dark: 0xFFF3EC),  // ink
+        dynamic(light: 0x8E4A6E, dark: 0xA86080),  // plum
+        dynamic(light: 0xD4844A, dark: 0xE8A060),  // amber
+        dynamic(light: 0x3D9A62, dark: 0x4CB876),  // green
+        dynamic(light: 0x6B4BC4, dark: 0x9070E0),  // violet
         dynamic(light: 0x2C6FD1, dark: 0x4C90EE),  // blue
-        dynamic(light: 0x6B4BC4, dark: 0x9070E0),  // purple
-        dynamic(light: 0xC2418E, dark: 0xE066AC),  // pink
         dynamic(light: 0x76767C, dark: 0x9A9AA0),  // grey
     ]
 
-    /// The stable colour for an agent, from its seed.
-    ///
-    /// Deterministic, so an agent looks the same on every launch and on every machine without the
-    /// colour having to be stored or fetched. Sum of the UTF-8 bytes: the distribution does not
-    /// need to be cryptographic, it needs to be the same answer twice.
     public static func agentColor(seed: String) -> Color {
         let total = seed.utf8.reduce(0) { $0 &+ Int($1) }
         return agentColors[total % agentColors.count]

@@ -270,10 +270,17 @@ struct HTTPEngineClientTests {
     @Test func healthRequiresTheXBotProductField() async {
         let host = "stub-\(UUID().uuidString).test"
         StubURLProtocol.register(
-            .init(body: Self.json(["status": "ok", "product": "xBot"])),
+            .init(body: Self.json([
+                "status": "ok",
+                "product": "xBot",
+                "engineVersion": "1.2.3",
+                "schemaVersion": "0012",
+            ])),
             forHost: host,
             path: "/health"
         )
+        let parsed = await client(host: host).health()
+        #expect(parsed == EngineHealth(engineVersion: "1.2.3", schemaVersion: "0012"))
         #expect(await client(host: host).isHealthy())
 
         StubURLProtocol.register(
@@ -281,6 +288,7 @@ struct HTTPEngineClientTests {
             forHost: host,
             path: "/health"
         )
+        #expect(await client(host: host).health() == nil)
         #expect(await client(host: host).isHealthy() == false)
     }
 

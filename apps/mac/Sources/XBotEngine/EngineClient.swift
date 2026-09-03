@@ -47,6 +47,24 @@ public protocol EngineClient: Sendable {
 
     /// The models this deployment can currently reach.
     func availableModels() async throws -> [ModelSelection]
+
+    /// The plugins admin page: catalogue, connected servers, and skills.
+    func pluginsPage() async throws -> PluginsPage
+
+    /// What one agent may use — tools and skills the runtime offers it.
+    func grantedPlugins(for agent: Agent.ID) async throws -> GrantedPlugins
+
+    /// Grant a tool or skill to an agent.
+    func grantPlugin(kind: PluginGrantKind, ref: String, to agent: Agent.ID) async throws
+
+    /// Revoke a tool or skill from an agent.
+    func revokePlugin(kind: PluginGrantKind, ref: String, from agent: Agent.ID) async throws
+
+    /// Add a first-party server from the catalogue.
+    func addPluginServer(catalogueKey: String) async throws
+
+    /// Which agents this one may ask via handoff.
+    func handoffGrants(for agent: Agent.ID) async throws -> HandoffGrants
 }
 
 /// What creating an agent needs. The rest of the row is generated — avatar seed, id, defaults.

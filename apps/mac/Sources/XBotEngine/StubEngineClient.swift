@@ -12,6 +12,12 @@ public actor StubEngineClient: EngineClient {
     private var fixedAgents: [Agent]
     private var fixedChannels: [Channel]
     private var control: ScreenControl = .agent
+    private var pluginCatalogue: [CatalogueItem]
+    private var pluginServers: [PluginServer]
+    private var pluginSkills: [PluginSkill]
+    private var handoffReachable: [Agent.ID: Set<Agent.ID>] = [
+        "orchestrator": ["inbox"],
+    ]
 
     /// How long a stubbed token takes to arrive.
     ///
@@ -55,6 +61,60 @@ public actor StubEngineClient: EngineClient {
         ]
         fixedAgents = agents
         fixedChannels = agents.map { Channel(id: "channel-\($0.id)", agentIds: [$0.id]) }
+
+        pluginCatalogue = [
+            CatalogueItem(
+                key: "google-drive",
+                title: "Google Drive",
+                vendor: "Google",
+                summary: "Search, read and write files in Drive.",
+                docsURL: "https://developers.google.com/drive",
+                auth: .userOAuth,
+                perInstance: false
+            ),
+            CatalogueItem(
+                key: "notion",
+                title: "Notion",
+                vendor: "Notion",
+                summary: "Search and update pages in Notion.",
+                docsURL: "https://developers.notion.com",
+                auth: .userOAuth,
+                perInstance: false
+            ),
+        ]
+        pluginServers = [
+            PluginServer(
+                id: "google-drive",
+                title: "Google Drive",
+                vendor: "Google",
+                url: "https://www.googleapis.com/mcp",
+                summary: "Search, read and write files in Drive.",
+                docsURL: "https://developers.google.com/drive",
+                hasCredential: true,
+                toolsRefreshedAt: nil,
+                lastError: nil,
+                dynamicClient: true,
+                tools: [
+                    PluginTool(
+                        serverID: "google-drive",
+                        name: "search_files",
+                        summary: "Search for files in Drive.",
+                        ref: "google-drive/search_files",
+                        effect: .read,
+                        grantedTo: ["orchestrator"]
+                    ),
+                    PluginTool(
+                        serverID: "google-drive",
+                        name: "read_file",
+                        summary: "Read a file from Drive.",
+                        ref: "google-drive/read_file",
+                        effect: .read,
+                        grantedTo: []
+                    ),
+                ]
+            ),
+        ]
+        pluginSkills = []
 
         messagesByChannel = [
             "channel-orchestrator": [
@@ -179,6 +239,123 @@ public actor StubEngineClient: EngineClient {
             ModelSelection(provider: "xAI", model: "grok-4", capabilities: ["tools"]),
             ModelSelection(provider: "Ollama", model: "llama3.1", capabilities: ["tools"]),
         ]
+    }
+
+    public func pluginsPage() async throws -> PluginsPage {
+        PluginsPage(
+            catalogue: pluginCatalogue,
+            servers: pluginServers,
+            skills: pluginSkills,
+            botsMayCallBack: true,
+            redirectURI: "http://127.0.0.1:3001/api/plugins/oauth/callback"
+        )
+    }
+
+    public func grantedPlugins(for agent: Agent.ID) async throws -> GrantedPlugins {
+        var tools: [GrantedPlugins.GrantedTool] = []
+        var skills: [GrantedPlugins.GrantedSkill] = []
+        for server in pluginServers {
+            for tool in server.tools where tool.grantedTo.contains(agent) {
+                tools.append(
+                    GrantedPlugins.GrantedTool(
+                        ref: tool.ref,
+                        toolName: tool.name,
+                        summary: tool.summary
+                    )
+                )
+            }
+        }
+        for skill in pluginSkills where skill.grantedTo.contains(agent) {
+            skills.append(
+                GrantedPlugins.GrantedSkill(
+                    slug: skill.slug,
+                    title: skill.title,
+                    summary: skill.summary,
+                    instructions: skill.instructions
+                )
+            )
+        }
+        return GrantedPlugins(tools: tools, skills: skills)
+    }
+
+    public func grantPlugin(kind: PluginGrantKind, ref: String, to agent: Agent.ID) async throws {
+        switch kind {
+        case .mcp:
+            guard let serverIndex = pluginServers.firstIndex(where: { server in
+                server.tools.contains { $0.ref == ref }
+            }) else { return }
+            guard let toolIndex = pluginServers[serverIndex].tools.firstIndex(where: { $0.ref == ref }) else {
+                return
+            }
+            var tool = pluginServers[serverIndex].tools[toolIndex]
+            if !tool.grantedTo.contains(agent) {
+                tool.grantedTo.append(agent)
+                pluginServers[serverIndex].tools[toolIndex] = tool
+            }
+        case .skill:
+            guard let index = pluginSkills.firstIndex(where: { $0.slug == ref }) else { return }
+            var skill = pluginSkills[index]
+            if !skill.grantedTo.contains(agent) {
+                skill.grantedTo.append(agent)
+                pluginSkills[index] = skill
+            }
+        case .bot:
+            guard agent != ref else { return }
+            var reachable = handoffReachable[agent, default: []]
+            reachable.insert(ref)
+            handoffReachable[agent] = reachable
+        }
+    }
+
+    public func revokePlugin(kind: PluginGrantKind, ref: String, from agent: Agent.ID) async throws {
+        switch kind {
+        case .mcp:
+            guard let serverIndex = pluginServers.firstIndex(where: { server in
+                server.tools.contains { $0.ref == ref }
+            }) else { return }
+            guard let toolIndex = pluginServers[serverIndex].tools.firstIndex(where: { $0.ref == ref }) else {
+                return
+            }
+            var tool = pluginServers[serverIndex].tools[toolIndex]
+            tool.grantedTo.removeAll { $0 == agent }
+            pluginServers[serverIndex].tools[toolIndex] = tool
+        case .skill:
+            guard let index = pluginSkills.firstIndex(where: { $0.slug == ref }) else { return }
+            var skill = pluginSkills[index]
+            skill.grantedTo.removeAll { $0 == agent }
+            pluginSkills[index] = skill
+        case .bot:
+            handoffReachable[agent]?.remove(ref)
+        }
+    }
+
+    public func addPluginServer(catalogueKey: String) async throws {
+        guard !pluginServers.contains(where: { $0.id == catalogueKey }) else { return }
+        guard let item = pluginCatalogue.first(where: { $0.key == catalogueKey }) else { return }
+        pluginServers.append(
+            PluginServer(
+                id: item.key,
+                title: item.title,
+                vendor: item.vendor,
+                url: "",
+                summary: item.summary,
+                docsURL: item.docsURL,
+                hasCredential: false,
+                toolsRefreshedAt: nil,
+                lastError: nil,
+                dynamicClient: item.auth == .userOAuth,
+                tools: []
+            )
+        )
+    }
+
+    public func handoffGrants(for agent: Agent.ID) async throws -> HandoffGrants {
+        HandoffGrants(
+            enabled: true,
+            canGrant: true,
+            reachable: Array(handoffReachable[agent] ?? []),
+            grantable: true
+        )
     }
     public func channels() async throws -> [Channel] { fixedChannels }
 

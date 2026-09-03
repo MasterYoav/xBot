@@ -42,4 +42,22 @@ public struct UnavailableEngineClient: EngineClient {
         // a view awaiting frames that will never come must not be left suspended forever.
         AsyncStream { $0.finish() }
     }
+
+    public func pluginsPage() async throws -> PluginsPage { throw EngineError.notRunning }
+    public func grantedPlugins(for agent: Agent.ID) async throws -> GrantedPlugins {
+        throw EngineError.notRunning
+    }
+    public func grantPlugin(kind: PluginGrantKind, ref: String, to agent: Agent.ID) async throws {
+        throw EngineError.notRunning
+    }
+    public func revokePlugin(kind: PluginGrantKind, ref: String, from agent: Agent.ID) async throws {
+        throw EngineError.notRunning
+    }
+    public func addPluginServer(catalogueKey: String) async throws {
+        throw EngineError.notRunning
+    }
+
+    public func handoffGrants(for agent: Agent.ID) async throws -> HandoffGrants {
+        throw EngineError.notRunning
+    }
 }

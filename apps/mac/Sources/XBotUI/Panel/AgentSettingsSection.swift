@@ -23,6 +23,9 @@ public struct AgentSettingsSection: View {
                 field(String(localized: "Name"), text: $name, focus: .name)
                 field(String(localized: "Label"), text: $label, focus: .label)
                 modelRow(agent)
+                AgentReachSection()
+                AgentConnectionSection()
+                AgentHandoffSection()
             }
         }
         .onChange(of: state.selectedAgentID, initial: true) { load() }

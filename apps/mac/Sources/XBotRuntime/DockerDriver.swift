@@ -16,16 +16,13 @@ public actor DockerDriver: ContainerDriver {
 
     public init(identifier: RuntimeIdentifier = .docker, executable: String? = nil) {
         self.identifier = identifier
-        self.executable = executable ?? Self.locateDocker()
+        self.executable = executable ?? Self.defaultDockerPath()
     }
 
     /// Find `docker` without inheriting the user's shell.
-    ///
-    /// A GUI app's PATH is not a terminal's: it does not source a profile, so Homebrew and
-    /// OrbStack paths are simply absent. Looking in the known install locations is what makes the
-    /// difference between "works when I run it from a terminal" and "works".
-    private static func locateDocker() -> String {
+    public static func defaultDockerPath() -> String {
         let candidates = [
+            RuntimePaths.dockerExecutable.path,
             "/usr/local/bin/docker",
             "/opt/homebrew/bin/docker",
             "/Applications/Docker.app/Contents/Resources/bin/docker",
@@ -157,6 +154,32 @@ public actor DockerDriver: ContainerDriver {
         // Docker Desktop, Colima and OrbStack all resolve this inside a container. Apple's
         // runtime does not, which is why this is on the protocol rather than a constant.
         "host.docker.internal"
+    }
+
+    public func containerNamed(_ name: String) async -> ContainerHandle? {
+        guard
+            let output = try? await run(["inspect", "-f", "{{.Id}}", name]),
+            !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return ContainerHandle(id: name)
+    }
+
+    public func loopbackHostPort(for handle: ContainerHandle) async -> UInt16? {
+        guard let output = try? await run(["port", handle.id]) else { return nil }
+        for line in output.split(separator: "\n") {
+            guard let arrow = line.range(of: " -> ") else { continue }
+            let destination = line[arrow.upperBound...]
+            guard destination.hasPrefix("127.0.0.1:") else { continue }
+            guard let port = destination.split(separator: ":").last.flatMap({ UInt16($0) }) else {
+                continue
+            }
+            return port
+        }
+        return nil
+    }
+
+    public func startContainer(_ handle: ContainerHandle) async throws {
+        _ = try await run(["start", handle.id])
     }
 
     public func recentCommands() -> [String] { commandLog }

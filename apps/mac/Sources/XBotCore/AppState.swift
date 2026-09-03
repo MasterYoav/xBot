@@ -86,9 +86,12 @@ public final class AppState {
     public var isPanelVisible = true {
         didSet { retuneScreen() }
     }
+    /// The agent rail. Toggled from the title bar; hidden state is remembered for the session.
+    public var isRailVisible = true
     public var panelSection: PanelSection = .screen {
         didSet { retuneScreen() }
     }
+    public var modelBannerDismissed = false
 
     /// Held in the client for the open conversation, and gone on reload.
     ///
@@ -100,6 +103,35 @@ public final class AppState {
     public private(set) var control: ScreenControl = .agent
     public private(set) var models: [ModelSelection] = []
 
+    /// Loopback origin when the engine is running. Used for admin webviews.
+    public private(set) var engineBaseURL: URL?
+
+    /// Tools and skills granted to the selected agent.
+    public private(set) var grantedPlugins: GrantedPlugins?
+    public private(set) var grantedPluginsLoading = false
+
+    /// Deployment-wide plugin catalogue and connected servers.
+    public private(set) var pluginsPage: PluginsPage?
+    public private(set) var pluginsPageLoading = false
+
+    /// Which agents the selected one may hand work to.
+    public private(set) var handoffGrants: HandoffGrants?
+    public private(set) var handoffGrantsLoading = false
+
+    /// Path under the engine origin for the plugins admin webview.
+    public var pluginsAdminDeepLink = "admin/plugins"
+
+    /// Full URL for the plugins admin webview, if the engine is running.
+    public var pluginsAdminURL: URL? {
+        guard let engineBaseURL else { return nil }
+        return engineBaseURL.appending(path: pluginsAdminDeepLink)
+    }
+
+    /// Bearer token for admin webviews. Read from the Keychain each time — never stored on state.
+    public var pluginsAdminToken: String? {
+        try? EngineTokenStore.token()
+    }
+
     private var screenTask: Task<Void, Never>?
 
     /// True while a turn is in flight, which is what makes the screen poll fast.
@@ -110,11 +142,15 @@ public final class AppState {
         isTurnRunning ? selectedAgentID : nil
     }
 
-    public init(engine: any EngineClient) {
+    public init(
+        engine: any EngineClient,
+        providers: ProviderConnectionStore = .shared
+    ) {
         self.engine = engine
         self.runtime = nil
         self.environmentFactory = nil
         self.engineFactory = nil
+        self.providers = providers
     }
 
     /// The app's real path: `AppState` owns nothing about *how* the engine runs, only that it
@@ -131,13 +167,20 @@ public final class AppState {
         environment: @escaping @Sendable (UInt16, String) -> [String: String],
         engineFactory: @escaping @Sendable (EngineEndpoint) -> any EngineClient = {
             HTTPEngineClient(baseURL: $0.baseURL)
-        }
+        },
+        /// Injected so a test gets its own preference domain. See `ProviderConnectionStore`.
+        providers: ProviderConnectionStore = .shared
     ) {
         self.engine = UnavailableEngineClient()
         self.runtime = runtime
         self.environmentFactory = environment
         self.engineFactory = engineFactory
+        self.providers = providers
     }
+
+    /// Which providers are connected, and whether the composer may send. Held rather than reached
+    /// for statically, so this state's behaviour does not depend on the machine it runs on.
+    private let providers: ProviderConnectionStore
 
     public var selectedAgent: Agent? {
         agents.first { $0.id == selectedAgentID }
@@ -176,7 +219,15 @@ public final class AppState {
             await loadMessages()
             await loadPanel()
             models = (try? await engine.availableModels()) ?? []
+            if models.isEmpty {
+                models = ModelProviderCatalog.selections(
+                    forConnectedProviders: providers.connectedProviderIDs
+                )
+            }
             status = nil
+            if runtime != nil, providers.requiresModelForComposer() {
+                composerBlock = .noModelConnected
+            }
         } catch {
             // Honest degradation: the rail is empty because the engine is down, and the composer
             // says so. Never an empty state that implies there is simply nothing here.
@@ -203,6 +254,10 @@ public final class AppState {
         switch runtimeState {
         case .notDetected(let probe):
             engine = UnavailableEngineClient()
+            engineBaseURL = nil
+            grantedPlugins = nil
+            pluginsPage = nil
+            handoffGrants = nil
             status = nil
             switch probe {
             case .absent:
@@ -213,10 +268,18 @@ public final class AppState {
             }
         case .stopped:
             engine = UnavailableEngineClient()
+            engineBaseURL = nil
+            grantedPlugins = nil
+            pluginsPage = nil
+            handoffGrants = nil
             composerBlock = .engineNotRunning
             status = nil
         case .failed(let error):
             engine = UnavailableEngineClient()
+            engineBaseURL = nil
+            grantedPlugins = nil
+            pluginsPage = nil
+            handoffGrants = nil
             composerBlock = .engineFailed(reason: error.sentence)
             status = nil
         case .pulling, .starting:
@@ -224,7 +287,12 @@ public final class AppState {
         case .running(let endpoint):
             guard let engineFactory else { return }
             engine = engineFactory(endpoint)
-            composerBlock = nil
+            engineBaseURL = endpoint.baseURL
+            if providers.requiresModelForComposer() {
+                composerBlock = .noModelConnected
+            } else {
+                composerBlock = nil
+            }
             await refreshFromEngine()
         case .degraded:
             // The conversation stays readable and usable — docs/09-ui-spec.md is explicit that a
@@ -235,6 +303,38 @@ public final class AppState {
 
     /// Bring the engine up. A no-op without a runtime to ask — `AppState(engine:)` has none, and
     /// its composer is never in the `.engineNotRunning` state that would call this anyway.
+    /// Handoff from onboarding: reload the engine and select the first agent if one was created.
+    public func completeOnboarding(_ handoff: OnboardingHandoff) async {
+        if handoff.modelSkipped {
+            providers.markSkipped()
+        }
+        await load()
+        if let id = handoff.firstAgentID {
+            selectedAgentID = id
+            seedWelcomeMessage(for: id)
+            await loadPanel()
+        }
+    }
+
+    public func dismissModelBanner() {
+        modelBannerDismissed = true
+    }
+
+    private func seedWelcomeMessage(for agentID: Agent.ID) {
+        let intro = String(
+            localized:
+                "Hi. I'm your first agent.\n\nI have a browser and files of my own, and I'll ask before doing anything that matters.\n\nTry me with something like:\n• \"Find three well-reviewed ramen places near me\"\n• \"Open my calendar and summarise this week\""
+        )
+        messages = [
+            Message(
+                id: "onboarding-welcome",
+                author: .agent(agentID),
+                text: intro,
+                state: .complete
+            ),
+        ]
+    }
+
     public func startEngine() {
         guard let runtime, let environmentFactory else { return }
         Task { await runtime.start(environment: environmentFactory) }
@@ -283,6 +383,9 @@ public final class AppState {
         turn = nil
         messages = []
         activity = []
+        grantedPlugins = nil
+        pluginsPage = nil
+        handoffGrants = nil
         screenFrame = nil
         Task {
             await loadMessages()
@@ -293,7 +396,88 @@ public final class AppState {
     private func loadPanel() async {
         guard let agent = selectedAgentID else { return }
         activity = (try? await engine.activity(for: agent)) ?? []
+        await refreshAgentSettingsData()
         retuneScreen()
+    }
+
+    /// Reload the plugin catalogue and this agent's grants together.
+    public func refreshPluginsData() async {
+        guard let agent = selectedAgentID else {
+            grantedPlugins = nil
+            pluginsPage = nil
+            return
+        }
+        grantedPluginsLoading = true
+        pluginsPageLoading = true
+        defer {
+            grantedPluginsLoading = false
+            pluginsPageLoading = false
+        }
+        async let page = engine.pluginsPage()
+        async let granted = engine.grantedPlugins(for: agent)
+        pluginsPage = try? await page
+        grantedPlugins = try? await granted
+    }
+
+    /// Reload handoff grants for the selected agent.
+    public func refreshHandoffGrants() async {
+        guard let agent = selectedAgentID else {
+            handoffGrants = nil
+            return
+        }
+        handoffGrantsLoading = true
+        defer { handoffGrantsLoading = false }
+        handoffGrants = try? await engine.handoffGrants(for: agent)
+    }
+
+    /// Reload plugin and handoff state shown in agent settings.
+    public func refreshAgentSettingsData() async {
+        async let plugins: Void = refreshPluginsData()
+        async let handoff: Void = refreshHandoffGrants()
+        _ = await (plugins, handoff)
+    }
+
+    /// Grant or revoke a tool or skill for the selected agent. Refreshes plugin state on completion.
+    public func setPluginGrant(kind: PluginGrantKind, ref: String, enabled: Bool) async {
+        guard let agent = selectedAgentID else { return }
+        if enabled {
+            try? await engine.grantPlugin(kind: kind, ref: ref, to: agent)
+        } else {
+            try? await engine.revokePlugin(kind: kind, ref: ref, from: agent)
+        }
+        await refreshPluginsData()
+    }
+
+    /// Whether this agent may hand work to another. Directional: selected agent asks `target`.
+    public func setHandoffGrant(to target: Agent.ID, enabled: Bool) async {
+        guard let agent = selectedAgentID, agent != target else { return }
+        if enabled {
+            try? await engine.grantPlugin(kind: .bot, ref: target, to: agent)
+        } else {
+            try? await engine.revokePlugin(kind: .bot, ref: target, from: agent)
+        }
+        await refreshHandoffGrants()
+    }
+
+    /// Add an agent to the open conversation by opening a multi-agent channel.
+    public func addAgentToCurrentChannel(_ agentID: Agent.ID) {
+        guard let selectedAgentID,
+              let channel = channels.first(where: { $0.agentIds.contains(selectedAgentID) }),
+              !channel.agentIds.contains(agentID)
+        else { return }
+
+        Task { [engine] in
+            let agentIds = channel.agentIds + [agentID]
+            guard let newChannel = try? await engine.createChannel(agentIds: agentIds) else { return }
+            channels.removeAll { $0.id == channel.id }
+            channels.append(newChannel)
+            await loadMessages()
+        }
+    }
+
+    /// Open the plugins admin webview at a path under the engine origin.
+    public func preparePluginsAdmin(path: String = "admin/plugins") {
+        pluginsAdminDeepLink = path
     }
 
     /// Match the polling cadence to what is actually on screen.

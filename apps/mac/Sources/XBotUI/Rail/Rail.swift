@@ -46,7 +46,7 @@ public struct Rail: View {
         .padding(.top, Space.m)
         .frame(width: Metrics.railWidth)
         .frame(maxHeight: .infinity)
-        .xbotMaterial(Materials.rail, opaqueFallback: Palette.railBackground)
+        .frostedGlass(opaqueFallback: Palette.railBackground)
         .motion(Motion.quick, value: state.selectedAgentID)
     }
 }

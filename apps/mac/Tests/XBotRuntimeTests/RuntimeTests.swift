@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Testing
+import XBotEngine
 
 @testable import XBotRuntime
 
@@ -65,6 +66,18 @@ struct EngineEnvironmentTests {
         let environment = EngineEnvironment.compose(inputs())
         #expect(environment["PORT"] == environment["SERVER_PORT"])
         #expect(environment["PORT"] == "49152")
+    }
+
+    @Test func browserLimitFollowsPhysicalMemory() {
+        #expect(EngineEnvironment.browserLimit(forPhysicalMemory: 8 * 1_073_741_824) == 1)
+        #expect(EngineEnvironment.browserLimit(forPhysicalMemory: 16 * 1_073_741_824) == 2)
+        #expect(EngineEnvironment.browserLimit(forPhysicalMemory: 32 * 1_073_741_824) == 4)
+    }
+
+    @Test func memoryLimitScalesWithHostRAM() {
+        let eightGB = EngineEnvironment.memoryLimitBytes(forPhysicalMemory: 8 * 1_073_741_824)
+        let sixteenGB = EngineEnvironment.memoryLimitBytes(forPhysicalMemory: 16 * 1_073_741_824)
+        #expect(eightGB < sixteenGB)
     }
 
     @Test func noIntelligenceMeansNoneOfTheFour() {
@@ -142,6 +155,7 @@ struct EngineEnvironmentTests {
 }
 
 /// The state machine, driven against a fake so every failure is reachable on demand.
+@Suite(.serialized)
 struct RuntimeControllerTests {
     private func controller(
         script: FakeDriver.Script = FakeDriver.Script(),
@@ -150,7 +164,9 @@ struct RuntimeControllerTests {
         RuntimeController(
             driver: FakeDriver(script: script),
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in healthy }
+            health: { _ in
+                healthy ? EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") : nil
+            }
         )
     }
 
@@ -176,20 +192,22 @@ struct RuntimeControllerTests {
         #expect(endpoint.host == "127.0.0.1")
     }
 
-    @Test func aSavedPortIsPreferredOnTheNextStart() async {
+    @Test func aSavedPortIsPreferredOnTheNextStart() async throws {
         defer { UserDefaults.standard.removeObject(forKey: EnginePortStore.key) }
-        EnginePortStore.save(49_200)
+        UserDefaults.standard.removeObject(forKey: EnginePortStore.key)
+        let preferred = try PortAllocator.allocate(preferred: 49_200, range: 49_200...49_200)
+        EnginePortStore.save(preferred)
 
         let driver = FakeDriver()
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in true }
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
         )
         await controller.start(environment: environment)
 
         let spec = await driver.startedSpecs.first
-        #expect(spec?.ports.keys.first == 49_200)
+        #expect(spec?.ports.keys.first == preferred)
     }
 
     @Test func aMissingImageIsPulledFirst() async {
@@ -225,6 +243,51 @@ struct RuntimeControllerTests {
             Issue.record("expected failed, got \(await controller.state)")
             return
         }
+    }
+
+    @Test func anExistingHealthyContainerIsAdopted() async {
+        defer { UserDefaults.standard.removeObject(forKey: EnginePortStore.key) }
+        let driver = FakeDriver(
+            script: FakeDriver.Script(runFails: true, existingContainerPort: 3_001)
+        )
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+        )
+        await controller.start(environment: environment)
+
+        let state = await controller.state
+        guard case .running(let endpoint) = state else {
+            Issue.record("expected running, got \(state)")
+            return
+        }
+        #expect(endpoint.port == 3_001)
+        #expect(await driver.startedSpecs.isEmpty)
+    }
+
+    @Test func aStoppedExistingContainerIsStartedThenAdopted() async {
+        let driver = FakeDriver(
+            script: FakeDriver.Script(
+                runFails: true,
+                existingContainerPort: 3_001,
+                existingContainerStopped: true
+            )
+        )
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+        )
+        await controller.start(environment: environment)
+
+        let state = await controller.state
+        guard case .running(let endpoint) = state else {
+            Issue.record("expected running, got \(state)")
+            return
+        }
+        #expect(endpoint.port == 3_001)
+        #expect(await driver.startedSpecs.isEmpty)
     }
 
     @Test func aFailedStartNeverEchoesTheCommand() {
@@ -270,7 +333,7 @@ struct RuntimeControllerTests {
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in true }
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
         )
         await controller.start(environment: environment)
 

@@ -27,13 +27,21 @@ public actor HTTPEngineClient: EngineClient {
     /// answer 200, and an app that accepted that would happily drive somebody's unrelated dev
     /// server — which is exactly the class of bug port negotiation exists to avoid.
     public func isHealthy() async -> Bool {
+        await health() != nil
+    }
+
+    /// Parsed `/health` when the body identifies this engine.
+    public func health() async -> EngineHealth? {
         guard
             let (data, response) = try? await send(request(.get, "/health")),
             (response as? HTTPURLResponse)?.statusCode == 200,
-            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return false }
-        return object["status"] as? String == "ok"
-            && object["product"] as? String == "xBot"
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            object["status"] as? String == "ok",
+            object["product"] as? String == "xBot",
+            let engineVersion = object["engineVersion"] as? String,
+            let schemaVersion = object["schemaVersion"] as? String
+        else { return nil }
+        return EngineHealth(engineVersion: engineVersion, schemaVersion: schemaVersion)
     }
 
     // MARK: - REST
@@ -291,10 +299,63 @@ public actor HTTPEngineClient: EngineClient {
 
     // MARK: - Plumbing
 
+    // MARK: - Plugins
+
+    public func pluginsPage() async throws -> PluginsPage {
+        let (data, _) = try await send(request(.get, "/api/plugins"))
+        guard let page = PluginDecoding.pluginsPage(from: data) else { throw EngineError.notRunning }
+        return page
+    }
+
+    public func grantedPlugins(for agent: Agent.ID) async throws -> GrantedPlugins {
+        let path = "/api/plugins/for/\(agent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? agent)"
+        let (data, _) = try await send(request(.get, path))
+        guard let granted = PluginDecoding.grantedPlugins(from: data) else { throw EngineError.notRunning }
+        return granted
+    }
+
+    public func grantPlugin(kind: PluginGrantKind, ref: String, to agent: Agent.ID) async throws {
+        _ = try await send(
+            request(
+                .post,
+                "/api/plugins/grants",
+                body: ["kind": kind.rawValue, "ref": ref, "agentId": agent]
+            )
+        )
+    }
+
+    public func revokePlugin(kind: PluginGrantKind, ref: String, from agent: Agent.ID) async throws {
+        let encodedRef = ref.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ref
+        let path = "/api/plugins/grants?kind=\(kind.rawValue)&ref=\(encodedRef)&agentId=\(agent)"
+        _ = try await send(request(.delete, path))
+    }
+
+    public func addPluginServer(catalogueKey: String) async throws {
+        _ = try await send(
+            request(.post, "/api/plugins/servers", body: ["key": catalogueKey])
+        )
+    }
+
+    public func handoffGrants(for agent: Agent.ID) async throws -> HandoffGrants {
+        let path = "/api/agents/\(agent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? agent)/handoff"
+        let (data, _) = try await send(request(.get, path))
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let handoff = object["handoff"] as? [String: Any]
+        else { throw EngineError.notRunning }
+        return HandoffGrants(
+            enabled: handoff["enabled"] as? Bool ?? false,
+            canGrant: handoff["canGrant"] as? Bool ?? false,
+            reachable: handoff["reachable"] as? [String] ?? [],
+            grantable: handoff["grantable"] as? Bool ?? false
+        )
+    }
+
     private enum Method: String {
         case get = "GET"
         case post = "POST"
         case patch = "PATCH"
+        case delete = "DELETE"
     }
 
     private func request(

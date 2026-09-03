@@ -68,6 +68,9 @@ public struct CommandPalette: View {
                 Divider().overlay(Palette.separator)
 
                 HStack {
+                    Text(String(localized: "Tab add"))
+                        .captionText()
+                        .foregroundStyle(Palette.textTertiary)
                     Spacer()
                     Text(String(localized: "⏎ open"))
                         .captionText()
@@ -86,6 +89,11 @@ public struct CommandPalette: View {
         }
         .onAppear { focused = true }
         .onExitCommand { isOpen = false }
+        .onKeyPress(.tab) {
+            guard highlighted > 0 else { return .ignored }
+            addHighlightedToChannel()
+            return .handled
+        }
     }
 
     private var createRow: some View {
@@ -134,6 +142,13 @@ public struct CommandPalette: View {
             guard index < matches.count else { return }
             state.select(matches[index].id)
         }
+        isOpen = false
+    }
+
+    private func addHighlightedToChannel() {
+        let index = highlighted - 1
+        guard index >= 0, index < matches.count else { return }
+        state.addAgentToCurrentChannel(matches[index].id)
         isOpen = false
     }
 }

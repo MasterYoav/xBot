@@ -15,19 +15,27 @@ public actor FakeDriver: ContainerDriver {
         public var runFails: Bool
         /// Health answers only after this many polls. Zero is immediate.
         public var healthAfterPolls: Int
+        /// When set, a container with this name already exists and should be adopted.
+        public var existingContainerPort: UInt16?
+        /// Whether the existing container starts stopped and needs `docker start`.
+        public var existingContainerStopped: Bool
 
         public init(
             probe: ProbeResult = .ready(version: "27.0.0"),
             imagePresent: Bool = true,
             pullSteps: Int = 4,
             runFails: Bool = false,
-            healthAfterPolls: Int = 0
+            healthAfterPolls: Int = 0,
+            existingContainerPort: UInt16? = nil,
+            existingContainerStopped: Bool = false
         ) {
             self.probe = probe
             self.imagePresent = imagePresent
             self.pullSteps = pullSteps
             self.runFails = runFails
             self.healthAfterPolls = healthAfterPolls
+            self.existingContainerPort = existingContainerPort
+            self.existingContainerStopped = existingContainerStopped
         }
     }
 
@@ -36,9 +44,11 @@ public actor FakeDriver: ContainerDriver {
     private(set) public var startedSpecs: [ContainerSpec] = []
     private(set) public var stopped = false
     private var healthPolls = 0
+    private var existingRunning = false
 
     public init(script: Script = Script()) {
         self.script = script
+        self.existingRunning = script.existingContainerPort != nil && !script.existingContainerStopped
     }
 
     public func probe() async -> ProbeResult { script.probe }
@@ -83,7 +93,13 @@ public actor FakeDriver: ContainerDriver {
     public func remove(_ handle: ContainerHandle) async throws {}
 
     public func inspect(_ handle: ContainerHandle) async throws -> ContainerStatus {
-        stopped ? .exited(code: 0) : .running
+        if handle.id == RuntimeController.engineContainerName,
+           script.existingContainerPort != nil
+        {
+            if existingRunning { return .running }
+            return .exited(code: 0)
+        }
+        return stopped ? .exited(code: 0) : .running
     }
 
     public func logs(_ handle: ContainerHandle, tail: Int) async throws -> [LogLine] {
@@ -91,6 +107,21 @@ public actor FakeDriver: ContainerDriver {
     }
 
     public func hostGatewayAddress() async throws -> String { "host.docker.internal" }
+
+    public func containerNamed(_ name: String) async -> ContainerHandle? {
+        guard name == RuntimeController.engineContainerName,
+              script.existingContainerPort != nil
+        else { return nil }
+        return ContainerHandle(id: name)
+    }
+
+    public func loopbackHostPort(for handle: ContainerHandle) async -> UInt16? {
+        script.existingContainerPort
+    }
+
+    public func startContainer(_ handle: ContainerHandle) async throws {
+        existingRunning = true
+    }
 
     /// Drives the health poll the controller waits on.
     public func healthAnswers() -> Bool {

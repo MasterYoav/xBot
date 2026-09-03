@@ -149,4 +149,17 @@ public protocol ContainerDriver: Sendable {
     /// the user's local Ollama. Getting it wrong means Ollama silently does not work, which
     /// presents as a model problem and is debugged in the wrong place for an hour.
     func hostGatewayAddress() async throws -> String
+
+    /// A container already on disk from a previous launch, if any.
+    func containerNamed(_ name: String) async -> ContainerHandle?
+    /// The loopback port Docker published for this container.
+    func loopbackHostPort(for handle: ContainerHandle) async -> UInt16?
+    /// Start a stopped container without creating a new one.
+    func startContainer(_ handle: ContainerHandle) async throws
+}
+
+public extension ContainerDriver {
+    func containerNamed(_ name: String) async -> ContainerHandle? { nil }
+    func loopbackHostPort(for handle: ContainerHandle) async -> UInt16? { nil }
+    func startContainer(_ handle: ContainerHandle) async throws {}
 }
