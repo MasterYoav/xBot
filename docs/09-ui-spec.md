@@ -22,10 +22,10 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 | The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
 | The right panel | Built — Screen, Activity, Routines, Agent settings (model picker, **What it can reach**, Connection, Handoff grants) |
 | Command palette | Built — search, open, create. **`Tab` adds an agent to the current channel** (creates a multi-agent channel). Footer shows both verbs |
-| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine, container adoption. Dev image `xbot/engine:1`; registry publish still open (M3) |
+| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine, container adoption. A stopped-but-installed runtime is now **started** rather than reported as missing. Image published to ghcr; the app still names the local `xbot/engine:1` tag rather than reading the manifest |
 | Design system | Built — tokens, aurora field, frosted glass, Reduce Motion and Reduce Transparency inside tokens |
 | Onboarding | **Built (M6 in progress)** — five steps, Colima install-for-me, engine adoption, provider keys, handoff to main window. VM clean-machine validation still open |
-| Settings scene | **Partial** — General placeholder + Advanced (Plugins…). Models, Agents, Computer, Usage, Updates tabs **not yet** |
+| Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General (engine status, version, address, start/stop/restart, diagnostics), Models (providers, custom providers), Advanced (Plugins, uninstall). Agents, Computer, Usage, Updates **not yet** |
 | Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). Other admin surfaces (audit, credentials, playground, …) **not embedded** |
 
 ## The main window

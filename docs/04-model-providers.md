@@ -34,18 +34,37 @@ user already has. No key. If it is not installed, the row offers a link, not an 
 
 ## What exists today
 
-**Client prep only — the engine router (M2) is not built.**
+**The router is built and the whole path is wired. It has not answered a real vendor yet.**
 
 | Piece | State |
 | --- | --- |
+| Provider registry + resolution + error classification | `engine/agent-langgraph/src/models/registry.ts`. Four providers: `openai`, `anthropic`, `google`, `openai-compatible` |
+| The seam that was `BOT_PROVIDER` | `buildModel()` takes a selection instead of closing over module constants. The environment is still read **at boot**, as the deployment fallback, so an OpenBot deployment forwarding nothing is unchanged |
+| Wire type + parser | `engine/shared/model-selection.ts`, shared because the server writes what the agent reads |
+| Selection on the agent | `configuration.modelSelection` — the column that already holds `endpoint`, so **no migration** |
+| Forwarded per run | `forwardedProps.xbotModel`, beside the run assertion and tool names |
 | Onboarding **Connect a model** step | Provider picker, secure key field, live validation via `ModelProviderValidator` |
-| Keychain storage | `ProviderKeyStore` — keys never in UserDefaults or logs |
-| Connection state | `ProviderConnectionStore` — which providers validated successfully |
-| Agent settings model picker | Dropdown in panel; lists models from connected providers via `ModelProviderCatalog` fallback when the engine has no router yet |
-| Settings → Models tab | **Not built** — full registry UI is M7 |
+| Keychain storage | `ProviderKeyStore` / `ProviderKeyVault` — keys never in UserDefaults or logs |
+| Connection state | `ProviderConnectionStore` — injected storage, so a test never touches the real domain |
+| Agent settings model picker | Dropdown in panel, backed by `ModelProviderCatalog` |
+| Settings → Models | **Built.** Provider rows with live connect/disconnect, Ollama detection, and **Add a custom provider** |
 
-Until M2 lands, changing the picker updates the agent record in the app; the engine may still use
-upstream's process-wide `BOT_PROVIDER` for actual inference.
+**Not built yet:** native Anthropic/OpenAI/Google adapters (compatible mode reaches all three), the
+container-to-host Ollama address (the ⚠️ below), usage accounting, and the live two-vendor smoke
+that closes M2.
+
+### Two bugs this path shipped with, for anyone reading the history
+
+Both were silent, and both are why the picker did nothing for weeks:
+
+1. **The engine dropped the field.** `parseAgentInput` never read `modelSelection`, so the value the
+   app was already sending went nowhere while the screen reported success.
+2. **The client sent the wrong key, in a body the engine rejects.** It sent `provider` — a display
+   name, `"Anthropic"` — where the engine reads `providerId`; and it built a partial PATCH against a
+   parser that requires the full object, so **every** agent edit returned 400, renames included.
+
+The lesson worth keeping: a setting that goes nowhere is worse than one that is absent, because the
+screen looks the same either way.
 
 ## What upstream does instead
 
@@ -155,7 +174,13 @@ This is the single highest-leverage piece of the router. It turns "every AI" fro
 into a text field, and it is how xAI and Ollama work on day one before their dedicated adapters
 exist.
 
-The "Add a custom provider" row is exactly this: name, base URL, optional key.
+The "Add a custom provider" row is exactly this: name, base URL, model, optional key. **Built** —
+`CustomProviderStore` and `ModelSettingsState.addCustomProvider`.
+
+**One rule in it is a security rule, not a nicety.** A key sent to a plain-`http` address on another
+machine crosses the network in clear text, so it is refused before any request is made. Loopback is
+exempt — it never leaves the machine, and it is exactly where a local Ollama or LM Studio lives, so
+refusing there would block the case the row exists to serve.
 
 ### Tier 3 — later
 

@@ -173,11 +173,27 @@ Use `superpowers:verification-before-completion`. Concretely:
 eval "$(scripts/dev-db.sh)"
 cd engine && bun run format:check && bun run lint && bun run typecheck && bun run test:ci
 
-# Mac app
-cd apps/mac && swift build && swift test
+# Mac app. On a fresh clone the icon must be compiled first: Package.swift declares xBot.icns
+# and Assets.car as resources and .gitignore excludes them, so `swift build` fails with
+# "missing inputs" until this has run. It needs Xcode 26 — xBot.icon is Icon Composer's format.
+scripts/generate-app-icon.sh
+# --build-tests, not plain build: `swift build` does NOT compile the test targets, so a change
+# that breaks only the tests looks green. This has produced a "verified" claim that measured
+# nothing.
+cd apps/mac && swift build --build-tests && swift test
 ```
 
 **Never say "done", "fixed", or "passing" without having run the command and read the output.**
+
+**Local green is not CI green.** Both are worth checking — `gh run list -R MasterYoav/xBot`. Every
+CI failure so far has been something that only exists on a fresh checkout: a generated file that
+was never committed, a runner image without the right Xcode, a value spliced into a script that
+only ever held a well-behaved string locally.
+
+**Swift Testing runs suites in parallel.** Two suites touching one global — `UserDefaults.standard`,
+the login Keychain, a `URLProtocol` stub's class-level fixtures — will pass alone and fail together,
+roughly one run in three. That has happened three times in this codebase. The fix each time was to
+inject the storage rather than serialise the suites, so **run a suspect suite ten times, not once.**
 
 ---
 

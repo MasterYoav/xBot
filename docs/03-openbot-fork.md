@@ -199,6 +199,11 @@ if (provider === "google")    return "gemini-2.5-flash";
 `BOT_PROVIDER=${PROVIDER} is not one this Bot knows. Use openai, anthropic or google.`
 ```
 
+**Status: replaced.** `buildModel()` now takes a selection resolved per run by
+`agent-langgraph/src/models/registry.ts`, and this environment read survives only as the
+deployment-wide fallback, evaluated once at boot. An OpenBot deployment that forwards no selection
+behaves exactly as it did. See [ADR-0002](decisions/0002-per-bot-model-router.md).
+
 Three consequences:
 
 1. **Process-wide.** Every agent served by that container uses the same provider and model.

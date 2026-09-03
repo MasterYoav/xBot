@@ -20,12 +20,12 @@ and the ones marked ⚠️ have the widest error bars.
 | --- | --- | --- |
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
 | M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
-| M2 | Model router | **Not started (engine).** Client prep: provider keys, agent settings picker, `ModelProviderCatalog` fallback |
-| M3 | Engine runs headless | **Partly** — dev image, `/health`, [`env-mapping.md`](env-mapping.md), manifest generator + CI build workflow; **registry publish still open** |
+| M2 | Model router | **Built end to end, unproven against live vendors.** Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent and forwarded, Settings → Models, custom providers. **Not yet done:** native adapters beyond compatible mode, Ollama host-address inside the container, usage accounting, live smoke against two real vendors |
+| M3 | Engine runs headless | **Done.** Image published to ghcr on every push to master, manifest pins the digest. **Open:** the app still hardcodes the local `xbot/engine:1` tag instead of reading that manifest |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
 | M5 | Connected | **Client done.** `scripts/verify-m5-handoff.sh` smoke check; model picker fallback from connected providers |
 | M6 | Onboarding | **In progress.** Five steps built, install-for-me, adoption, handoff transition, failure branches, runtime choice persistence; VM testing still open |
-| M7 | Ship v1.0 | **In progress (unsigned).** Icon pipeline, bundle script, unsigned DMG + `mac-release` CI; signing, notarization, Sparkle still open |
+| M7 | Ship v1.0 | **In progress (unsigned).** Icon pipeline, bundle script, unsigned DMG + `mac-release` CI, Settings (General/Models/Advanced), uninstall; signing, notarization, Sparkle, engine update + rollback still open |
 
 ---
 
@@ -104,6 +104,28 @@ See [ADR-0002](decisions/0002-per-bot-model-router.md) and
 **Done when:** two agents in the same engine, on different providers, both answer correctly, and
 switching one from a dropdown takes effect on the next message with no restart.
 
+### Where it actually got to
+
+The path is complete and every part of it is unit-tested; **none of it has answered a real vendor.**
+That last step is the milestone's own done-criterion and it has not been run.
+
+| Piece | Where |
+| --- | --- |
+| Provider registry, resolution, error classification | `engine/agent-langgraph/src/models/registry.ts` |
+| Wire type + parser, shared across the boundary | `engine/shared/model-selection.ts` |
+| The seam that was `BOT_PROVIDER` | `buildModel()` in `engine/agent-langgraph/src/index.ts` |
+| Selection stored and forwarded | `configuration.modelSelection` → `forwardedProps.xbotModel` in `engine/server/src/copilot.ts` |
+| Settings → Models, custom providers | `apps/mac/Sources/XBotCore/ModelSettingsState.swift` |
+
+Two bugs found on the way, both silent and both shipped: the engine dropped `modelSelection`
+entirely, and the client sent a display name under the wrong key on a partial PATCH that the
+engine's PUT-shaped parser rejected with a 400 — so **every** agent edit failed while the app
+reported success.
+
+**Still open:** native Anthropic/OpenAI/Google adapters (compatible mode covers them for now), the
+container-to-host Ollama address ([04](04-model-providers.md) ⚠️), usage accounting, and the live
+two-vendor smoke that closes the milestone.
+
 ---
 
 ## M3 — The engine runs headless
@@ -121,8 +143,13 @@ Everything needed for the app to own the engine.
 - The upstream `.env` → xBot settings mapping table, filled in and committed.
 
 **Done when:** `docker run` with generated environment and three volumes brings up a working engine,
-and `/health` answers correctly. As of this writing a dev build (`scripts/build-engine-image.sh`)
-produces `xbot/engine:1` locally; the published digest manifest is still open.
+and `/health` answers correctly. **Met.** `.github/workflows/engine-image.yml` builds and pushes to
+`ghcr.io/masteryoav/xbot-engine` on every push to master, and `scripts/generate-engine-manifest.sh`
+emits a manifest pinning the pushed digest rather than a tag — a tag can be moved.
+
+**One thing remains and it is a client change, not an engine one:** `EngineBootstrap.devImage` still
+names the local `xbot/engine:1` tag, so the app runs a developer's own build and never reads the
+manifest. That is the last thread between here and a user pulling a pinned image.
 
 ---
 

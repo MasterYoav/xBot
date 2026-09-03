@@ -73,11 +73,26 @@ Unsigned local releases are scripted; signing and Sparkle remain open (M7). Step
 | `scripts/create-dmg.sh` | Unsigned DMG with Applications alias |
 | `scripts/build-engine-image.sh` | Local dev image `xbot/engine:1` |
 | `scripts/generate-engine-manifest.sh` | Pinned digest manifest for updates |
+| `scripts/build-engine-manifest.py` | Assembles that JSON from environment values |
+| `scripts/read-health-field.py` | Reads one field from a `/health` response |
 | `scripts/verify-m5-handoff.sh` | Smoke check against a live engine |
 
-CI: `.github/workflows/mac-release.yml` builds and uploads an unsigned artifact; `.github/workflows/engine-image.yml`
-builds the engine image. Developer ID signing, notarization, and Sparkle appcast generation are **not
-wired yet**.
+CI: `.github/workflows/mac-release.yml` builds and uploads an unsigned artifact;
+`.github/workflows/engine-image.yml` builds the engine image, **pushes it to
+`ghcr.io/masteryoav/xbot-engine`**, and uploads a manifest pinning the pushed digest. Developer ID
+signing, notarization, and Sparkle appcast generation are **not wired yet**.
+
+### Two ordering rules in CI that are not obvious
+
+Both were live failures, and both are the kind that only appear on a fresh checkout:
+
+1. **The icon is a build input, not a packaging step.** `Package.swift` declares `xBot.icns` and
+   `Assets.car` as bundled resources and `.gitignore` excludes them, because they are compiled from
+   `xBot.icon/`. So `swift build` fails on a clean clone with "missing inputs" until
+   `scripts/generate-app-icon.sh` has run. It runs **first** in both workflows.
+2. **The Mac jobs need `macos-26`.** `xBot.icon` is Icon Composer's format and only Xcode 26's
+   `actool` compiles it. On `macos-15` the step runs, reports "actool did not produce Assets.car",
+   and the build then fails on the missing resources.
 
 ---
 
