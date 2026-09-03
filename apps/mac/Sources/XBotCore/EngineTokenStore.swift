@@ -8,4 +8,9 @@ public enum EngineTokenStore: Sendable {
     public static func token() throws -> String {
         try KeychainSecretStore.string(service: service)
     }
+
+    /// Forget it. Only uninstall calls this — a new one is generated on next use.
+    public static func remove() throws {
+        try KeychainSecretStore.remove(service: service, account: "default")
+    }
 }

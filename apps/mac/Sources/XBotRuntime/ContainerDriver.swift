@@ -136,6 +136,8 @@ public protocol ContainerDriver: Sendable {
 
     func createVolume(_ name: String) async throws
     func volumeExists(_ name: String) async -> Bool
+    /// Delete a volume and everything in it. Only uninstall calls this.
+    func removeVolume(_ name: String) async throws
 
     func run(_ spec: ContainerSpec) async throws -> ContainerHandle
     func stop(_ handle: ContainerHandle, timeout: Duration) async throws

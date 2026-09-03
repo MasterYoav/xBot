@@ -262,11 +262,20 @@ public final class AppState {
         }
     }
 
+    /// The runtime's own state, mirrored for the surfaces that report on the engine itself.
+    ///
+    /// `status` and `composerBlock` say what the *conversation* should show, which is a narrower
+    /// question — several runtime states collapse into "the engine isn't running" there, and a
+    /// settings pane reporting on the engine needs to tell them apart.
+    public private(set) var runtimeState: RuntimeState?
+
     private func apply(_ runtimeState: RuntimeState) async {
+        self.runtimeState = runtimeState
         switch runtimeState {
         case .notDetected(let probe):
             engine = UnavailableEngineClient()
             engineBaseURL = nil
+            engineHealth = nil
             grantedPlugins = nil
             pluginsPage = nil
             handoffGrants = nil
@@ -281,6 +290,7 @@ public final class AppState {
         case .stopped:
             engine = UnavailableEngineClient()
             engineBaseURL = nil
+            engineHealth = nil
             grantedPlugins = nil
             pluginsPage = nil
             handoffGrants = nil
@@ -289,6 +299,7 @@ public final class AppState {
         case .failed(let error):
             engine = UnavailableEngineClient()
             engineBaseURL = nil
+            engineHealth = nil
             grantedPlugins = nil
             pluginsPage = nil
             handoffGrants = nil
@@ -300,6 +311,7 @@ public final class AppState {
             guard let engineFactory else { return }
             engine = engineFactory(endpoint)
             engineBaseURL = endpoint.baseURL
+            engineHealth = await runtime?.checkHealth()
             if providers.requiresModelForComposer() {
                 composerBlock = .noModelConnected
             } else {
@@ -350,6 +362,81 @@ public final class AppState {
     public func startEngine() {
         guard let runtime, let environmentFactory else { return }
         Task { await runtime.start(environment: environmentFactory) }
+    }
+
+    /// Stop the engine, leaving its data where it is.
+    ///
+    /// Not destructive and so not confirmed: everything the person has is in the volumes, which
+    /// this does not touch. Starting again picks up the same conversations.
+    public func stopEngine() {
+        guard let runtime else { return }
+        Task { await runtime.stop() }
+    }
+
+    public func restartEngine() {
+        guard let runtime, let environmentFactory else { return }
+        Task { await runtime.restart(environment: environmentFactory) }
+    }
+
+    /// The engine's own account of itself, or nil when nothing is answering.
+    public private(set) var engineHealth: EngineHealth?
+
+    /// Whether an engine command is in flight, so the buttons can say so rather than look dead.
+    public private(set) var isEngineBusy = false
+
+    /// A redacted report on the clipboard: versions, state history, the last log lines.
+    ///
+    /// It exists so somebody can send it to us, not so they can read it — docs/06-onboarding.md.
+    /// The redaction is `Diagnostics`' own, and it is tested: no keys, no tokens, no conversation.
+    public func copyDiagnostics() async {
+        guard let runtime else { return }
+        DiagnosticsClipboard.copy(await runtime.diagnostics(appVersion: Self.appVersion))
+    }
+
+    /// Remove everything xBot put on this Mac, in the order that cannot strand anything.
+    ///
+    /// Containers and volumes first, then the Keychain, then the preferences. The order matters:
+    /// the preferences are what tell the app which volumes and containers are its own, so clearing
+    /// them first would leave the rest with nothing naming it.
+    ///
+    /// The container runtime is deliberately left alone — the person may have installed Docker or
+    /// Colima for something else, and taking an unrelated tool with us is worse than leaving it.
+    ///
+    /// Returns when the data is gone. Moving the app itself to the Trash is the person's to do,
+    /// and the screen says so.
+    public func uninstall() async {
+        isEngineBusy = true
+        defer { isEngineBusy = false }
+
+        await runtime?.uninstall()
+
+        // Every key this app has ever written. Listed rather than enumerated, because a wildcard
+        // sweep of the login keychain is not something this app should ever perform.
+        for providerID in ModelProviderCatalog.all.map(\.id) {
+            try? ProviderKeyStore.remove(providerID: providerID)
+        }
+        for provider in CustomProviderStore.shared.all {
+            try? ProviderKeyStore.remove(providerID: provider.id)
+        }
+        try? EngineTokenStore.remove()
+        try? KeyEncryptionKeyStore.remove()
+
+        providers.reset()
+        RuntimeChoiceStore.reset()
+        OnboardingVersion.reset()
+        for provider in CustomProviderStore.shared.all {
+            CustomProviderStore.shared.remove(id: provider.id)
+        }
+
+        agents = []
+        channels = []
+        messages = []
+        engineHealth = nil
+        engineBaseURL = nil
+    }
+
+    public static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
 
     /// What the composer's inline action button does, keyed by the same reason that put it there.

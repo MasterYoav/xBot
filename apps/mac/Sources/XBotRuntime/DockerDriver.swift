@@ -94,6 +94,12 @@ public actor DockerDriver: ContainerDriver {
         return !(output ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    public func removeVolume(_ name: String) async throws {
+        // `-f` so a volume that is already gone is not an error. Uninstall runs once and cannot
+        // ask the person to try again, so every step of it has to tolerate work already done.
+        _ = try await run(["volume", "rm", "-f", name])
+    }
+
     // MARK: - Containers
 
     public func run(_ spec: ContainerSpec) async throws -> ContainerHandle {

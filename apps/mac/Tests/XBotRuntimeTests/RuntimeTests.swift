@@ -359,6 +359,53 @@ struct RuntimeControllerTests {
     }
 }
 
+extension RuntimeControllerTests {
+    /**
+     Uninstall removes the container and all three volumes.
+
+     docs/11-packaging-and-updates.md: an app that manages containers and leaves gigabytes of
+     volumes behind after being dragged to the Trash is a bad citizen with a reputation problem.
+     The volumes are the whole point — the conversations, the agents, and the browser logins their
+     computers hold live in them, and nothing else on the machine names them.
+     */
+    @Test func uninstallRemovesTheContainerAndEveryVolume() async {
+        let driver = FakeDriver()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+        await controller.start(environment: environment)
+        #expect(!(await driver.remainingVolumes.isEmpty))
+
+        await controller.uninstall()
+
+        #expect(await driver.remainingVolumes.isEmpty)
+        // Stopped, not notDetected: the runtime is still installed and still works. Only xBot's
+        // own data is gone, and saying otherwise would send somebody to reinstall Docker.
+        #expect(await controller.state == .stopped)
+    }
+
+    /// Uninstall runs once and cannot ask the person to try again, so a step whose work is already
+    /// done must not stop the rest. Without this, a half-uninstalled machine keeps its volumes.
+    @Test func uninstallSurvivesAnythingAlreadyGone() async {
+        let driver = FakeDriver()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+
+        // Never started: no container, no volumes, nothing to remove.
+        await controller.uninstall()
+
+        #expect(await driver.remainingVolumes.isEmpty)
+        #expect(await controller.state == .stopped)
+    }
+}
+
 /// Defaults that live and die with the test, so no two share the one live domain.
 ///
 /// Three tests wrote `dev.xbot.enginePort` and Swift Testing runs their suites in parallel: a port

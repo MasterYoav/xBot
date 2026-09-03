@@ -243,6 +243,32 @@ public actor RuntimeController {
 
     /// Health was lost while running. Degraded, not failed — the conversation stays readable and
     /// the pill appears. Recovery is automatic and needs no click.
+    /// Stop the engine, remove its container, and delete its three volumes.
+    ///
+    /// This is the one path in the app that destroys the data volume — the conversations, the
+    /// agents, and the browser logins their computers hold. It is not undoable, which is why the
+    /// caller confirms first and names what goes.
+    ///
+    /// It does **not** remove the container runtime. The person may well have installed Docker or
+    /// Colima for something else, and an uninstaller that takes an unrelated tool with it is worse
+    /// than one that leaves something behind. The screen says so.
+    ///
+    /// Every step tolerates work already done. An uninstall that fails halfway and cannot be run
+    /// again leaves exactly the orphaned state it exists to prevent, so a missing container or an
+    /// already-deleted volume is not an error.
+    public func uninstall() async {
+        await stop()
+        if let handle = await driver.containerNamed(Self.engineContainerName) {
+            try? await driver.remove(handle)
+        }
+        for volume in [Self.dataVolume, Self.workspaceVolume, Self.profilesVolume] {
+            try? await driver.removeVolume(volume)
+        }
+        // Back to stopped, not notDetected: the runtime is still installed and still working — it
+        // is only xBot's own data that is gone.
+        state = .stopped
+    }
+
     public func noteHealthLost(_ reason: RuntimeState.DegradedReason) {
         guard case .running = state else { return }
         state = .degraded(reason: reason)

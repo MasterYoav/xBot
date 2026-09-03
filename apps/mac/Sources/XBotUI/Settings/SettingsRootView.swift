@@ -1,10 +1,13 @@
 import SwiftUI
 import XBotCore
 
-/// Settings → Advanced. Admin surfaces live here per ADR-0004.
+/// Settings → Advanced. Admin surfaces live here per ADR-0004, and so does uninstall.
 public struct AdvancedSettingsView: View {
     @Environment(AppState.self) private var state
     @Environment(\.openWindow) private var openWindow
+
+    @State private var isConfirmingUninstall = false
+    @State private var hasUninstalled = false
 
     public var body: some View {
         Form {
@@ -23,8 +26,61 @@ public struct AdvancedSettingsView: View {
                     )
                 )
             }
+
+            Section {
+                if hasUninstalled {
+                    // Said plainly, and it is the one place this app names the Trash: the app
+                    // bundle is the person's to move, and doing it for them while it is running is
+                    // not something an app should try.
+                    Text(
+                        String(
+                            localized:
+                                "Everything xBot stored has been removed. You can now drag xBot from your Applications folder to the Trash."
+                        )
+                    )
+                    .foregroundStyle(Palette.textSecondary)
+                } else {
+                    Button(String(localized: "Remove all xBot data…"), role: .destructive) {
+                        isConfirmingUninstall = true
+                    }
+                    .disabled(state.isEngineBusy)
+                }
+            } header: {
+                Text(String(localized: "Uninstall"))
+            } footer: {
+                // Named, not summarised. "Remove all data" tells somebody nothing about what they
+                // are about to lose, and this is the only action in the app that cannot be undone.
+                Text(
+                    String(
+                        localized:
+                            "This deletes your conversations, your agents, and the websites your agents are signed in to. It does not remove Docker or Colima — you may be using those for something else."
+                    )
+                )
+            }
         }
         .formStyle(.grouped)
+        // The rare case that earns a dialog: deleting an agent's container and browser profile is
+        // not undoable, and this deletes every one of them at once.
+        .confirmationDialog(
+            String(localized: "Remove everything xBot stored on this Mac?"),
+            isPresented: $isConfirmingUninstall,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Remove everything"), role: .destructive) {
+                Task {
+                    await state.uninstall()
+                    hasUninstalled = true
+                }
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(
+                String(
+                    localized:
+                        "Your conversations, your agents, and their browser logins will be deleted. This cannot be undone."
+                )
+            )
+        }
     }
 }
 
@@ -36,9 +92,10 @@ public struct AdvancedSettingsView: View {
 /// model is being changed.
 public struct SettingsRootView: View {
     @Environment(AppState.self) private var state
-    @State private var section: Section = .models
+    @State private var section: Section = .general
 
     enum Section: String, CaseIterable, Identifiable {
+        case general
         case models
         case advanced
 
@@ -46,6 +103,7 @@ public struct SettingsRootView: View {
 
         var title: String {
             switch self {
+            case .general: String(localized: "General")
             case .models: String(localized: "Models")
             case .advanced: String(localized: "Advanced")
             }
@@ -53,6 +111,7 @@ public struct SettingsRootView: View {
 
         var symbol: String {
             switch self {
+            case .general: "gearshape"
             case .models: "cpu"
             case .advanced: "slider.horizontal.3"
             }
@@ -129,6 +188,7 @@ public struct SettingsRootView: View {
     @ViewBuilder
     private var pane: some View {
         switch section {
+        case .general: GeneralSettingsView()
         case .models: ModelsSettingsView()
         case .advanced: AdvancedSettingsView()
         }

@@ -78,6 +78,9 @@ public actor FakeDriver: ContainerDriver {
 
     public func createVolume(_ name: String) async throws { volumes.insert(name) }
     public func volumeExists(_ name: String) async -> Bool { volumes.contains(name) }
+    public func removeVolume(_ name: String) async throws { volumes.remove(name) }
+    /// What survived an uninstall, for the test that says nothing did.
+    public var remainingVolumes: Set<String> { volumes }
 
     public func run(_ spec: ContainerSpec) async throws -> ContainerHandle {
         if script.runFails {

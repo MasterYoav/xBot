@@ -7,4 +7,9 @@ public enum KeyEncryptionKeyStore: Sendable {
     public static func key() throws -> String {
         try KeychainSecretStore.string(service: service)
     }
+
+    /// Forget it. Only uninstall calls this — a new one is generated on next use.
+    public static func remove() throws {
+        try KeychainSecretStore.remove(service: service, account: "default")
+    }
 }
