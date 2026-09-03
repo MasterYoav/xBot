@@ -10,6 +10,9 @@ public actor FakeDriver: ContainerDriver {
 
     public struct Script: Sendable {
         public var probe: ProbeResult
+        /// Whether waking an installed-but-stopped daemon works. False is a runtime that will not
+        /// come up — Docker Desktop refusing to start, or a Colima VM that is broken.
+        public var daemonStartSucceeds = true
         public var imagePresent: Bool
         public var pullSteps: Int
         public var runFails: Bool
@@ -27,7 +30,8 @@ public actor FakeDriver: ContainerDriver {
             runFails: Bool = false,
             healthAfterPolls: Int = 0,
             existingContainerPort: UInt16? = nil,
-            existingContainerStopped: Bool = false
+            existingContainerStopped: Bool = false,
+            daemonStartSucceeds: Bool = true
         ) {
             self.probe = probe
             self.imagePresent = imagePresent
@@ -36,6 +40,7 @@ public actor FakeDriver: ContainerDriver {
             self.healthAfterPolls = healthAfterPolls
             self.existingContainerPort = existingContainerPort
             self.existingContainerStopped = existingContainerStopped
+            self.daemonStartSucceeds = daemonStartSucceeds
         }
     }
 
@@ -51,11 +56,25 @@ public actor FakeDriver: ContainerDriver {
         self.existingRunning = script.existingContainerPort != nil && !script.existingContainerStopped
     }
 
-    public func probe() async -> ProbeResult { script.probe }
+    public func probe() async -> ProbeResult {
+        daemonStarted ? .ready(version: "fake") : script.probe
+    }
+
+    /// Whether anything asked this driver to wake its daemon, and whether that then worked.
+    ///
+    /// The real driver opens Docker Desktop or runs `colima start` and waits. The fake records the
+    /// ask and flips the probe, which is the behaviour a caller depends on: a stopped runtime that
+    /// is installed becomes ready after somebody asks for it.
+    public private(set) var daemonStartRequested = false
+    private var daemonStarted = false
 
     public func ensureDaemonRunning() async throws {
-        if case .ready = script.probe { return }
-        throw RuntimeError.daemonUnavailable
+        if case .ready = await probe() { return }
+        daemonStartRequested = true
+        guard case .installedNotRunning = script.probe, script.daemonStartSucceeds else {
+            throw RuntimeError.daemonUnavailable
+        }
+        daemonStarted = true
     }
 
     public func imageExists(_ reference: ImageReference) async -> Bool { script.imagePresent }

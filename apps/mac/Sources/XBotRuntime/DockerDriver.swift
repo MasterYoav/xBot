@@ -46,9 +46,56 @@ public actor DockerDriver: ContainerDriver {
         return .ready(version: version.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
+    /// Start the daemon and wait for it, rather than only asking whether it is up.
+    ///
+    /// This used to probe once and throw, which meant nothing ever started a stopped runtime: the
+    /// composer offered Start, `start()` probed, saw a daemon that was not answering, and returned
+    /// to the same screen. Pressing the one button the app offered did nothing at all, which is
+    /// exactly the state invariant 7 exists to prevent.
+    ///
+    /// Colima first, because if it is there this app installed it (ADR-0003) and can drive it
+    /// directly. Docker Desktop otherwise: it is a GUI app, so opening it is all we can do — it
+    /// starts its own daemon and takes its time about it.
     public func ensureDaemonRunning() async throws {
         if case .ready = await probe() { return }
+        guard case .installedNotRunning = await probe() else {
+            // Nothing installed. Starting a daemon that is not there is not a recoverable state,
+            // and the caller's sentence for it is "you need a container runtime", not "wait".
+            throw RuntimeError.daemonUnavailable
+        }
+
+        if FileManager.default.isExecutableFile(atPath: RuntimePaths.colimaExecutable.path) {
+            try? await startColima()
+        } else {
+            RuntimeLauncher.openDockerDesktop()
+        }
+
+        // Docker Desktop routinely takes 30 seconds or more from a cold start, and a deadline
+        // shorter than the thing it is waiting for is just a wrong error message.
+        let deadline = Date().addingTimeInterval(Self.daemonStartTimeoutSeconds)
+        while Date() < deadline {
+            try? await Task.sleep(for: .seconds(2))
+            if case .ready = await probe() { return }
+        }
         throw RuntimeError.daemonUnavailable
+    }
+
+    private static let daemonStartTimeoutSeconds: TimeInterval = 90
+
+    /// `colima start`, detached, so this actor is not blocked for the minute it can take.
+    private func startColima() async throws {
+        let process = Process()
+        process.executableURL = RuntimePaths.colimaExecutable
+        process.arguments = ["start"]
+        // Colima shells out to `docker` and to its own VM tooling, and it will not find either
+        // without a PATH — the app's environment does not inherit the user's shell.
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] =
+            "\(RuntimePaths.binDirectory.path):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        process.environment = environment
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
     }
 
     // MARK: - Images

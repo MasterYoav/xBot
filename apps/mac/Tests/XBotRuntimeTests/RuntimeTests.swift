@@ -225,19 +225,6 @@ struct RuntimeControllerTests {
         }
     }
 
-    @Test func aDeadDaemonIsNotDetectedRatherThanFailed() async {
-        let controller = controller(script: FakeDriver.Script(probe: .installedNotRunning))
-        await controller.start(environment: environment)
-
-        // Installed-but-stopped is recoverable without the user installing anything, so it must
-        // not present as a failure — the sentence and the button are different.
-        guard case .notDetected(let probe) = await controller.state else {
-            Issue.record("expected notDetected, got \(await controller.state)")
-            return
-        }
-        #expect(probe == .installedNotRunning)
-    }
-
     @Test func aContainerThatWillNotRunFails() async {
         let controller = controller(script: FakeDriver.Script(runFails: true))
         await controller.start(environment: environment)
@@ -360,6 +347,74 @@ struct RuntimeControllerTests {
 }
 
 extension RuntimeControllerTests {
+    /**
+     An installed-but-stopped runtime is woken, not reported and abandoned.
+
+     `start()` used to probe once and return `.notDetected` for anything that was not ready. So a
+     person with Docker installed but not running pressed the one button the app offered, nothing
+     happened, and they were left on the same screen with the same button — the dead end invariant 7
+     exists to prevent. Nothing in the codebase called `ensureDaemonRunning` at all.
+     */
+    @Test func aStoppedDaemonIsStartedRatherThanReportedAsMissing() async {
+        let driver = FakeDriver(script: FakeDriver.Script(probe: .installedNotRunning))
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+
+        await controller.start(environment: environment)
+
+        #expect(await driver.daemonStartRequested)
+        guard case .running = await controller.state else {
+            Issue.record("expected the engine to come up, got \(await controller.state)")
+            return
+        }
+    }
+
+    /// A runtime that will not come up still reports honestly, and does not pretend to be absent:
+    /// "install Docker" is the wrong sentence for somebody who already has it.
+    ///
+    /// This supersedes `aDeadDaemonIsNotDetectedRatherThanFailed`, which asserted that an
+    /// installed-but-stopped daemon *stays* not-detected — the bug itself, written down as an
+    /// expectation. Its actual point survives here: installed-but-stopped is recoverable and must
+    /// never present as `.failed`, because the sentence and the button are different.
+    @Test func aDaemonThatWillNotStartIsStillInstalled() async {
+        let driver = FakeDriver(
+            script: FakeDriver.Script(probe: .installedNotRunning, daemonStartSucceeds: false)
+        )
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+
+        await controller.start(environment: environment)
+
+        #expect(await driver.daemonStartRequested)
+        #expect(await controller.state == .notDetected(.installedNotRunning))
+    }
+
+    /// Nothing installed is a different case, and must not sit waiting for a daemon that cannot
+    /// exist — the honest answer is immediate.
+    @Test func anAbsentRuntimeIsNotWaitedFor() async {
+        let driver = FakeDriver(script: FakeDriver.Script(probe: .absent))
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+
+        await controller.start(environment: environment)
+
+        #expect(!(await driver.daemonStartRequested))
+        #expect(await controller.state == .notDetected(.absent))
+    }
+
+
     /**
      Uninstall removes the container and all three volumes.
 

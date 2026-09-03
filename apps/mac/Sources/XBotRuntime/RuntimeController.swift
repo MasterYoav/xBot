@@ -79,8 +79,22 @@ public actor RuntimeController {
     /// Sequential and explicit rather than one opaque await, because "starting" with no substate is
     /// the thing that makes an app feel hung. Each stage here is a sentence the user can read.
     public func start(environment: (UInt16, String) -> [String: String]) async {
-        guard case .ready = await driver.probe() else {
-            state = .notDetected(await driver.probe())
+        /*
+         * A stopped daemon is something to fix, not something to report and give up on.
+         *
+         * This used to probe once and return `.notDetected` for anything that was not ready, so a
+         * person with Docker installed but not running pressed Start, watched nothing happen, and
+         * was left on the same screen with the same button. The runtime is only "not detected" when
+         * there is genuinely nothing installed; when it is installed and asleep, wake it.
+         */
+        var probe = await driver.probe()
+        if case .installedNotRunning = probe {
+            state = .starting(.runtime)
+            try? await driver.ensureDaemonRunning()
+            probe = await driver.probe()
+        }
+        guard case .ready = probe else {
+            state = .notDetected(probe)
             return
         }
 

@@ -15,13 +15,57 @@ public struct WindowChromeConfigurator: NSViewRepresentable {
     }
 
     public func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        DispatchQueue.main.async { configure(window: view.window) }
+        let view = ChromeHost()
+        view.configure = { window in configure(window: window) }
+        DispatchQueue.main.async { [weak view] in view?.applyChrome() }
         return view
     }
 
     public func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { configure(window: nsView.window) }
+        guard let host = nsView as? ChromeHost else { return }
+        host.configure = { window in configure(window: window) }
+        DispatchQueue.main.async { [weak host] in host?.applyChrome() }
+    }
+
+    /// Re-applies the chrome whenever AppKit rebuilds the title bar.
+    ///
+    /// One `DispatchQueue.main.async` from `makeNSView` was not enough. On a cold launch the
+    /// toolbar's item background views do not exist yet when it runs, so the walk that hides them
+    /// finds nothing — and the app opened with a glass pill behind each toggle and behind the agent
+    /// name. Pressing any toggle drove `updateNSView`, by which time the views existed, and they
+    /// vanished. The chrome was correct only after the person touched something.
+    ///
+    /// `didUpdateNotification` is the deterministic hook rather than a longer delay: AppKit posts it
+    /// when the window has finished updating, including the pass that first builds the toolbar, and
+    /// again after anything that rebuilds it — entering full screen, or a toolbar item changing.
+    /// Hiding an already-hidden view is a no-op, so re-running it costs a short tree walk.
+    final class ChromeHost: NSView {
+        var configure: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            NotificationCenter.default.removeObserver(self)
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowDidUpdate),
+                name: NSWindow.didUpdateNotification,
+                object: window
+            )
+            applyChrome()
+        }
+
+        @objc private func windowDidUpdate() {
+            applyChrome()
+        }
+
+        func applyChrome() {
+            configure?(window)
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
     }
 
     private func configure(window: NSWindow?) {

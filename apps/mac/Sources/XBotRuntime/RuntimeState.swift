@@ -15,6 +15,8 @@ public enum RuntimeState: Sendable, Equatable {
 
     /// The steps of a start, named, so the UI says which one is happening.
     public enum Stage: String, Sendable, CaseIterable {
+        /// Waiting for the container runtime's own daemon, which the app just asked to start.
+        case runtime
         case volumes
         case ports
         case container
@@ -23,6 +25,7 @@ public enum RuntimeState: Sendable, Equatable {
 
         public var sentence: String {
             switch self {
+            case .runtime: String(localized: "Starting the container runtime")
             case .volumes: String(localized: "Preparing storage")
             case .ports: String(localized: "Choosing a port")
             case .container: String(localized: "Starting the engine")
