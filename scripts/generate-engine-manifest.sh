@@ -35,30 +35,22 @@ else
   REF="local-dev@${ID#sha256:}"
 fi
 
-SCHEMA="$(curl -sf "http://127.0.0.1:3001/health" 2>/dev/null | python3 -c "
-import json, sys
-try:
-    o = json.load(sys.stdin)
-    print(o.get('schemaVersion', '0'))
-except Exception:
-    print('0')
-" 2>/dev/null || echo "0")"
+# The engine reports its schema as a migration tag — "0025_backfill_existing_users_have_onboarded".
+# Absent when nothing is running to ask, which is the normal case in CI.
+SCHEMA_TAG="$(curl -sf "http://127.0.0.1:3001/health" 2>/dev/null \
+  | "${ROOT}/scripts/read-health-field.py" schemaVersion 2>/dev/null || echo "")"
 
-python3 - <<PY
-import json
-from pathlib import Path
-
-template = json.loads(Path("${TEMPLATE}").read_text())
-template.update({
-    "channel": "${CHANNEL}",
-    "version": "${VERSION}",
-    "image": "${REF}",
-    "size": int("${SIZE}"),
-    "minimumAppVersion": "${MIN_APP}",
-    "migration": {
-        "schemaVersion": "${SCHEMA}",
-        "backwardCompatibleWith": 0,
-    },
-})
-print(json.dumps(template, indent=2))
-PY
+# Every value reaches Python through the environment, never spliced into its source.
+#
+# They used to be interpolated into a heredoc directly, which made any value carrying a newline or
+# a quote a syntax error in the generated program rather than data. CI failed on exactly that:
+# `"schemaVersion": "0` and an unterminated string literal. A value that came from `curl` is input,
+# and input does not belong in source.
+CHANNEL="${CHANNEL}" \
+VERSION="${VERSION}" \
+IMAGE_REF="${REF}" \
+IMAGE_SIZE="${SIZE}" \
+MIN_APP="${MIN_APP}" \
+SCHEMA_TAG="${SCHEMA_TAG}" \
+TEMPLATE_PATH="${TEMPLATE}" \
+  "${ROOT}/scripts/build-engine-manifest.py"

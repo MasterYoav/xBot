@@ -15,6 +15,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # First: the icon is a build input, not a packaging step. Package.swift declares the
+      # compiled artifacts as resources, so neither the test nor the build can run without them.
+      - name: Generate icon
+        run: scripts/generate-app-icon.sh
+
       - name: Test
         working-directory: apps/mac
         run: swift test
@@ -22,9 +27,6 @@ jobs:
       - name: Release build
         working-directory: apps/mac
         run: swift build -c release
-
-      - name: Generate icon
-        run: scripts/generate-app-icon.sh
 
       - name: Bundle .app
         run: scripts/bundle-mac-app.sh

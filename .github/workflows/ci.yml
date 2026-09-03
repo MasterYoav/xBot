@@ -88,5 +88,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # Before the build, not after. Package.swift declares xBot.icns and Assets.car as bundled
+      # resources and .gitignore excludes them — they are compiled from xBot.icon/ by this script.
+      # So they exist on the machine of anyone who has run it and on no fresh checkout, and
+      # `swift build` fails outright with "missing inputs". This job had never run on a push until
+      # the branch trigger was fixed, which is why nothing had reported it.
+      - name: Generate icon
+        working-directory: .
+        run: scripts/generate-app-icon.sh
       - run: swift build
       - run: swift test
