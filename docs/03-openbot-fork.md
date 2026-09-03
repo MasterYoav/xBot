@@ -326,10 +326,10 @@ security-sensitive codebase within a year.
 | Local history provider (ADR-0001) | 3–5 weeks | **No, since ADR-0007.** Seam built; deferred past v1 |
 | Model router (ADR-0002) | 2–3 weeks | **Yes — the product is single-model without it** |
 | Vendor adapters beyond OpenAI-compatible | 1–2 weeks | No — compatible mode covers most |
-| Local-token auth | 3–4 days | Yes |
-| Config surface → app settings | 1–2 weeks | Yes |
-| Port negotiation + runtime driver | 1–2 weeks | Yes |
-| Admin webview embedding | 3–4 days | No |
+| Local-token auth | 3–4 days | **Done** — `EngineTokenStore`, bearer on loopback |
+| Config surface → app settings | 1–2 weeks | **Done** — `EngineEnvironment` + [`env-mapping.md`](env-mapping.md) |
+| Port negotiation + runtime driver | 1–2 weeks | **Done** — `DockerDriver`, adoption, `RuntimeController` |
+| Admin webview embedding | 3–4 days | **Partially done** — plugins admin webview ships; other admin surfaces still open |
 | **Engine total** | **~9–14 weeks** | |
 
 The Mac client is estimated separately in [12-roadmap.md](12-roadmap.md). The two streams can run in

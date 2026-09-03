@@ -28,6 +28,15 @@ each step says what it is doing.
 Five steps. Two of them ask nothing. **Exactly one asks for input**, and it is the one where the
 user gets something in return.
 
+## What exists today
+
+All five steps are implemented in `XBotOnboarding`: Welcome, SystemCheck, EngineSetup,
+ConnectModel, MeetAgent. The flow runs inside the main window via `AppShellView` (crossfade handoff
+to the rail/conversation layout on completion). Colima **Install for me**, Docker Desktop start,
+engine container adoption for an existing `xbot-engine`, provider key validation, and runtime choice
+persistence (`RuntimeChoiceStore`) are in place. Failure branches for engine health timeout and
+failed start have automated tests; VM clean-machine validation (M6 done criterion) is still open.
+
 ---
 
 ## Step 1 — Welcome
@@ -247,12 +256,11 @@ data volume.
 
 The path with the least test coverage and the most consequence. It gets more, not less.
 
-- **Every failure branch has an automated test** with a fake runtime driver: no network, network
-  drops at 40%, disk full at 80%, runtime dies during start, migration fails, port occupied by a
-  process claiming to be Postgres.
-- **The happy path is an XCUITest** on a clean machine image in CI.
+- **Failure branches covered in unit tests** with `FakeDriver` / fake health clients: engine health
+  timeout, failed start (no command echo), runtime-not-detected paths. More branches (network drop
+  mid-pull, disk full, port collision) are specified here but **not all automated yet**.
+- **The happy path is an XCUITest** on a clean machine image in CI — **not wired yet**.
 - **Manual, before every release, on a genuinely clean Mac** — no Homebrew, no Docker, no developer
-  tools. A VM snapshot. This catches the assumptions a developer's machine hides, and it is where
-  the 5432 collision would have been caught.
+  tools. A VM snapshot. See `scripts/README-packaging.md` for the M6 checklist.
 - **Timed.** Record how long a clean install takes on a normal connection. If it grows past ten
   minutes, that is a regression with a bug number.

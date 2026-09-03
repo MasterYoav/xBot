@@ -32,6 +32,21 @@ Changing it takes effect on the next message. No restart. Not visible anywhere e
 **Ollama gets special treatment.** The app detects it on `localhost:11434` and lists the models the
 user already has. No key. If it is not installed, the row offers a link, not an instruction.
 
+## What exists today
+
+**Client prep only — the engine router (M2) is not built.**
+
+| Piece | State |
+| --- | --- |
+| Onboarding **Connect a model** step | Provider picker, secure key field, live validation via `ModelProviderValidator` |
+| Keychain storage | `ProviderKeyStore` — keys never in UserDefaults or logs |
+| Connection state | `ProviderConnectionStore` — which providers validated successfully |
+| Agent settings model picker | Dropdown in panel; lists models from connected providers via `ModelProviderCatalog` fallback when the engine has no router yet |
+| Settings → Models tab | **Not built** — full registry UI is M7 |
+
+Until M2 lands, changing the picker updates the agent record in the app; the engine may still use
+upstream's process-wide `BOT_PROVIDER` for actual inference.
+
 ## What upstream does instead
 
 ```ts

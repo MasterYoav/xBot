@@ -43,6 +43,7 @@ everything else works around. After that, read by area.
 11. **[Packaging and updates](11-packaging-and-updates.md)** — DMG, Developer ID, notarization,
     Sparkle.
 12. **[Roadmap](12-roadmap.md)** — milestones, and what "done" means for each.
+13. **[Engine environment mapping](env-mapping.md)** — how app settings become the container's env vars.
 
 ## Decisions
 

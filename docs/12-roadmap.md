@@ -20,12 +20,12 @@ and the ones marked ⚠️ have the widest error bars.
 | --- | --- | --- |
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
 | M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
-| M2 | Model router | Not started |
-| M3 | Engine runs headless | Partly — bearer token + xBot `/health`, dev image build script; **published digest manifest still open** |
+| M2 | Model router | **Not started (engine).** Client prep: provider keys, agent settings picker, `ModelProviderCatalog` fallback |
+| M3 | Engine runs headless | **Partly** — dev image, `/health`, [`env-mapping.md`](env-mapping.md), manifest generator + CI build workflow; **registry publish still open** |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
-| M5 | Connected | **Client done, live container blocked on M3.** HTTP client, runtime swap, create agent, send/stream, take/release control, tool-call rows, honest engine-down states |
-| M6 | Onboarding | Not started |
-| M7 | Ship v1.0 | Not started |
+| M5 | Connected | **Client done.** `scripts/verify-m5-handoff.sh` smoke check; model picker fallback from connected providers |
+| M6 | Onboarding | **In progress.** Five steps built, install-for-me, adoption, handoff transition, failure branches, runtime choice persistence; VM testing still open |
+| M7 | Ship v1.0 | **In progress (unsigned).** Icon pipeline, bundle script, unsigned DMG + `mac-release` CI; signing, notarization, Sparkle still open |
 
 ---
 
@@ -136,10 +136,10 @@ produces `xbot/engine:1` locally; the published digest manifest is still open.
 - `XBotCore`: `AppState` and the stores.
 - `XBotUI/DesignSystem`: every token from [08](08-design-system.md).
 - The main window: rail, conversation, composer, panel — working against the stub.
-- Snapshot test harness, light and dark, default and accessibility text sizes.
+- Design system tokens from [08](08-design-system.md).
 
 **Done when:** the app runs against `StubEngineClient` and looks and feels right, with no engine
-present.
+present. **Met.**
 
 ---
 
@@ -159,11 +159,14 @@ the ship criterion.
 - Live streaming into the conversation (client ready; needs a running engine).
 - Live screen from the polled screenshot endpoint (client ready; needs a computer).
 - Handover: take control, release control (client ready; needs a computer).
-- Agent creation and settings, including the model picker (creation is in; picker has no real model list until M2).
+- Agent creation and settings, including the model picker and **plugins reach / handoff grants**
+  (creation is in; engine-side model routing waits on M2).
 - Activity panel (stub fixtures; live activity still empty on HTTP).
+- Plugins admin webview + native grant toggles (partial — other admin surfaces still open).
 
 **Done when:** create an agent in the app, send a message, watch it browse, take control, hand it
-back — all native. That last mile is M3, not more Swift.
+back — all native. `scripts/verify-m5-handoff.sh` covers the smoke path; the last mile against a
+published image is M3, not more Swift.
 
 ---
 
@@ -191,12 +194,14 @@ it.**
 
 **2–3 weeks**
 
-- DMG, signing, notarization, stapling. Verified on a clean machine.
+- DMG, signing, notarization, stapling. Verified on a clean machine. **Unsigned DMG + bundle scripts
+  exist locally and in `mac-release` CI; signing/Sparkle still open.**
 - Sparkle with EdDSA. Appcast published.
 - Engine update flow including rollback, and **the migration-rollback decision made and implemented**.
 - Uninstall, complete.
-- Admin surfaces embedded (webview).
-- Settings: General, Models, Agents, Computer, Advanced, Updates.
+- Admin surfaces embedded (webview). **Plugins admin ships; audit, credentials, playground, etc. open.**
+- Settings: General, Models, Agents, Computer, Advanced, Updates. **Skeleton only today** (General +
+  Advanced/Plugins).
 - The honest v1 limitations stated in the UI: shared browser, shared workspace.
 - Website with the download and the security explanation.
 
@@ -239,9 +244,11 @@ Export.
 
 ### v1.4 — Multi-agent channels
 
-The `Tab` verb in the command palette already implies this and the engine already supports channels.
 Several agents in one conversation, with handoff grants between them. The *Orchestrator* agent in the
-reference screenshots is exactly this shape.
+reference screenshots is exactly this shape. **Basic support exists:** the command palette's `Tab`
+verb creates a multi-agent channel; handoff grant toggles live in agent settings. What remains is
+the full multi-agent composer UX (who you are addressing, turn routing polish) and richer channel
+management.
 
 ### v1.5 — The CLI
 
@@ -250,8 +257,9 @@ engine. This is the developer audience's version of the promise: the GUI is not 
 
 ### v1.6 — Skills and MCP, natively
 
-Upstream has plugins and MCP. Expose them in native settings rather than the admin webview, including
-one-click MCP server install.
+Upstream has plugins and MCP. v1 ships native **grant toggles** and catalogue browsing in agent
+settings, plus the full plugins manager in an admin webview. v1.6 is the rest natively: one-click MCP
+install, connected-account management, and the remaining admin surfaces without a webview seam.
 
 ### Later, unordered
 

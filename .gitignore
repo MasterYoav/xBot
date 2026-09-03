@@ -7,3 +7,22 @@ xcuserdata/
 node_modules/
 .env
 .env.local
+
+# macOS app build outputs
+apps/mac/XBot.app/
+dist/
+*.dmg
+
+# Generated icon artifacts (source: xBot.icon/ + scripts/generate-app-icon.sh)
+apps/mac/Sources/XBotApp/Resources/Assets.car
+apps/mac/Sources/XBotApp/Resources/xBot.icns
+apps/mac/Sources/XBotUI/Resources/xBot.icns
+apps/mac/Resources/AppIcon.iconset/
+apps/mac/Resources/AppIcon.png
+apps/mac/Resources/AppIcon.icns
+
+# macOS resource-fork junk
+Icon?
+
+# Tool caches
+.impeccable/

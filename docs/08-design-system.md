@@ -333,8 +333,8 @@ Handled in the tokens so no call site can forget.
 
 ## 9. Component inventory
 
-Each is one file in `XBotUI/Components/`, has a snapshot test in light and dark at default and
-accessibility text sizes, and takes only tokens.
+Each lives in one file under `XBotUI/Components/` (or the feature folder) and takes only tokens.
+**Snapshot tests are planned, not wired yet** — the inventory below is the target set.
 
 | Component | Notes |
 | --- | --- |

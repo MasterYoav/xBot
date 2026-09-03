@@ -53,8 +53,20 @@ public protocol ContainerDriver: Sendable {
 }
 ```
 
-Implementations: `DockerDriver` (CLI), `ColimaDriver` (wraps `DockerDriver` with lifecycle),
-`AppleContainerDriver`, and `FakeDriver` for tests.
+Implementations: `DockerDriver` (CLI against Docker or Colima's socket), `ColimaInstaller`
+(downloads Colima + Docker CLI into Application Support when the user chooses **Install for me**),
+`FakeDriver` for tests, and `RuntimeLauncher` for picking the preferred `docker` executable path.
+
+**Not implemented:** separate `ColimaDriver` or `AppleContainerDriver` types. Colima is reached
+through the same `DockerDriver` once its daemon is running.
+
+### What exists today
+
+`RuntimeController` drives the full state machine. `DockerDriver` handles probe, pull, run, stop,
+adopt-or-create for `xbot-engine`, and log tailing. Onboarding can install Colima via
+`ColimaInstaller`, persist the user's runtime choice, and surface failures with copyable diagnostics
+(`DiagnosticsClipboard` with redaction tests). Environment for the container is composed in
+`EngineEnvironment` — see [`env-mapping.md`](env-mapping.md).
 
 **`hostGatewayAddress()` is load-bearing** and easy to overlook. Two things inside the container need
 to reach the host: the agent's tool-call callback (upstream already uses `host.docker.internal`) and

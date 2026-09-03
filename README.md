@@ -39,11 +39,11 @@ vendor.
 
 ## Status
 
-**In development.** The native Mac client exists: rail, conversation, composer, panel, and
-command palette, wired to a real `RuntimeController` and `HTTPEngineClient`. On a machine without
-Docker it says so and offers Start. Creating an agent, sending a message, and taking/releasing
-browser control are implemented. A published engine image (milestone M3) is still required before
-a live conversation against a container.
+**In development.** The native Mac client ships rail, conversation, composer, panel, command palette,
+onboarding (five steps), agent settings (model picker, plugins reach, handoff grants), plugins admin
+webview, and a settings skeleton — all wired to `RuntimeController` and `HTTPEngineClient` when the
+engine is running. A published engine image (M3) is still required before a non-developer install path
+works end to end.
 
 Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 [`docs/12-roadmap.md`](docs/12-roadmap.md).
@@ -53,9 +53,11 @@ Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 ```sh
 cd apps/mac && swift run          # debug: stub engine, full UI, no Docker
 cd apps/mac && XBOT_USE_RUNTIME=1 swift run   # debug: real runtime path — Start in the UI
-cd apps/mac && swift test         # 77 unit tests
+cd apps/mac && swift test         # 99 unit tests (SwiftPM)
 scripts/build-engine-image.sh     # dev: build xbot/engine:1 for the runtime path
 scripts/check-engine-health.sh    # dev: read-only /health check once the engine is up
+scripts/generate-app-icon.sh      # compile xBot.icon → Assets.car + xBot.icns
+scripts/bundle-mac-app.sh          # wrap release binary in XBot.app (after swift build -c release)
 ```
 
 Release builds always use the runtime path. The runtime path needs a local `xbot/engine:1` image
@@ -80,6 +82,7 @@ for a clean retry (volumes are kept).
 | [Security](docs/10-security.md) | Keys, secrets, isolation, what never gets written down |
 | [Packaging](docs/11-packaging-and-updates.md) | Signing, notarization, updates |
 | [Roadmap](docs/12-roadmap.md) | Milestones |
+| [Engine environment mapping](docs/env-mapping.md) | App settings → container env vars |
 | [Decisions](docs/decisions/) | ADRs — read these before disagreeing with anything above |
 
 ## Built on OpenBot

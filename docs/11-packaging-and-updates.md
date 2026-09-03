@@ -61,13 +61,33 @@ generates support mail from people who cannot describe it.
 
 ---
 
-## CI
+## Build pipeline (today)
+
+Unsigned local releases are scripted; signing and Sparkle remain open (M7). Step-by-step:
+[`scripts/README-packaging.md`](../scripts/README-packaging.md).
+
+| Script | Purpose |
+| --- | --- |
+| `scripts/generate-app-icon.sh` | `xBot.icon` → `Assets.car` + `xBot.icns` via `actool` |
+| `scripts/bundle-mac-app.sh` | Wrap `swift build -c release` binary in `XBot.app` |
+| `scripts/create-dmg.sh` | Unsigned DMG with Applications alias |
+| `scripts/build-engine-image.sh` | Local dev image `xbot/engine:1` |
+| `scripts/generate-engine-manifest.sh` | Pinned digest manifest for updates |
+| `scripts/verify-m5-handoff.sh` | Smoke check against a live engine |
+
+CI: `.github/workflows/mac-release.yml` builds and uploads an unsigned artifact; `.github/workflows/engine-image.yml`
+builds the engine image. Developer ID signing, notarization, and Sparkle appcast generation are **not
+wired yet**.
+
+---
+
+## CI (target)
 
 ```yaml
 build:
-  - swift build --arch arm64 --arch x86_64      # universal
-  - swift test
-  - xcodebuild test -scheme XBot -destination 'platform=macOS'
+  - scripts/generate-app-icon.sh
+  - cd apps/mac && swift build -c release --arch arm64 --arch x86_64   # universal (target)
+  - cd apps/mac && swift test
 
 sign:
   - codesign --deep --force --options runtime --timestamp
@@ -79,7 +99,8 @@ notarize:
   - xcrun stapler validate XBot.app
 
 package:
-  - create-dmg with the standard layout
+  - scripts/bundle-mac-app.sh
+  - scripts/create-dmg.sh
   - codesign the DMG
   - notarize + staple the DMG
 

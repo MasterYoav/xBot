@@ -152,7 +152,7 @@ model per agent, from a settings pane, and expect it to take effect on the next 
 
 - **Test-driven where there is logic to test.** The model router, the policy evaluation, the
   container state machine, and the credential store all have real logic — write the test first.
-  UI views do not need unit tests; their behaviour is covered by snapshot and interaction tests.
+  UI views do not need unit tests; snapshot and interaction tests are planned for M7+.
 - **Small, focused changes.** One concern per commit.
 - **Preserve upstream comments in `engine/`.** OpenBot's source comments explain *why* a security
   boundary is where it is. Deleting one to tidy up has, upstream, previously reintroduced a
@@ -175,7 +175,6 @@ cd engine && bun run format:check && bun run lint && bun run typecheck && bun ru
 
 # Mac app
 cd apps/mac && swift build && swift test
-xcodebuild -scheme XBot -destination 'platform=macOS' test   # from M4, once the Xcode target exists
 ```
 
 **Never say "done", "fixed", or "passing" without having run the command and read the output.**

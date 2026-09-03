@@ -193,10 +193,10 @@ entirely in the right-hand column.
 | Control handover as first-class audited events | Take control · Give it back, on the live screen, with the honest sentence about refusal |
 | Secret requests on a channel separate from chat | A card with a secure field. **Never a normal message** |
 | Routines — recurring scheduled turns | The panel's Routines section, schedules in plain language |
-| MCP plugins and connected accounts | Native settings, one-click install, rather than the admin webview |
+| MCP plugins and connected accounts | Native grant toggles in agent settings + plugins admin webview; full native manager is v1.6 |
 | Generative UI from the agent | Sandboxed `WKWebView` in the conversation, fixed height, expandable |
 | AG-UI: any agent endpoint, any framework | "Bring your own agent" as a settings pane for the developer audience |
-| Multi-agent channels with handoff grants | The palette's `Tab` verb — several agents in one conversation |
+| Multi-agent channels with handoff grants | Palette `Tab` verb (basic); handoff grant toggles in agent settings |
 | SPIFFE workload identity, optional gVisor | Nothing. It should be invisible and simply on where the host supports it |
 
 **The pattern:** the engine decides, records, and enforces; the app explains, surfaces, and asks.
@@ -210,7 +210,7 @@ Summary; details in [03-openbot-fork.md](03-openbot-fork.md).
 | Area | Upstream | xBot |
 | --- | --- | --- |
 | Threads & memory | Hosted CopilotKit Intelligence, **mandatory** | **v1: Intelligence, kept.** Local provider seam built and deferred — [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) |
-| Model selection | `BOT_PROVIDER` env var, process-wide, 3 vendors | Per-agent, runtime, every vendor + Ollama |
+| Model selection | `BOT_PROVIDER` env var, process-wide, 3 vendors | Per-agent, runtime, every vendor + Ollama — **client prep done; engine router (M2) open** |
 | Auth | OAuth/SAML/OIDC, or single-user mode | Single local user. Keychain-backed token |
 | Configuration | `.env` file | App settings → generated env → container |
 | Client | React/Vite on `:3010` | Native SwiftUI. React kept for admin only |

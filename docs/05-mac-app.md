@@ -13,10 +13,11 @@
 
 ## Module layout
 
-A Swift package with six targets, plus a thin Xcode app target. Dependencies point one way only.
+A Swift package with six library/executable targets. **SwiftPM only** — there is no Xcode project
+file; build with `swift build` or `swift run`. Dependencies point one way only.
 
 ```
-XBotApp          @main, scenes, windows, menu bar, app lifecycle
+XBotApp          @main, scenes, windows, app lifecycle (menu bar planned, not shipped)
    ├── XBotOnboarding    first-run flow
    ├── XBotUI            all views + the design system
    ├── XBotCore          models, state, persistence, coordination
@@ -69,23 +70,23 @@ let's spin." A spinner with no state behind it is how you get an app the user fo
 The API client. Three transports:
 
 ```swift
-public actor EngineClient {
-    // REST
+public protocol EngineClient: Sendable {
+    // REST — agents, channels, messages, plugins, handoff grants
     public func agents() async throws -> [Agent]
-    public func createAgent(_ draft: AgentDraft) async throws -> Agent
-    public func updateAgent(_ id: Agent.ID, _ patch: AgentPatch) async throws -> Agent
-    public func channels() async throws -> [Channel]
-    public func messages(in: Channel.ID, before: Cursor?) async throws -> Page<Message>
+    // …
 
     // SSE — the turn stream
-    public func send(_ text: String, to: Channel.ID, attachments: [Attachment])
+    public func send(_ text: String, to: Channel.ID)
         -> AsyncThrowingStream<TurnEvent, Error>
 
     // Polled screenshots
-    public func screenStream(for: Agent.ID, cadence: ScreenCadence)
+    public func screen(for: Agent.ID, cadence: ScreenCadence)
         -> AsyncStream<ScreenFrame>
 }
 ```
+
+Implementations: `HTTPEngineClient` (loopback + bearer token), `StubEngineClient` (fixtures),
+`UnavailableEngineClient` (engine down).
 
 **The `TurnEvent` stream is the heart of the app.** AG-UI emits text deltas, tool call starts, tool
 results, state patches, and errors. The parser must be:
@@ -98,18 +99,21 @@ results, state patches, and errors. The parser must be:
 
 ### XBotCore
 
-The state everything else reads. One `@Observable` root, and stores hanging off it.
+The state everything else reads. One `@Observable` root today — stores split when they earn their
+own behaviour (see inline comment in `AppState.swift`).
 
 ```swift
 @Observable @MainActor
 public final class AppState {
-    public var runtime: RuntimeState
-    public var agents: AgentStore
-    public var channels: ChannelStore
-    public var settings: SettingsStore
-    public var providers: ProviderStore
+    public private(set) var agents: [Agent]
+    public private(set) var channels: [Channel]
+    public private(set) var messages: [Message]
+    // runtime observation, panel, plugins, handoff grants, composer block, …
 }
 ```
+
+Provider keys and connection state live in `ProviderKeyStore`, `ProviderConnectionStore`, and
+`EngineTokenStore` — not yet a dedicated Settings store.
 
 **Rule: views read from stores, and send intents to stores.** A view never holds a `URLSession`,
 never constructs a request, never parses a response. If `import XBotEngine` appears in a file under
@@ -145,15 +149,15 @@ See [06-onboarding.md](06-onboarding.md).
 
 | Scene | Kind | Notes |
 | --- | --- | --- |
-| Main | `Window` | Rail, conversation, panel. One at a time. Restores position and selection |
-| Onboarding | `Window` | Fixed size, no resize, no minimise. Closes into Main |
-| Settings | `Settings` | Standard macOS settings scene, tabbed |
-| Agent screen | `WindowGroup` | Optional detached full-size live view, one per agent |
-| Menu bar | `MenuBarExtra` | Engine state, quick agent access, start/stop |
+| Main | `Window` | Rail, conversation, panel. Onboarding crossfades in via `AppShellView` on first run |
+| Onboarding | (in Main) | Fixed-size window mode during first run; not a separate scene |
+| Settings | `Settings` | General placeholder + Advanced (Plugins…) today |
+| Plugins admin | `Window` | `WKWebView` at engine `/admin/plugins` |
+| Agent screen (detached) | — | **Not built** |
+| Menu bar | — | **Not built** — planned for runtime status when the main window is closed |
 
-**The menu bar item is not decoration.** It is where the runtime state lives when the main window is
-closed, and it is the answer to "is this thing running and eating my battery." It shows a dot for
-state and offers Stop Engine.
+**The menu bar item is planned, not shipped.** When it exists, it is where the runtime state lives
+when the main window is closed.
 
 ## Threading
 
@@ -214,11 +218,12 @@ Not a phase. Built in from the first component.
 
 | Layer | Approach |
 | --- | --- |
-| `XBotRuntime` | Unit tests against a fake runtime driver. Every state transition, including failures |
-| `XBotEngine` | Recorded fixtures. Especially: truncated SSE, malformed events, mid-stream disconnect |
-| `XBotCore` | Unit tests on stores and reducers |
-| `XBotUI` | Snapshot tests, light and dark, at default and accessibility text sizes |
-| End to end | XCUITest against a real engine in CI: onboard → create agent → send → receive |
+| `XBotRuntime` | Unit tests against `FakeDriver`. State transitions including container adoption |
+| `XBotEngine` | Unit tests on HTTP client, SSE parser, AG-UI decoder, plugin JSON decoding |
+| `XBotCore` | Unit tests on `AppState`, provider stores, onboarding version |
+| `XBotOnboarding` | Failure-branch tests with fake runtime |
+| `XBotUI` | **No snapshot or XCUITest yet** — planned |
+| End to end | `scripts/verify-m5-handoff.sh` against a live engine; full XCUITest not yet |
 
 **The stub engine is a first-class deliverable.** `XBotEngine` ships a `StubEngineClient` conforming
 to the same protocol as `HTTPEngineClient`, serving fixtures. Tests and snapshot work stay

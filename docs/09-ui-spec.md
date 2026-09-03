@@ -16,17 +16,17 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 
 | Surface | State |
 | --- | --- |
-| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring while a turn is in flight. Unread and attention badges specified, not wired |
+| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring while a turn is in flight. Unread and attention badges specified, **not wired** |
 | Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up. Empty states distinguish engine-down, runtime-missing, failed-start, and no-agents |
-| Message bubbles | Built for text and compact tool-call rows. Images, handover and secret cards not yet |
+| Message bubbles | Built for text and compact tool-call rows. Images, handover and secret cards **not yet** |
 | The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
-| The right panel | Built — Screen, Activity, Routines, Agent settings incl. the model picker. Take control / give it back |
-| Command palette | Built for search, open, and **create**. `Tab` to add an agent to a channel is not wired |
-| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine. Live container still needs M3's image |
-| Design system | Built — all tokens, with Reduce Motion and Reduce Transparency inside them |
-| Settings scene | Not started |
-| Onboarding | Not started — M6, and the widest error bar left in the project |
-| Admin webview | Not started |
+| The right panel | Built — Screen, Activity, Routines, Agent settings (model picker, **What it can reach**, Connection, Handoff grants) |
+| Command palette | Built — search, open, create. **`Tab` adds an agent to the current channel** (creates a multi-agent channel). Footer shows both verbs |
+| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine, container adoption. Dev image `xbot/engine:1`; registry publish still open (M3) |
+| Design system | Built — tokens, aurora field, frosted glass, Reduce Motion and Reduce Transparency inside tokens |
+| Onboarding | **Built (M6 in progress)** — five steps, Colima install-for-me, engine adoption, provider keys, handoff to main window. VM clean-machine validation still open |
+| Settings scene | **Partial** — General placeholder + Advanced (Plugins…). Models, Agents, Computer, Usage, Updates tabs **not yet** |
+| Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). Other admin surfaces (audit, credentials, playground, …) **not embedded** |
 
 ## The main window
 
@@ -280,6 +280,9 @@ footer states both, because a keyboard affordance nobody knows about does not ex
 
 A standard macOS `Settings` scene. Tabs, not a sidebar-in-a-sheet.
 
+**Shipped today:** General (placeholder copy) and Advanced (opens Plugins admin). All other tabs below
+are spec — not built yet.
+
 | Tab | Contents |
 | --- | --- |
 | **General** | Account (local), appearance, language, microphone, timezone, launch at login |
@@ -329,12 +332,23 @@ The advanced editor is the raw policy with the dry-run tool upstream provides.
 
 ## Admin surfaces
 
-Audit, boundaries, computers, credentials, people, plugins, components, playground. Rendered in an
-embedded `WKWebView` against the engine's own admin pages, in a dedicated window opened from
-Advanced. See [ADR-0004](decisions/0004-native-vs-webview.md).
+Audit, boundaries, computers, credentials, people, plugins, components, playground. Per
+[ADR-0004](decisions/0004-native-vs-webview.md), dense operational tools open in a dedicated window
+from Settings → Advanced, not inside the main window.
+
+**What ships today:**
+
+| Surface | How |
+| --- | --- |
+| **Plugins (full manager)** | `WKWebView` at the engine's `/admin/plugins` — OAuth setup, catalogue, per-tool config |
+| **Plugin grants (per agent)** | Native — **What it can reach** and **Handoff grants** in the panel's Agent settings |
+| Everything else in the table above | **Not embedded yet** — same webview pattern when added |
+
+The webview injects the loopback bearer token at document start so the upstream React admin can call
+`/api` without a sign-in flow. The token never appears in page-visible UI.
 
 **They are labelled as advanced and they look it.** No attempt to make a dense operational tool feel
-like the chat app. Pretending otherwise would be worse than the honest seam.
+like the chat app.
 
 **Exception: the audit trail gets a native view before v1.0.** It is the product's central trust
 claim. A user who wants to know what their agent did should not meet a webview at that moment.
