@@ -321,6 +321,11 @@ export function createAgentProfileStore(
           // auth-header.ts for why a bearer token must not sit next to the endpoint.
           configuration: {
             ...endpoint,
+            // Which model this coworker answers on, when it was created with one. Absent means it
+            // never chose and the endpoint answers on its deployment's own configuration.
+            ...(input.modelSelection
+              ? { modelSelection: input.modelSelection }
+              : {}),
             ...(input.auth && vault
               ? {
                   auth: await storeAgentAuth({
@@ -380,6 +385,16 @@ export function createAgentProfileStore(
           const configuration = {
             ...previous,
             ...(input.endpoint ? { endpoint: input.endpoint } : {}),
+            /*
+             * The model, when this edit carried one.
+             *
+             * Absent leaves whatever is stored alone, the same rule the key above follows and for
+             * the same reason: a form that cannot show the current value must not be able to clear
+             * it by staying quiet. Changing the model is an explicit act, so it arrives explicitly.
+             */
+            ...(input.modelSelection
+              ? { modelSelection: input.modelSelection }
+              : {}),
             ...(input.auth && vault
               ? {
                   auth: await storeAgentAuth({

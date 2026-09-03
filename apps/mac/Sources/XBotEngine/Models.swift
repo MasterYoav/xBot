@@ -30,15 +30,63 @@ public struct Agent: Identifiable, Hashable, Sendable {
 
 /// Which model answers for one agent. The xBot addition; see docs/04-model-providers.md.
 public struct ModelSelection: Hashable, Sendable {
+    /// What the person reads: "Anthropic", "xAI", "Ollama".
     public let provider: String
+    /// What the engine routes on: `openai`, `anthropic`, `google`, `openai-compatible`.
+    ///
+    /// Separate from `provider` because they genuinely differ. xAI and Ollama are both
+    /// `openai-compatible` to the router — one adapter, different base URLs — while a person
+    /// picking a model is choosing "Grok", not an adapter. Sending the display name is what the
+    /// client used to do, and the engine has no provider called "Anthropic".
+    public let providerID: String
     public let model: String
+    /// Required by `openai-compatible`, which has no endpoint of its own.
+    public let baseURL: String?
     /// Shown under the picker: "Anthropic · vision · tools".
     public let capabilities: [String]
 
-    public init(provider: String, model: String, capabilities: [String] = []) {
+    public init(
+        provider: String,
+        providerID: String,
+        model: String,
+        baseURL: String? = nil,
+        capabilities: [String] = []
+    ) {
         self.provider = provider
+        self.providerID = providerID
         self.model = model
+        self.baseURL = baseURL
         self.capabilities = capabilities
+    }
+
+    /// The vendor's name for a stored selection, worked back out of what the engine holds.
+    ///
+    /// Here rather than in `ModelProviderCatalog` because `XBotEngine` is Foundation-only and does
+    /// not import `XBotCore` — see the target graph in Package.swift. The base URL is what tells
+    /// two `openai-compatible` selections apart: the router sees one adapter, the person picked
+    /// either Grok or a model running on their own Mac, and showing them the adapter's name would
+    /// be showing them our plumbing.
+    public static func displayName(providerID: String, baseURL: String?) -> String {
+        switch providerID {
+        case "anthropic": "Anthropic"
+        case "openai": "OpenAI"
+        case "google": "Google"
+        case "openai-compatible":
+            switch baseURL {
+            case let url? where url.contains("x.ai"): "xAI"
+            case let url? where url.contains("11434"): "Ollama"
+            // A gateway somebody added by hand. Naming the host beats naming the adapter.
+            default: URL(string: baseURL ?? "")?.host ?? "Custom"
+            }
+        default: providerID
+        }
+    }
+
+    /// What the engine stores, and nothing else. See `shared/model-selection.ts`.
+    public var wireFormat: [String: Any] {
+        var wire: [String: Any] = ["providerId": providerID, "model": model]
+        if let baseURL { wire["baseURL"] = baseURL }
+        return wire
     }
 }
 

@@ -1,3 +1,5 @@
+import type { ModelSelection } from "../../../shared/model-selection";
+
 export type AgentVisibility = "public" | "private";
 
 export type AgentActor = {
@@ -48,4 +50,13 @@ export type CreateAgentInput = Pick<
    * why it is optional rather than defaulting to empty; a blank field must not drop a key.
    */
   auth?: { header: string; value: string };
+  /**
+   * Which model this coworker answers on, if it was given one of its own.
+   *
+   * Undefined means it never chose, and the endpoint answers on whatever its deployment is
+   * configured for. Stored in `configuration` alongside `endpoint` rather than in a column of its
+   * own: that field is already this agent type's open shape, so per-agent model choice costs no
+   * migration and leaves no upstream merge conflict.
+   */
+  modelSelection?: ModelSelection;
 };

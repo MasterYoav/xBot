@@ -135,13 +135,31 @@ public actor HTTPEngineClient: EngineClient {
         []
     }
 
+    /// Edit one agent.
+    ///
+    /// The engine's PATCH is PUT-shaped: its parser requires name, title, roleDescription and
+    /// visibility on every call and rejects the request outright when one is missing. This used to
+    /// send only the changed fields, so **every** edit — renames included, not just the model —
+    /// came back 400 while the app showed the change as saved.
+    ///
+    /// So the current row is read first and the patch applied on top of it. One extra round trip
+    /// for an edit a person makes by hand, which is the cheap side of the trade.
     public func updateAgent(_ id: Agent.ID, _ patch: AgentPatch) async throws -> Agent {
-        var body: [String: Any] = [:]
-        if let name = patch.name { body["name"] = name }
-        if let label = patch.label { body["title"] = label }
-        if let model = patch.model {
-            body["modelSelection"] = ["provider": model.provider, "model": model.model]
+        let current = try await agentRow(id)
+        var body: [String: Any] = [
+            "name": patch.name ?? current["name"] as? String ?? id,
+            "title": patch.label ?? current["title"] as? String ?? "",
+            "roleDescription": current["roleDescription"] as? String
+                ?? current["title"] as? String ?? "",
+            "visibility": current["visibility"] as? String ?? "private",
+        ]
+        // Endpoint is re-sent because omitting it would drop the agent back to the built-in Bot.
+        if let endpoint = current["endpoint"] as? String, !endpoint.isEmpty {
+            body["endpoint"] = endpoint
         }
+        // Only when this edit changed it. Absent means "leave the stored one alone" — the engine's
+        // store follows the same rule the vault key does, for the same reason.
+        if let model = patch.model { body["modelSelection"] = model.wireFormat }
 
         let (data, _) = try await send(request(.patch, "/api/agents/\(id)", body: body))
         guard
@@ -151,6 +169,15 @@ public actor HTTPEngineClient: EngineClient {
         else { throw EngineError.unknownChannel(id) }
 
         return agent
+    }
+
+    /// One agent's row as the engine holds it, for edits that must send a complete object.
+    private func agentRow(_ id: Agent.ID) async throws -> [String: Any] {
+        let (data, _) = try await send(request(.get, "/api/agents/\(id)"))
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw EngineError.unknownChannel(id)
+        }
+        return (object["agent"] as? [String: Any]) ?? object
     }
 
     public func availableModels() async throws -> [ModelSelection] {
@@ -394,12 +421,17 @@ public actor HTTPEngineClient: EngineClient {
     }
 
     private static func model(from row: [String: Any]?) -> ModelSelection? {
-        guard let row, let provider = row["provider"] as? String,
-            let model = row["model"] as? String
-        else { return nil }
+        // `providerId`, the engine's spelling — see shared/model-selection.ts. `provider` was what
+        // this read before the router existed, and the engine has never sent it.
+        guard let row, let providerID = row["providerId"] as? String else { return nil }
         return ModelSelection(
-            provider: provider,
-            model: model,
+            provider: ModelSelection.displayName(
+                providerID: providerID,
+                baseURL: row["baseURL"] as? String
+            ),
+            providerID: providerID,
+            model: row["model"] as? String ?? "",
+            baseURL: row["baseURL"] as? String,
             capabilities: row["capabilities"] as? [String] ?? []
         )
     }

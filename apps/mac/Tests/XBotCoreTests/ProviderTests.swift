@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import XBotEngine
 @testable import XBotCore
 
 @Suite(.serialized)
@@ -22,6 +23,10 @@ final class MemoryDefaults: KeyValueDefaults, @unchecked Sendable {
 
     func bool(forKey defaultName: String) -> Bool {
         lock.withLock { values[defaultName] as? Bool ?? false }
+    }
+
+    func integer(forKey defaultName: String) -> Int {
+        lock.withLock { values[defaultName] as? Int ?? 0 }
     }
 
     func set(_ value: Any?, forKey defaultName: String) {

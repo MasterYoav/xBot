@@ -663,6 +663,67 @@ describe("agent profile store integration", () => {
     }
   });
 
+  /**
+   * Per-agent model choice, all the way to the row — ADR-0002.
+   *
+   * An end-to-end check rather than two unit tests, because the parser accepting the field and the
+   * store writing it were each fine on their own while the path between them dropped it. The
+   * column is `configuration`, which already carries `endpoint`, so this needs no migration.
+   */
+  test("stores a model selection, and leaves it alone on an edit that omits one", async () => {
+    const owner = await createUser();
+    const created = await store.create(owner, {
+      name: `Created ${randomUUID()}`,
+      title: "Created Title",
+      roleDescription: "Created role description.",
+      visibility: "private",
+      modelSelection: {
+        providerId: "openai-compatible",
+        model: "grok-4",
+        baseURL: "https://api.x.ai/v1",
+      },
+    } as CreateAgentInput);
+    createdAgentIds.push(created.id);
+
+    const stored = async () => {
+      const [row] = await database
+        .select()
+        .from(agents)
+        .where(eq(agents.id, created.id));
+      return (row?.configuration as { modelSelection?: unknown })
+        ?.modelSelection;
+    };
+
+    expect(await stored()).toEqual({
+      providerId: "openai-compatible",
+      model: "grok-4",
+      baseURL: "https://api.x.ai/v1",
+    });
+
+    // A rename must not clear the model. The form cannot show what is stored, so saying nothing
+    // means "leave it" — the same rule the vault key follows, and for the same reason.
+    await store.update(owner, created.id, {
+      name: "Renamed",
+      title: "Created Title",
+      roleDescription: "Created role description.",
+      visibility: "private",
+    } as CreateAgentInput);
+    expect(await stored()).toMatchObject({ model: "grok-4" });
+
+    // And an edit that carries one replaces it.
+    await store.update(owner, created.id, {
+      name: "Renamed",
+      title: "Created Title",
+      roleDescription: "Created role description.",
+      visibility: "private",
+      modelSelection: { providerId: "anthropic", model: "claude-sonnet-4-5" },
+    } as CreateAgentInput);
+    expect(await stored()).toEqual({
+      providerId: "anthropic",
+      model: "claude-sonnet-4-5",
+    });
+  });
+
   test("creates a caller-owned remote AG-UI profile with the requested visibility", async () => {
     const owner = await createUser();
     const input: CreateAgentInput = {

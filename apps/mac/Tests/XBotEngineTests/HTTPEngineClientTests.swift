@@ -35,8 +35,11 @@ struct HTTPEngineClientTests {
             "name": "Orchestrator",
             "title": "Orchestrate and use the other agents",
             "avatarSeed": "orchestrator",
+            // `providerId`, which is what the engine stores — see shared/model-selection.ts. This
+            // fixture used to say `provider`, a key the engine has never sent, so it asserted the
+            // client's own mistake rather than the engine's shape.
             "modelSelection": [
-                "provider": "anthropic", "model": "claude-sonnet-4.5",
+                "providerId": "anthropic", "model": "claude-sonnet-4.5",
                 "capabilities": ["vision", "tools"],
             ],
         ]
@@ -51,7 +54,9 @@ struct HTTPEngineClientTests {
         #expect(agents.count == 1)
         #expect(agents.first?.id == "orchestrator")
         #expect(agents.first?.name == "Orchestrator")
-        #expect(agents.first?.model?.provider == "anthropic")
+        #expect(agents.first?.model?.providerID == "anthropic")
+        // The vendor's name is resolved for display; the id is what routes.
+        #expect(agents.first?.model?.provider == "Anthropic")
     }
 
     @Test func agentsDegradesToEmptyOnAMalformedBody() async throws {
@@ -164,6 +169,90 @@ struct HTTPEngineClientTests {
 
         #expect(updated.name == "Renamed")
         #expect(updated.label == "New label")
+    }
+
+    /**
+     The engine's PATCH is PUT-shaped: its parser demands name, title, roleDescription and
+     visibility and rejects the call when one is missing. This client sent only the changed fields,
+     so every edit — renames included — came back 400 while the app showed it as saved.
+     */
+    @Test func updateAgentSendsACompleteObjectBecauseThePatchIsPutShaped() async throws {
+        let host = "stub-\(UUID().uuidString).test"
+        StubURLProtocol.register(
+            .init(
+                body: Self.json([
+                    "agent": [
+                        "id": "orchestrator",
+                        "name": "Orchestrator",
+                        "title": "Runs things",
+                        "roleDescription": "Orchestrates the other agents.",
+                        "visibility": "private",
+                    ]
+                ])
+            ),
+            forHost: host,
+            path: "/api/agents/orchestrator"
+        )
+
+        _ = try await client(host: host).updateAgent("orchestrator", AgentPatch(label: "Renamed"))
+
+        let patch = try #require(
+            StubURLProtocol.sentRequests(forHost: host).last { $0.method == "PATCH" }
+        )
+        // The changed field, and every field the parser requires alongside it.
+        #expect(patch.body["title"] == "Renamed")
+        #expect(patch.body["name"] == "Orchestrator")
+        #expect(patch.body["roleDescription"] == "Orchestrates the other agents.")
+        #expect(patch.body["visibility"] == "private")
+    }
+
+    /// The engine reads `providerId`. This sent `provider`, and a display name in it — so the field
+    /// was dropped and picking a model from the settings pane changed nothing.
+    @Test func updateAgentSendsTheEngineProviderIdRatherThanTheVendorName() async throws {
+        let host = "stub-\(UUID().uuidString).test"
+        StubURLProtocol.register(
+            .init(body: Self.json(["agent": ["id": "a", "name": "A", "title": "t"]])),
+            forHost: host,
+            path: "/api/agents/a"
+        )
+
+        _ = try await client(host: host).updateAgent(
+            "a",
+            AgentPatch(
+                model: ModelSelection(
+                    provider: "xAI",
+                    providerID: "openai-compatible",
+                    model: "grok-4",
+                    baseURL: "https://api.x.ai/v1"
+                )
+            )
+        )
+
+        let patch = try #require(
+            StubURLProtocol.sentRequests(forHost: host).last { $0.method == "PATCH" }
+        )
+        let selection = try #require(patch.body["modelSelection"])
+        #expect(selection.contains("openai-compatible"))
+        #expect(selection.contains("https://api.x.ai/v1"))
+        // The vendor's name is the app's word for it and means nothing to the router.
+        #expect(!selection.contains("xAI"))
+    }
+
+    /// An edit that did not touch the model must not carry one, or a rename would overwrite it.
+    @Test func anEditThatDidNotTouchTheModelSendsNoSelection() async throws {
+        let host = "stub-\(UUID().uuidString).test"
+        StubURLProtocol.register(
+            .init(body: Self.json(["agent": ["id": "a", "name": "A", "title": "t"]])),
+            forHost: host,
+            path: "/api/agents/a"
+        )
+
+        _ = try await client(host: host).updateAgent("a", AgentPatch(name: "Renamed"))
+
+        let patch = try #require(
+            StubURLProtocol.sentRequests(forHost: host).last { $0.method == "PATCH" }
+        )
+        #expect(patch.body["modelSelection"] == nil)
     }
 
     @Test func updateAgentThrowsOnAMalformedResponse() async throws {
@@ -317,9 +406,52 @@ final class StubURLProtocol: URLProtocol {
         }
     }
 
+    /// One request as it was actually sent, so a test can assert the body rather than trusting it.
+    struct Sent: Sendable {
+        var method: String
+        var path: String
+        var body: [String: String]
+    }
+
     private static let lock = NSLock()
     nonisolated(unsafe) private static var stubs: [String: Stub] = [:]
     nonisolated(unsafe) private static var seenPaths: [String: [String]] = [:]
+    nonisolated(unsafe) private static var sent: [String: [Sent]] = [:]
+
+    /// What reached this host, in order. Values are stringified: these tests assert which fields
+    /// were sent and what they said, not the JSON types, and `[String: Any]` is not `Sendable`.
+    static func sentRequests(forHost host: String) -> [Sent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return sent[host] ?? []
+    }
+
+    private static func record(_ request: URLRequest) {
+        guard let url = request.url, let host = url.host else { return }
+        // URLProtocol moves a body to the stream when the request is sent, so read both.
+        var data = request.httpBody
+        if data == nil, let stream = request.httpBodyStream {
+            stream.open()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            var collected = Data()
+            while stream.hasBytesAvailable {
+                let read = stream.read(&buffer, maxLength: buffer.count)
+                if read <= 0 { break }
+                collected.append(contentsOf: buffer[0..<read])
+            }
+            stream.close()
+            data = collected
+        }
+        let object = data.flatMap {
+            try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+        } ?? [:]
+        let body = object.mapValues { String(describing: $0) }
+        lock.lock()
+        sent[host, default: []].append(
+            Sent(method: request.httpMethod ?? "", path: url.path, body: body)
+        )
+        lock.unlock()
+    }
 
     static func register(_ stub: Stub, forHost host: String, path: String) {
         lock.lock()
@@ -345,6 +477,7 @@ final class StubURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        Self.record(request)
         guard let url = request.url else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return

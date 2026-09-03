@@ -119,6 +119,49 @@ describe("the agent form", () => {
     expect(parsed.ok).toBe(true);
     if (parsed.ok) expect(parsed.value.endpoint).toBeUndefined();
   });
+
+  /**
+   * Which model this coworker answers on — ADR-0002.
+   *
+   * The field used to be dropped here silently. The Mac app was already sending it, so a person
+   * picking a model from the agent's settings pane changed nothing at all, and the screen said it
+   * had worked. A setting that goes nowhere is worse than one that is absent.
+   */
+  test("a model selection is carried through", () => {
+    const parsed = parseAgentInput({
+      ...base,
+      modelSelection: {
+        providerId: "openai-compatible",
+        model: "grok-4",
+        baseURL: "https://api.x.ai/v1",
+      },
+    });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok)
+      expect(parsed.value.modelSelection).toEqual({
+        providerId: "openai-compatible",
+        model: "grok-4",
+        baseURL: "https://api.x.ai/v1",
+      });
+  });
+
+  test("no model selection is the deployment default, not an error", () => {
+    const parsed = parseAgentInput(base);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.value.modelSelection).toBeUndefined();
+  });
+
+  test("a malformed selection is dropped rather than failing the form", () => {
+    // The opposite call to the endpoint above, and for the opposite reason. A bad endpoint would
+    // silently produce a Bot that answers somewhere unintended, so it fails the form. A bad model
+    // selection just means this agent has not chosen, and the deployment default answers — taking
+    // the whole form down would block a rename over an unrelated field.
+    for (const modelSelection of [null, "openai", { model: "gpt-5.5" }, []]) {
+      const parsed = parseAgentInput({ ...base, modelSelection });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) expect(parsed.value.modelSelection).toBeUndefined();
+    }
+  });
 });
 
 describe("the connection test", () => {

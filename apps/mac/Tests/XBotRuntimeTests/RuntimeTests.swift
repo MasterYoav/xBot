@@ -148,9 +148,9 @@ struct EngineEnvironmentTests {
     }
 
     @Test func enginePortSurvivesRelaunch() {
-        defer { UserDefaults.standard.removeObject(forKey: EnginePortStore.key) }
-        EnginePortStore.save(49_180)
-        #expect(EnginePortStore.load() == 49_180)
+        let ports = isolatedPortStore()
+        ports.save(49_180)
+        #expect(ports.load() == 49_180)
     }
 }
 
@@ -166,7 +166,8 @@ struct RuntimeControllerTests {
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in
                 healthy ? EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") : nil
-            }
+            },
+            ports: isolatedPortStore()
         )
     }
 
@@ -193,16 +194,18 @@ struct RuntimeControllerTests {
     }
 
     @Test func aSavedPortIsPreferredOnTheNextStart() async throws {
-        defer { UserDefaults.standard.removeObject(forKey: EnginePortStore.key) }
-        UserDefaults.standard.removeObject(forKey: EnginePortStore.key)
+        let ports = isolatedPortStore()
         let preferred = try PortAllocator.allocate(preferred: 49_200, range: 49_200...49_200)
-        EnginePortStore.save(preferred)
+        ports.save(preferred)
 
         let driver = FakeDriver()
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            // The same store the port was saved to. Without this the controller reads the live
+            // domain and the test asserts against a port it never wrote.
+            ports: ports
         )
         await controller.start(environment: environment)
 
@@ -246,14 +249,14 @@ struct RuntimeControllerTests {
     }
 
     @Test func anExistingHealthyContainerIsAdopted() async {
-        defer { UserDefaults.standard.removeObject(forKey: EnginePortStore.key) }
         let driver = FakeDriver(
             script: FakeDriver.Script(runFails: true, existingContainerPort: 3_001)
         )
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
         )
         await controller.start(environment: environment)
 
@@ -277,7 +280,8 @@ struct RuntimeControllerTests {
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
         )
         await controller.start(environment: environment)
 
@@ -333,7 +337,8 @@ struct RuntimeControllerTests {
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
-            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
         )
         await controller.start(environment: environment)
 
@@ -352,4 +357,38 @@ struct RuntimeControllerTests {
         await controller.stop()
         #expect(await controller.state == .stopped)
     }
+}
+
+/// Defaults that live and die with the test, so no two share the one live domain.
+///
+/// Three tests wrote `dev.xbot.enginePort` and Swift Testing runs their suites in parallel: a port
+/// saved by one landed in the middle of another's read, and the assertion failed with a port it had
+/// never written.
+final class MemoryDefaults: KeyValueDefaults, @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [String: Any] = [:]
+
+    func stringArray(forKey defaultName: String) -> [String]? {
+        lock.withLock { values[defaultName] as? [String] }
+    }
+
+    func bool(forKey defaultName: String) -> Bool {
+        lock.withLock { values[defaultName] as? Bool ?? false }
+    }
+
+    func integer(forKey defaultName: String) -> Int {
+        lock.withLock { values[defaultName] as? Int ?? 0 }
+    }
+
+    func set(_ value: Any?, forKey defaultName: String) {
+        lock.withLock { values[defaultName] = value }
+    }
+
+    func removeObject(forKey defaultName: String) {
+        lock.withLock { values[defaultName] = nil }
+    }
+}
+
+func isolatedPortStore() -> EnginePortStore {
+    EnginePortStore(defaults: MemoryDefaults())
 }

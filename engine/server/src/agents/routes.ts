@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
+import { parseModelSelection } from "../../../shared/model-selection";
 import type { AuditEventType, AuditStore } from "../audit";
 import { recordAuditEvent } from "../audit";
 import type { AppVariables } from "../auth/guards";
@@ -30,6 +31,7 @@ type AgentInputObject = {
   visibility?: unknown;
   endpoint?: unknown;
   auth?: unknown;
+  modelSelection?: unknown;
 };
 
 /**
@@ -110,9 +112,28 @@ export function parseAgentInput(
     }
   }
 
+  /*
+   * Which model this coworker answers on — ADR-0002.
+   *
+   * Dropped when malformed rather than failing the form, which is the opposite call to the
+   * endpoint above and deliberately so. A bad endpoint would produce a Bot that answers somewhere
+   * nobody intended, so it refuses. A bad model selection only means this agent has not chosen,
+   * and the deployment default answers — refusing the whole form would block a rename over a field
+   * the person may not have touched.
+   */
+  const modelSelection = parseModelSelection(input.modelSelection);
+
   return {
     ok: true,
-    value: { name, title, roleDescription, visibility, endpoint, auth },
+    value: {
+      name,
+      title,
+      roleDescription,
+      visibility,
+      endpoint,
+      auth,
+      modelSelection,
+    },
   };
 }
 

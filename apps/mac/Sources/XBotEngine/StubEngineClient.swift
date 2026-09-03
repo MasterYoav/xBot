@@ -35,7 +35,7 @@ public actor StubEngineClient: EngineClient {
                 label: "Orchestrate and use the other agents",
                 avatarSeed: "orchestrator",
                 model: ModelSelection(
-                    provider: "Anthropic",
+                    provider: "Anthropic", providerID: "anthropic",
                     model: "Claude Sonnet 4.5",
                     capabilities: ["vision", "tools"]
                 )
@@ -46,7 +46,7 @@ public actor StubEngineClient: EngineClient {
                 label: "Reads and drafts your mail",
                 avatarSeed: "inbox",
                 model: ModelSelection(
-                    provider: "OpenAI",
+                    provider: "OpenAI", providerID: "openai",
                     model: "gpt-4.1",
                     capabilities: ["vision", "tools"]
                 )
@@ -56,7 +56,13 @@ public actor StubEngineClient: EngineClient {
                 name: "Researcher with a long name",
                 label: "Reads the web and writes it up",
                 avatarSeed: "researcher",
-                model: ModelSelection(provider: "Ollama", model: "llama3.1", capabilities: ["tools"])
+                model: ModelSelection(
+                    provider: "Ollama",
+                    providerID: "openai-compatible",
+                    model: "llama3.1",
+                    baseURL: "http://host.docker.internal:11434/v1",
+                    capabilities: ["tools"]
+                )
             ),
         ]
         fixedAgents = agents
@@ -233,11 +239,17 @@ public actor StubEngineClient: EngineClient {
 
     public func availableModels() async throws -> [ModelSelection] {
         [
-            ModelSelection(provider: "Anthropic", model: "Claude Sonnet 4.5", capabilities: ["vision", "tools"]),
-            ModelSelection(provider: "Anthropic", model: "Claude Opus 4.1", capabilities: ["vision", "tools"]),
-            ModelSelection(provider: "OpenAI", model: "gpt-4.1", capabilities: ["vision", "tools"]),
-            ModelSelection(provider: "xAI", model: "grok-4", capabilities: ["tools"]),
-            ModelSelection(provider: "Ollama", model: "llama3.1", capabilities: ["tools"]),
+            ModelSelection(provider: "Anthropic", providerID: "anthropic", model: "Claude Sonnet 4.5", capabilities: ["vision", "tools"]),
+            ModelSelection(provider: "Anthropic", providerID: "anthropic", model: "Claude Opus 4.1", capabilities: ["vision", "tools"]),
+            ModelSelection(provider: "OpenAI", providerID: "openai", model: "gpt-4.1", capabilities: ["vision", "tools"]),
+            ModelSelection(provider: "xAI", providerID: "openai-compatible", model: "grok-4", baseURL: "https://api.x.ai/v1", capabilities: ["tools"]),
+            ModelSelection(
+                    provider: "Ollama",
+                    providerID: "openai-compatible",
+                    model: "llama3.1",
+                    baseURL: "http://host.docker.internal:11434/v1",
+                    capabilities: ["tools"]
+                ),
         ]
     }
 

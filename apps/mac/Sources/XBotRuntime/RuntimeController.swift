@@ -37,14 +37,19 @@ public actor RuntimeController {
         driver: any ContainerDriver,
         image: ImageReference,
         health: @escaping @Sendable (EngineEndpoint) async -> EngineHealth?,
-        startHealthDeadlineSeconds: Int = 120
+        startHealthDeadlineSeconds: Int = 120,
+        /// Injected so a test gets its own storage rather than the one live preference domain.
+        ports: EnginePortStore = .shared
     ) {
         self.driver = driver
         self.image = image
         self.health = health
         self.startHealthDeadlineSeconds = startHealthDeadlineSeconds
-        self.allocatedPort = EnginePortStore.load()
+        self.ports = ports
+        self.allocatedPort = ports.load()
     }
+
+    private let ports: EnginePortStore
 
     public var events: AsyncStream<RuntimeEvent> {
         AsyncStream { continuation in
@@ -105,7 +110,7 @@ public actor RuntimeController {
                 range: 49_152...49_400
             )
             allocatedPort = port
-            EnginePortStore.save(port)
+            ports.save(port)
             let endpoint = EngineEndpoint(port: port)
 
             state = .starting(.container)
@@ -195,7 +200,7 @@ public actor RuntimeController {
         }
 
         allocatedPort = port
-        EnginePortStore.save(port)
+        ports.save(port)
         handle = existing
 
         state = .starting(.health)
