@@ -71,6 +71,67 @@ describe("registered Copilot agents", () => {
     }
   });
 
+  /**
+   * Per-agent model choice, from the column that was already an open shape.
+   *
+   * ADR-0002 moves the model off `BOT_PROVIDER` — one value for every agent in a container — and
+   * onto the agent. It rides in `configuration` rather than a new column on purpose: that is where
+   * `endpoint` already lives, so the feature costs no migration and leaves no upstream conflict.
+   */
+  test("carries a per-agent model selection when the row has one", () => {
+    expect(
+      registeredAgentFromRow({
+        ...riskRow,
+        configuration: {
+          endpoint: "http://risk.internal/ag-ui",
+          modelSelection: {
+            providerId: "openai-compatible",
+            model: "grok-4",
+            baseURL: "https://api.x.ai/v1",
+          },
+        },
+      }),
+    ).toMatchObject({
+      modelSelection: {
+        providerId: "openai-compatible",
+        model: "grok-4",
+        baseURL: "https://api.x.ai/v1",
+      },
+    });
+  });
+
+  test("an agent that never chose normalises to exactly the agent it always was", () => {
+    // Not `modelSelection: undefined`: a row without a selection has to stay deep-equal to what
+    // this function returned before the field existed, or every consumer comparing agents sees a
+    // change that did not happen.
+    const agent = registeredAgentFromRow({
+      ...riskRow,
+      configuration: { endpoint: "http://risk.internal/ag-ui" },
+    });
+    expect(agent && "modelSelection" in agent).toBe(false);
+  });
+
+  test("a malformed selection is no selection, not a broken agent", () => {
+    // The deployment default answers instead. Refusing to register the coworker over a bad field
+    // in one of its settings would take a person's conversation away to protect a dropdown.
+    for (const modelSelection of [
+      null,
+      "anthropic",
+      { model: "gpt-5.5" },
+      [],
+    ]) {
+      const agent = registeredAgentFromRow({
+        ...riskRow,
+        configuration: {
+          endpoint: "http://risk.internal/ag-ui",
+          modelSelection,
+        },
+      });
+      expect(agent).not.toBeNull();
+      expect(agent && "modelSelection" in agent).toBe(false);
+    }
+  });
+
   test("trims built-in prompts and preserves valid remote endpoint strings", () => {
     expect(
       registeredAgentFromRow({

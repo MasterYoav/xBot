@@ -8,8 +8,7 @@ export type XBotHealth = {
   schemaVersion: string;
 };
 
-const schemaVersion =
-  journal.entries.at(-1)?.tag ?? "unknown";
+const schemaVersion = journal.entries.at(-1)?.tag ?? "unknown";
 
 /**
  * Identifies this process as xBot's engine, with version metadata the app can show in diagnostics.

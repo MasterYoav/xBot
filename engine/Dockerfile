@@ -207,11 +207,13 @@ ENV DATABASE_URL=postgres://openbot@127.0.0.1:5432/openbot
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ARG XBOT_ENGINE_VERSION=dev
+ENV XBOT_ENGINE_VERSION=${XBOT_ENGINE_VERSION}
 EXPOSE 3001
 
 # One port out. The browser's 4100 is deliberately not exposed: it holds real logins and its only
 # caller is the process next to it.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
-  CMD bun -e "const r = await fetch('http://127.0.0.1:3001/health'); process.exit(r.ok ? 0 : 1)"
+  CMD bun -e "const r=await fetch('http://127.0.0.1:3001/health');const j=await r.json();process.exit(r.ok&&j.product==='xBot'?0:1)"
 
 ENTRYPOINT ["/init"]

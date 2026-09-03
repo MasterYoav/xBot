@@ -15,6 +15,10 @@ import {
   COMPUTER_GUIDANCE,
   PROVENANCE_GUIDANCE,
 } from "../../shared/bot-prompt";
+import {
+  type ModelSelection,
+  parseModelSelection,
+} from "../../shared/model-selection";
 import type { AgentActor } from "./agents/profile-types";
 import type { AgentFetch, StallGuard } from "./channels/stall-guard";
 import type { DeploymentConfig } from "./config";
@@ -61,6 +65,15 @@ type RegisteredRemoteAgent = {
   standingMessage: StandingRoleMessage;
   /** The key this agent sits behind, resolved from the vault at load time. Never logged. */
   headers?: Record<string, string>;
+  /**
+   * Which model this coworker answers on, if it was given one of its own.
+   *
+   * Absent means it never chose, and the endpoint answers on whatever its deployment is configured
+   * for — which is every agent today and is why this is optional rather than a migration. It rides
+   * in `configuration` for the same reason `endpoint` does: that column is already this agent
+   * type's open shape, so per-agent model choice costs no schema change and no upstream conflict.
+   */
+  modelSelection?: ModelSelection;
 };
 
 /**
@@ -158,6 +171,9 @@ export function registeredAgentFromRow(
   }
 
   const endpoint = configuration?.endpoint;
+  // Omitted rather than set to undefined when absent, so a row without a selection normalises to
+  // exactly the object it always did — a stored agent that never chose is not a different agent.
+  const modelSelection = parseModelSelection(configuration?.modelSelection);
   return typeof endpoint === "string" && isHttpUrl(endpoint)
     ? {
         id: row.id,
@@ -165,6 +181,7 @@ export function registeredAgentFromRow(
         type: "remote_ag_ui",
         endpoint,
         standingMessage: standingRoleMessage(row),
+        ...(modelSelection ? { modelSelection } : {}),
       }
     : null;
 }
@@ -630,6 +647,18 @@ function remoteAgentWithStandingRole(
          * in front of them. Only this side knows which is which, so only this side can say.
          */
         openbotDeploymentTools: tools.map((tool) => tool.name),
+        /*
+         * Which model this coworker answers on, when it has one of its own.
+         *
+         * Sent per run, for the same reason the grants above are: a person changing the model in a
+         * settings pane expects the next message to use it, and the endpoint is somebody else's
+         * process that we are not going to restart from a dropdown. ADR-0002 is the whole argument.
+         *
+         * Absent when the agent never chose, which is not the same as sending a default: only the
+         * endpoint knows what its deployment is configured for, so deciding that here would
+         * override a setting this side cannot see.
+         */
+        ...(agent.modelSelection ? { xbotModel: agent.modelSelection } : {}),
         /*
          * This deployment's own statement of what this run is.
          *

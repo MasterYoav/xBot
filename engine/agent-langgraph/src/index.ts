@@ -12,8 +12,13 @@ import {
 import { ChatOpenAI } from "@langchain/openai";
 import { serve } from "bun";
 import { hasManagedAgentToken } from "../../shared/agent-authorisation";
+import {
+  type ModelSelection,
+  parseModelSelection,
+} from "../../shared/model-selection";
 import { toLangChainMessages } from "./history";
 import { readReasoningEffort } from "./model-options";
+import { resolveModel } from "./models/registry";
 import { streamRun } from "./stream";
 
 /**
@@ -168,6 +173,53 @@ if (!API_KEY) {
 }
 
 /**
+ * What the environment configured, expressed as a selection the router understands.
+ *
+ * This is the one place the environment is read, and it happens at boot rather than in the request
+ * path — ADR-0002's two hard rules are about the request path, and the reason is that a process
+ * reading `process.env` per run cannot be given a different answer per agent.
+ *
+ * It is the *fallback*, not the answer. A run that forwards its own selection overrides all of it;
+ * a run that forwards nothing gets exactly what upstream would have given it, which is what keeps
+ * an existing OpenBot deployment working unchanged.
+ */
+const DEPLOYMENT_DEFAULT: ModelSelection = {
+  providerId: PROVIDER,
+  model: MODEL,
+  baseURL:
+    PROVIDER === "anthropic"
+      ? ANTHROPIC_BASE_URL
+      : PROVIDER === "google"
+        ? GOOGLE_BASE_URL
+        : OPENAI_BASE_URL,
+};
+
+/**
+ * Deployment-wide keys, by provider id.
+ *
+ * Read here and passed in as an argument, so nothing below this line touches `process.env`. When
+ * the engine's vault resolves a key per agent it arrives on the selection instead and wins, which
+ * is how two agents on the same provider can be on different accounts.
+ */
+const DEPLOYMENT_KEYS: Record<string, string | undefined> = {
+  openai: process.env.OPENAI_API_KEY?.trim(),
+  anthropic: process.env.ANTHROPIC_API_KEY?.trim(),
+  google: process.env.GOOGLE_API_KEY?.trim(),
+};
+
+/**
+ * The model this particular run should answer on, if the deployment said.
+ *
+ * Carried on `forwardedProps` alongside the run assertion and the deployment's tool names, because
+ * that is already the channel by which the deployment tells this process things it cannot know. A
+ * run that says nothing is not an error: it means "whatever this deployment is configured for".
+ */
+function modelSelectionOf(input: RunAgentInput): ModelSelection | undefined {
+  const props = input.forwardedProps as { xbotModel?: unknown } | undefined;
+  return parseModelSelection(props?.xbotModel);
+}
+
+/**
  * Every tool comes from the caller. This service publishes none of its own, on purpose.
  *
  * Same rule as `agent-bot`: a new capability on the front end needs no change here.
@@ -185,39 +237,76 @@ function toBoundTools(input: RunAgentInput) {
 }
 
 /**
- * The chat model, from whichever provider this deployment chose.
+ * The chat model, from whichever provider *this run* is for.
  *
  * Every one of these binds tools the same way and streams the same way, which is exactly why the
- * rest of this file does not know which one it got.
+ * rest of this file does not know which one it got — and why per-agent selection fits here at all.
+ *
+ * This is the seam ADR-0002 asks for. The provider used to be a module constant; now it is an
+ * argument, and `models/registry.ts` decides what it resolves to. The function is otherwise the
+ * upstream one, which is deliberate: a rewritten file is a permanent merge conflict.
  */
-function buildModel() {
-  if (PROVIDER === "anthropic") {
+function buildModel(selection: ModelSelection | undefined) {
+  const { model: resolved, problem } = resolveModel({
+    selection,
+    fallback: DEPLOYMENT_DEFAULT,
+    keys: DEPLOYMENT_KEYS,
+  });
+  /*
+   * Thrown, not exited. A missing key at *boot* is the deployer's problem and still exits below;
+   * a missing key for one agent mid-flight is that agent's problem, and taking the process down
+   * would end every other agent's conversation over it. `streamRun` turns this into a RUN_ERROR
+   * carrying the sentence the registry wrote, which is the one the person needs to read.
+   */
+  if (!resolved) {
+    throw new Error(problem?.message ?? "No model is selected for this agent.");
+  }
+
+  if (resolved.providerId === "anthropic") {
     return new ChatAnthropic({
-      model: MODEL,
-      apiKey: API_KEY,
+      model: resolved.model,
+      apiKey: resolved.apiKey,
       streaming: true,
-      ...(ANTHROPIC_BASE_URL ? { anthropicApiUrl: ANTHROPIC_BASE_URL } : {}),
+      ...(resolved.baseURL ? { anthropicApiUrl: resolved.baseURL } : {}),
     });
   }
-  if (PROVIDER === "google") {
+  if (resolved.providerId === "google") {
     return new ChatGoogleGenerativeAI({
-      model: MODEL,
-      apiKey: API_KEY,
+      model: resolved.model,
+      apiKey: resolved.apiKey,
       streaming: true,
-      ...(GOOGLE_BASE_URL ? { baseUrl: GOOGLE_BASE_URL } : {}),
+      ...(resolved.baseURL ? { baseUrl: resolved.baseURL } : {}),
     });
   }
+  /*
+   * OpenAI and `openai-compatible` are the same client with a different address.
+   *
+   * That is the whole trick, and why docs/04 calls the compatible adapter the highest-leverage
+   * piece of the router: xAI, Ollama, OpenRouter, Groq, Together, DeepSeek, LM Studio and any
+   * corporate gateway all speak this API, so they cost a base URL rather than an adapter each.
+   */
   return new ChatOpenAI({
-    model: MODEL,
-    apiKey: API_KEY,
+    model: resolved.model,
+    apiKey: resolved.apiKey,
     streaming: true,
-    ...(OPENAI_BASE_URL ? { configuration: { baseURL: OPENAI_BASE_URL } } : {}),
-    ...(USE_RESPONSES_API ? { useResponsesApi: true } : {}),
+    ...(resolved.baseURL
+      ? { configuration: { baseURL: resolved.baseURL } }
+      : {}),
+    ...(resolved.useResponsesApi ? { useResponsesApi: true } : {}),
     /*
      * `reasoning.effort`, not the `reasoningEffort` convenience field: the integration deprecated
      * the latter in favour of merging it into this object, and one of them is the one that survives.
+     *
+     * Gated on the *resolved* provider, not the configured one. The startup check below only knows
+     * what the environment chose, so without this an agent switched to Anthropic from a dropdown
+     * would be sent an OpenAI-only setting — the "configuration that goes nowhere" failure the
+     * effort check exists to prevent, arriving by the new route.
      */
-    ...(REASONING_EFFORT ? { reasoning: { effort: REASONING_EFFORT } } : {}),
+    ...(REASONING_EFFORT &&
+    resolved.providerId === "openai" &&
+    resolved.useResponsesApi
+      ? { reasoning: { effort: REASONING_EFFORT } }
+      : {}),
   });
 }
 
@@ -323,7 +412,7 @@ function callsTheSurface(
  * is for. `recursionLimit` bounds a model that would otherwise call tools in a circle.
  */
 function buildGraph(input: RunAgentInput) {
-  const model = buildModel();
+  const model = buildModel(modelSelectionOf(input));
   const run = runAssertionOf(input);
 
   const tools = toBoundTools(input);

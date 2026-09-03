@@ -56,9 +56,12 @@ describe("xBot engine boundary", () => {
       }),
     );
 
-    const response = await app.request("http://openbot.local/api/capabilities", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await app.request(
+      "http://openbot.local/api/capabilities",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
 
     // Capabilities is always mounted — the point is the gate opened.
     expect(response.status).toBe(200);
