@@ -1,0 +1,12 @@
+{
+  "channel": "stable",
+  "version": "0.0.0-dev",
+  "image": "ghcr.io/masteryoav/xbot-engine@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "size": 0,
+  "minimumAppVersion": "1.0.0",
+  "migration": {
+    "schemaVersion": 0,
+    "backwardCompatibleWith": 0
+  },
+  "releaseNotes": "https://github.com/MasterYoav/xBot/releases"
+}

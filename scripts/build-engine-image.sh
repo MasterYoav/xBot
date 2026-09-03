@@ -29,10 +29,12 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 echo "Building ${IMAGE} from engine/Dockerfile (this takes several minutes on first run)…"
+VERSION="$(git -C "${ROOT}" describe --tags --always --dirty 2>/dev/null || echo dev)"
+BUILD=(--build-arg "XBOT_ENGINE_VERSION=${VERSION}")
 if ((${#CACHE[@]})); then
-  docker build "${CACHE[@]}" -t "${IMAGE}" "${ROOT}/engine"
+  docker build "${CACHE[@]}" "${BUILD[@]}" -t "${IMAGE}" "${ROOT}/engine"
 else
-  docker build -t "${IMAGE}" "${ROOT}/engine"
+  docker build "${BUILD[@]}" -t "${IMAGE}" "${ROOT}/engine"
 fi
 
 echo ""

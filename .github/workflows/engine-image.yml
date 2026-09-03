@@ -1,0 +1,52 @@
+name: Engine image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - engine/**
+      - scripts/build-engine-image.sh
+      - scripts/generate-engine-manifest.sh
+      - scripts/engine-manifest.template.json
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: build xbot/engine and manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # generate-engine-manifest.sh versions the image with `git describe --tags`.
+          fetch-depth: 0
+
+      - name: Build engine image
+        run: scripts/build-engine-image.sh
+
+      # ghcr rejects an uppercase path, and the owner here is MasterYoav.
+      - name: Push to ghcr
+        id: push
+        run: |
+          set -euo pipefail
+          repo="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/xbot-engine"
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag xbot/engine:1 "${repo}:latest"
+          docker push "${repo}:latest"
+          # The digest only exists once the registry has the image, and the pinned digest is
+          # the whole point of the manifest — a tag can be moved, a digest cannot.
+          digest="$(docker image inspect "${repo}:latest" --format '{{index .RepoDigests 0}}')"
+          echo "ref=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifest
+        run: scripts/generate-engine-manifest.sh '${{ steps.push.outputs.ref }}' > engine-manifest.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-manifest
+          path: engine-manifest.json

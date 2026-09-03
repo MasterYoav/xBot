@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [master]
 
 # Least privilege by default.
 permissions:
@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 # engine/.github/workflows/ is upstream's own CI. GitHub only reads the root, so it never
 # fires — it is kept because docs/03-openbot-fork.md forbids reorganising engine/ (a moved
