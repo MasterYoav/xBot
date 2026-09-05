@@ -43,6 +43,7 @@ user already has. No key. If it is not installed, the row offers a link, not an 
 | Wire type + parser | `engine/shared/model-selection.ts`, shared because the server writes what the agent reads |
 | Selection on the agent | `configuration.modelSelection` — the column that already holds `endpoint`, so **no migration** |
 | Forwarded per run | `forwardedProps.xbotModel`, beside the run assertion and tool names |
+| Read back | `agentDto` publishes it, **stripped of any per-agent key** by `publishableSelection` — so the picker shows what is stored and `GET /api/agents` never carries a secret |
 | Onboarding **Connect a model** step | Provider picker, secure key field, live validation via `ModelProviderValidator` |
 | Keychain storage | `ProviderKeyStore` / `ProviderKeyVault` — keys never in UserDefaults or logs |
 | Connection state | `ProviderConnectionStore` — injected storage, so a test never touches the real domain |
@@ -56,9 +57,10 @@ usage accounting, and the live two-vendor smoke that closes M2.
 engine calls through `hostGatewayAddress()` from the runtime driver
 (`http://<gateway>:11434/v1`), not `localhost` inside the container.
 
-### Two bugs this path shipped with, for anyone reading the history
+### Three bugs this path shipped with, for anyone reading the history
 
-Both were silent, and both are why the picker did nothing for weeks:
+All three were silent, and together they are why the picker did nothing for weeks. They are worth
+keeping written down because they are the same mistake at three different points on one path:
 
 1. **The engine dropped the field.** `parseAgentInput` never read `modelSelection`, so the value the
    app was already sending went nowhere while the screen reported success.
@@ -66,8 +68,14 @@ Both were silent, and both are why the picker did nothing for weeks:
    name, `"Anthropic"` — where the engine reads `providerId`; and it built a partial PATCH against a
    parser that requires the full object, so **every** agent edit returned 400, renames included.
 
+3. **Nothing ever read it back.** `AgentProfile` did not carry the selection and `agentDto` did not
+   publish it, so `GET /api/agents` never mentioned it. The value was stored and routed on
+   correctly, and the settings pane still said "Not set" on every reload.
+
 The lesson worth keeping: a setting that goes nowhere is worse than one that is absent, because the
-screen looks the same either way.
+screen looks the same either way — and "goes nowhere" has as many places to hide as the path has
+hops. Parsed, stored, forwarded, and read back are four separate things, and three of them were
+broken one at a time.
 
 ## What upstream does instead
 

@@ -20,7 +20,7 @@ and the ones marked ⚠️ have the widest error bars.
 | --- | --- | --- |
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
 | M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
-| M2 | Model router | **Built end to end, unproven against live vendors.** Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent and forwarded, Settings → Models, custom providers, **Ollama host-gateway routing**. **Not yet done:** native adapters beyond compatible mode, usage accounting, live smoke against two real vendors |
+| M2 | Model router | **Built end to end, unproven against live vendors.** Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent, forwarded, and read back, Settings → Models, custom providers, **Ollama host-gateway routing**. **Not yet done:** native adapters beyond compatible mode, usage accounting, live smoke against two real vendors |
 | M3 | Engine runs headless | **Done.** Image published to ghcr on every push to master; manifest pinned and fetched by the app at start |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
 | M5 | Connected | **Client done.** `scripts/verify-m5-handoff.sh` smoke check; model picker fallback from connected providers |

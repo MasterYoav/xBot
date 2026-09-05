@@ -278,7 +278,13 @@ footer states both, because a keyboard affordance nobody knows about does not ex
 
 ## Settings
 
-A standard macOS `Settings` scene. Tabs, not a sidebar-in-a-sheet.
+**In the main window, not a `Settings` scene.** A list on the left and the pane on the right, the
+shape macOS System Settings uses and the one the rail already establishes here. Opened by the gear
+at the foot of the rail, by ⌘,, and closed by Escape or the back chevron.
+
+A separate floating panel was tried first and removed: it put settings somewhere a person had to go
+and find, and it hid the rail — so which agent was selected stopped being visible while its model
+was being changed.
 
 **Shipped today:** General, Models, **Agents** (default model + description; shared preamble deferred), **Computer** (auto-review + preset deny rules + boundaries admin webview), **Usage** (honest placeholder — engine accounting still open), Updates (Sparkle scaffold + engine install with health rollback), Advanced (Plugins, uninstall).
 
