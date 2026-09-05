@@ -107,6 +107,16 @@ struct ModelProviderCatalogTests {
         #expect(rows[0].provider == "Anthropic")
         #expect(rows[0].model == "claude-sonnet-4-5")
     }
+
+    @Test func ollamaUsesHostGatewayFromRuntime() {
+        let url = ModelProviderCatalog.ollamaBaseURL(hostGateway: "gateway.test")
+        #expect(url == "http://gateway.test:11434/v1")
+        let row = ModelProviderCatalog.selections(
+            forConnectedProviders: ["ollama"],
+            hostGateway: "gateway.test"
+        ).first
+        #expect(row?.baseURL == url)
+    }
 }
 
 @Suite(.serialized)

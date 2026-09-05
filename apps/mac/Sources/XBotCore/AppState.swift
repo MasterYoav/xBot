@@ -114,6 +114,25 @@ public final class AppState {
     /// Loopback origin when the engine is running. Used for admin webviews.
     public private(set) var engineBaseURL: URL?
 
+    /// Pinned container image the runtime is using, when known.
+    public private(set) var pinnedEngineImage: String?
+
+    /// Result of the last engine update check from Settings → Updates.
+    public private(set) var engineUpdateStatus: EngineUpdateStatus?
+
+    public private(set) var isCheckingEngineUpdate = false
+
+    public private(set) var isInstallingEngineUpdate = false
+
+    /// Outcome of the most recent engine update install, if any.
+    public private(set) var lastEngineUpgradeOutcome: EngineUpgradeOutcome?
+
+    /// Sparkle when release metadata is bundled; inert in local SwiftPM runs.
+    public let appUpdates: any AppUpdateControlling
+
+    /// True when this state owns a `RuntimeController` (production / runtime debug), not a fixed stub.
+    public var hasManagedRuntime: Bool { runtime != nil }
+
     /// Tools and skills granted to the selected agent.
     public private(set) var grantedPlugins: GrantedPlugins?
     public private(set) var grantedPluginsLoading = false
@@ -150,15 +169,21 @@ public final class AppState {
         isTurnRunning ? selectedAgentID : nil
     }
 
+    /// Whether a reply is currently streaming. Engine updates must wait for this to finish.
+    public var isTurnInFlight: Bool { isTurnRunning }
+
     public init(
         engine: any EngineClient,
-        providers: ProviderConnectionStore = .shared
+        providers: ProviderConnectionStore = .shared,
+        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared
     ) {
         self.engine = engine
         self.runtime = nil
         self.environmentFactory = nil
         self.engineFactory = nil
         self.providers = providers
+        self.appUpdates = appUpdates
+        wireAppUpdateBlocking()
     }
 
     /// The app's real path: `AppState` owns nothing about *how* the engine runs, only that it
@@ -177,13 +202,22 @@ public final class AppState {
             HTTPEngineClient(baseURL: $0.baseURL)
         },
         /// Injected so a test gets its own preference domain. See `ProviderConnectionStore`.
-        providers: ProviderConnectionStore = .shared
+        providers: ProviderConnectionStore = .shared,
+        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared
     ) {
         self.engine = UnavailableEngineClient()
         self.runtime = runtime
         self.environmentFactory = environment
         self.engineFactory = engineFactory
         self.providers = providers
+        self.appUpdates = appUpdates
+        wireAppUpdateBlocking()
+    }
+
+    private func wireAppUpdateBlocking() {
+        appUpdates.bindUpdateBlockingActivity { [weak self] in
+            self?.isTurnInFlight ?? false
+        }
     }
 
     /// Which providers are connected, and whether the composer may send. Held rather than reached
@@ -231,9 +265,11 @@ public final class AppState {
             await loadPanel()
             models = (try? await engine.availableModels()) ?? []
             if models.isEmpty {
+                let gateway = await runtime?.hostGateway ?? "host.docker.internal"
                 models = ModelProviderCatalog.selections(
                     forConnectedProviders: providers.connectedProviderIDs,
-                    custom: customProviders.all
+                    custom: customProviders.all,
+                    hostGateway: gateway
                 )
             }
             status = nil
@@ -311,6 +347,7 @@ public final class AppState {
             guard let engineFactory else { return }
             engine = engineFactory(endpoint)
             engineBaseURL = endpoint.baseURL
+            pinnedEngineImage = await runtime?.currentImageReference.full
             engineHealth = await runtime?.checkHealth()
             if providers.requiresModelForComposer() {
                 composerBlock = .noModelConnected
@@ -318,6 +355,8 @@ public final class AppState {
                 composerBlock = nil
             }
             await refreshFromEngine()
+            await checkForEngineUpdateIfDue()
+            appUpdates.scheduleAutomaticCheckIfDue()
         case .degraded:
             // The conversation stays readable and usable — docs/09-ui-spec.md is explicit that a
             // health blip must not yank away what is already loaded.
@@ -393,6 +432,70 @@ public final class AppState {
         DiagnosticsClipboard.copy(await runtime.diagnostics(appVersion: Self.appVersion))
     }
 
+    /// User-initiated Sparkle check from Settings → Updates.
+    public func checkForAppUpdate() {
+        appUpdates.checkForUpdates(userInitiated: true)
+    }
+
+    public func fetchActionPolicy() async throws -> ActionPolicy {
+        try await engine.actionPolicy()
+    }
+
+    public func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy {
+        try await engine.saveActionPolicy(policy)
+    }
+
+    /// Fetch the published engine manifest and compare it to what is running.
+    public func checkForEngineUpdate() async {
+        guard runtime != nil else { return }
+        isCheckingEngineUpdate = true
+        defer { isCheckingEngineUpdate = false }
+        let current = await runtime?.currentImageReference.full
+        pinnedEngineImage = current
+        let resolver = EngineImageResolver()
+        engineUpdateStatus = await resolver.checkUpdate(
+            currentImage: current,
+            appVersion: Self.appVersion
+        )
+        EngineUpdateCheckStore.markChecked()
+    }
+
+    /// Daily, and when the engine reaches running — docs/11-packaging-and-updates.md.
+    private func checkForEngineUpdateIfDue() async {
+        guard hasManagedRuntime, EngineUpdateCheckStore.shouldCheck() else { return }
+        await checkForEngineUpdate()
+    }
+
+    /// Pull a published engine update and restart against the same volumes.
+    ///
+    /// Blocked while a turn is streaming — docs/11: never interrupt mid-conversation.
+    public func installEngineUpdate() async {
+        guard !isTurnRunning,
+              let newImage = engineUpdateStatus?.installableImage,
+              let runtime,
+              let environmentFactory
+        else { return }
+
+        isInstallingEngineUpdate = true
+        status = .updating
+        composerBlock = .engineNotRunning
+        defer {
+            isInstallingEngineUpdate = false
+            if case .updating = status { status = nil }
+        }
+
+        let previousImage = await runtime.currentImageReference
+        let outcome = await runtime.upgrade(
+            to: newImage,
+            rollingBackTo: previousImage,
+            environment: environmentFactory
+        )
+        lastEngineUpgradeOutcome = outcome
+        pinnedEngineImage = await runtime.currentImageReference.full
+        await checkForEngineUpdate()
+        await refreshFromEngine()
+    }
+
     /// Remove everything xBot put on this Mac, in the order that cannot strand anything.
     ///
     /// Containers and volumes first, then the Keychain, then the preferences. The order matters:
@@ -421,6 +524,9 @@ public final class AppState {
         try? EngineTokenStore.remove()
         try? KeyEncryptionKeyStore.remove()
 
+        EngineUpdateCheckStore.reset()
+        AppUpdateCheckStore.reset()
+        AgentDefaultsStore.reset()
         providers.reset()
         RuntimeChoiceStore.reset()
         OnboardingVersion.reset()
@@ -456,9 +562,11 @@ public final class AppState {
     /// round-trip finishes, so the fill never waits on a second request.
     public func createAgent(named name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let agentName = trimmed.isEmpty ? String(localized: "New agent") : trimmed
         let draft = AgentDraft(
-            name: trimmed.isEmpty ? String(localized: "New agent") : trimmed,
-            label: ""
+            name: agentName,
+            roleDescription: AgentDefaultsStore.roleDescription(),
+            model: AgentDefaultsStore.defaultModel()
         )
         Task { [engine] in
             guard let agent = try? await engine.createAgent(draft) else { return }

@@ -45,7 +45,7 @@ live in `apps/mac/Sources/XBotRuntime/EngineEnvironment.swift` and this table.
 | --- | --- | --- |
 | `BOT_PROVIDER` | **Ignore** — replaced by per-agent model router | ADR-0002 |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `XAI_API_KEY` | **Ignore** at container level | Keys from Keychain via model router |
-| `OLLAMA_BASE_URL` | **Deferred M2** | Ollama detection in onboarding Step 4 |
+| `OLLAMA_BASE_URL` | **Via model selection** — `baseURL` on the agent uses `hostGatewayAddress()` | App probes host; engine uses gateway URL |
 
 ---
 

@@ -29,8 +29,18 @@ cp "${BUILD}" "${APP}/Contents/MacOS/XBot"
 cp "${RES}/Assets.car" "${APP}/Contents/Resources/Assets.car"
 cp "${RES}/xBot.icns" "${APP}/Contents/Resources/xBot.icns"
 cp "${MAC}/Resources/Info.plist" "${APP}/Contents/Info.plist"
+"${ROOT}/scripts/inject-sparkle-plist.sh" "${APP}/Contents/Info.plist"
 
 chmod +x "${APP}/Contents/MacOS/XBot"
+
+# Sparkle ships as an embedded framework when linked through SwiftPM.
+SPARKLE_FW="$(find "${MAC}/.build" -path '*/Sparkle.framework' -type d 2>/dev/null | head -1)"
+if [[ -n "${SPARKLE_FW}" ]]; then
+  mkdir -p "${APP}/Contents/Frameworks"
+  rsync -a "${SPARKLE_FW}" "${APP}/Contents/Frameworks/"
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "${APP}/Contents/MacOS/XBot" 2>/dev/null \
+    || true
+fi
 
 echo "Bundled ${APP}"
 echo "Open with: open ${APP}"

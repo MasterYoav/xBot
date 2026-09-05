@@ -60,4 +60,10 @@ public struct UnavailableEngineClient: EngineClient {
     public func handoffGrants(for agent: Agent.ID) async throws -> HandoffGrants {
         throw EngineError.notRunning
     }
+
+    public func actionPolicy() async throws -> ActionPolicy { throw EngineError.notRunning }
+
+    public func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy {
+        throw EngineError.notRunning
+    }
 }

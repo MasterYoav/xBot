@@ -43,19 +43,24 @@ user already has. No key. If it is not installed, the row offers a link, not an 
 | Wire type + parser | `engine/shared/model-selection.ts`, shared because the server writes what the agent reads |
 | Selection on the agent | `configuration.modelSelection` — the column that already holds `endpoint`, so **no migration** |
 | Forwarded per run | `forwardedProps.xbotModel`, beside the run assertion and tool names |
+| Read back | `agentDto` publishes it, **stripped of any per-agent key** by `publishableSelection` — so the picker shows what is stored and `GET /api/agents` never carries a secret |
 | Onboarding **Connect a model** step | Provider picker, secure key field, live validation via `ModelProviderValidator` |
 | Keychain storage | `ProviderKeyStore` / `ProviderKeyVault` — keys never in UserDefaults or logs |
 | Connection state | `ProviderConnectionStore` — injected storage, so a test never touches the real domain |
 | Agent settings model picker | Dropdown in panel, backed by `ModelProviderCatalog` |
 | Settings → Models | **Built.** Provider rows with live connect/disconnect, Ollama detection, and **Add a custom provider** |
 
-**Not built yet:** native Anthropic/OpenAI/Google adapters (compatible mode reaches all three), the
-container-to-host Ollama address (the ⚠️ below), usage accounting, and the live two-vendor smoke
-that closes M2.
+**Not built yet:** native Anthropic/OpenAI/Google adapters (compatible mode reaches all three),
+usage accounting, and the live two-vendor smoke that closes M2.
 
-### Two bugs this path shipped with, for anyone reading the history
+**Ollama container routing:** the app probes Ollama on the host (`localhost:11434`) and routes
+engine calls through `hostGatewayAddress()` from the runtime driver
+(`http://<gateway>:11434/v1`), not `localhost` inside the container.
 
-Both were silent, and both are why the picker did nothing for weeks:
+### Three bugs this path shipped with, for anyone reading the history
+
+All three were silent, and together they are why the picker did nothing for weeks. They are worth
+keeping written down because they are the same mistake at three different points on one path:
 
 1. **The engine dropped the field.** `parseAgentInput` never read `modelSelection`, so the value the
    app was already sending went nowhere while the screen reported success.
@@ -63,8 +68,14 @@ Both were silent, and both are why the picker did nothing for weeks:
    name, `"Anthropic"` — where the engine reads `providerId`; and it built a partial PATCH against a
    parser that requires the full object, so **every** agent edit returned 400, renames included.
 
+3. **Nothing ever read it back.** `AgentProfile` did not carry the selection and `agentDto` did not
+   publish it, so `GET /api/agents` never mentioned it. The value was stored and routed on
+   correctly, and the settings pane still said "Not set" on every reload.
+
 The lesson worth keeping: a setting that goes nowhere is worse than one that is absent, because the
-screen looks the same either way.
+screen looks the same either way — and "goes nowhere" has as many places to hide as the path has
+hops. Parsed, stored, forwarded, and read back are four separate things, and three of them were
+broken one at a time.
 
 ## What upstream does instead
 
@@ -207,11 +218,9 @@ picker shows a tools badge, and selecting a model without it warns that the agen
 to use its computer. **Silently degrading an agent to text-only is the worst outcome here** — a user
 watching their agent fail to click anything with no explanation will conclude xBot is broken.
 
-**⚠️ Open question:** the container reaching the host's Ollama. Inside a container,
-`localhost:11434` is the container's own loopback. `host.docker.internal` works on Docker Desktop
-and upstream already uses it for the tool callback URL. Apple's Containerization framework networks
-differently. The runtime driver must resolve a host-reachable address at start and hand it to the
-engine as a setting. Tracked in [07-container-runtime.md](07-container-runtime.md).
+**Resolved:** the container reaches the host's Ollama via `hostGatewayAddress()` — passed into
+`ModelProviderCatalog.ollamaBaseURL(hostGateway:)` when building model selections. The app still
+probes `localhost:11434` on the Mac for detection; only the engine-facing URL uses the gateway.
 
 ## Costs and limits
 

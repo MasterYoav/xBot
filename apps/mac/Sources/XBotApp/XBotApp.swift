@@ -7,6 +7,7 @@ import XBotUI
 
 @main
 struct XBotApp: App {
+    private let appUpdates = SparkleAppUpdateController()
     @State private var state: AppState
     @State private var onboardingCoordinator: OnboardingCoordinator
     @State private var showOnboarding = Self.initialShowOnboarding
@@ -22,7 +23,13 @@ struct XBotApp: App {
         #endif
         let runtime = EngineBootstrap.runtimeController()
         let environment = EngineBootstrap.environmentFactory()
-        _state = State(wrappedValue: Self.productionState(runtime: runtime, environment: environment))
+        _state = State(
+            wrappedValue: Self.productionState(
+                runtime: runtime,
+                environment: environment,
+                appUpdates: appUpdates
+            )
+        )
         _onboardingCoordinator = State(
             wrappedValue: OnboardingCoordinator(runtime: runtime, environmentFactory: environment)
         )
@@ -30,7 +37,8 @@ struct XBotApp: App {
 
     private static func productionState(
         runtime: RuntimeController,
-        environment: @escaping @Sendable (UInt16, String) -> [String: String]
+        environment: @escaping @Sendable (UInt16, String) -> [String: String],
+        appUpdates: SparkleAppUpdateController
     ) -> AppState {
         let engineToken = (try? EngineTokenStore.token()) ?? ""
 
@@ -39,7 +47,8 @@ struct XBotApp: App {
             environment: environment,
             engineFactory: { endpoint in
                 HTTPEngineClient(baseURL: endpoint.baseURL, token: engineToken)
-            }
+            },
+            appUpdates: appUpdates
         )
     }
 

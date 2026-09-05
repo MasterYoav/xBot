@@ -110,9 +110,9 @@ public struct EngineEnvironment: Sendable {
             "OPENBOT_SINGLE_USER": "true",
             "TRUSTED_ORIGINS": inputs.appOrigin,
 
-            // Built from the driver, never hardcoded. This is also the path the user's local
-            // Ollama is reached on, and getting it wrong presents as a model problem.
-            "OPENBOT_TOOL_URL": "http://\(inputs.hostGateway):\(inputs.port)",
+            // Built from the driver at container start. Also the host address agents inside the
+            // container use to reach the user's local Ollama (`ModelProviderCatalog.ollamaBaseURL`).
+            "OPENBOT_TOOL_URL": "http://\(inputs.hostGateway):\(inputs.port)/api/agent-tools/call",
 
             "COMPUTER_MAX_BROWSERS": "\(inputs.maxBrowsers)",
         ]

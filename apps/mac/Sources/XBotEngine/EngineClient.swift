@@ -65,16 +65,33 @@ public protocol EngineClient: Sendable {
 
     /// Which agents this one may ask via handoff.
     func handoffGrants(for agent: Agent.ID) async throws -> HandoffGrants
+
+    /// Deployment-wide browser action policy.
+    func actionPolicy() async throws -> ActionPolicy
+
+    /// Replace the whole policy. The engine normalises and echoes what is in force.
+    func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy
 }
 
 /// What creating an agent needs. The rest of the row is generated — avatar seed, id, defaults.
 public struct AgentDraft: Sendable, Hashable {
     public var name: String
     public var label: String
+    /// Standing instruction for the agent. Defaults to the title when empty.
+    public var roleDescription: String
+    /// Applied on create when the engine accepts `modelSelection` on POST.
+    public var model: ModelSelection?
 
-    public init(name: String, label: String = "") {
+    public init(
+        name: String,
+        label: String = "",
+        roleDescription: String = "",
+        model: ModelSelection? = nil
+    ) {
         self.name = name
         self.label = label
+        self.roleDescription = roleDescription
+        self.model = model
     }
 }
 

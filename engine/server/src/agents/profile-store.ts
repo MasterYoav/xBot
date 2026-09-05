@@ -17,6 +17,7 @@ import {
   mintCallbackToken,
   sameToken,
 } from "./callback-token";
+import { parseModelSelection } from "../../../shared/model-selection";
 import { canManageAgent } from "./profile-policy";
 import type {
   AgentActor,
@@ -166,7 +167,27 @@ function mapProfile(
     // Whether a key is set, never which. The form needs to show "a key is set" so a person does not
     // wipe one by saving an unrelated edit; showing the value would put a secret in a screenshot.
     hasAuth: authFromConfiguration(row.configuration) !== null,
+    ...(publishableSelection(row.configuration)
+      ? { modelSelection: publishableSelection(row.configuration) }
+      : {}),
   };
+}
+
+/**
+ * The stored model selection, with any key removed.
+ *
+ * The key is stripped here rather than at each caller, because this is the single place a profile
+ * is built and "every caller remembers to redact" is not a property a codebase keeps. Same posture
+ * as `hasAuth` above: the surface learns the address and the model, never the secret.
+ */
+function publishableSelection(configuration: unknown) {
+  if (!configuration || typeof configuration !== "object") return undefined;
+  const stored = parseModelSelection(
+    (configuration as { modelSelection?: unknown }).modelSelection,
+  );
+  if (!stored) return undefined;
+  const { apiKey: _withheld, ...publishable } = stored;
+  return publishable;
 }
 
 /**

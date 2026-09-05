@@ -46,14 +46,20 @@ public actor FakeDriver: ContainerDriver {
 
     private var script: Script
     private var volumes: Set<String> = []
+    /// Images the fake registry is pretending to have locally.
+    private var presentImages: Set<String> = []
     private(set) public var startedSpecs: [ContainerSpec] = []
     private(set) public var stopped = false
+    private(set) public var removedHandles: [ContainerHandle] = []
     private var healthPolls = 0
     private var existingRunning = false
 
     public init(script: Script = Script()) {
         self.script = script
         self.existingRunning = script.existingContainerPort != nil && !script.existingContainerStopped
+        if script.imagePresent {
+            presentImages.insert("xbot/engine:1")
+        }
     }
 
     public func probe() async -> ProbeResult {
@@ -77,7 +83,9 @@ public actor FakeDriver: ContainerDriver {
         daemonStarted = true
     }
 
-    public func imageExists(_ reference: ImageReference) async -> Bool { script.imagePresent }
+    public func imageExists(_ reference: ImageReference) async -> Bool {
+        presentImages.contains(reference.full)
+    }
 
     public func pullImage(
         _ reference: ImageReference,
@@ -92,6 +100,7 @@ public actor FakeDriver: ContainerDriver {
                 )
             )
         }
+        presentImages.insert(reference.full)
         script.imagePresent = true
     }
 
@@ -112,7 +121,13 @@ public actor FakeDriver: ContainerDriver {
     }
 
     public func stop(_ handle: ContainerHandle, timeout: Duration) async throws { stopped = true }
-    public func remove(_ handle: ContainerHandle) async throws {}
+    public func remove(_ handle: ContainerHandle) async throws {
+        removedHandles.append(handle)
+        if handle.id == RuntimeController.engineContainerName {
+            script.existingContainerPort = nil
+            existingRunning = false
+        }
+    }
 
     public func inspect(_ handle: ContainerHandle) async throws -> ContainerStatus {
         if handle.id == RuntimeController.engineContainerName,

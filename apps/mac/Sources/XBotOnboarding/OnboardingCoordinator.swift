@@ -284,10 +284,15 @@ public final class OnboardingCoordinator {
         }
 
         if !didSkipModel,
-           let providerID = ProviderConnectionStore.shared.connectedProviderIDs.first,
-           let model = ModelProviderCatalog.selections(forConnectedProviders: [providerID]).first
+           let providerID = ProviderConnectionStore.shared.connectedProviderIDs.first
         {
-            agent = (try? await client.updateAgent(agent.id, AgentPatch(model: model))) ?? agent
+            let gateway = await runtime.hostGateway
+            if let model = ModelProviderCatalog.selections(
+                forConnectedProviders: [providerID],
+                hostGateway: gateway
+            ).first {
+                agent = (try? await client.updateAgent(agent.id, AgentPatch(model: model))) ?? agent
+            }
         }
 
         _ = try? await client.createChannel(agentIds: [agent.id])

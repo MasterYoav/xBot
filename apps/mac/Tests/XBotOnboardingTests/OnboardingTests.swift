@@ -46,6 +46,7 @@ struct SystemRequirementsTests {
     }
 }
 
+@Suite(.serialized)
 struct OnboardingVersionTests {
     @Test func resetAndComplete() {
         defer { OnboardingVersion.reset() }

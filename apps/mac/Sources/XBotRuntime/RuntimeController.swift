@@ -16,13 +16,18 @@ public actor RuntimeController {
     }
 
     private let driver: any ContainerDriver
-    private let image: ImageReference
+    private var image: ImageReference
+    private let imageResolver: EngineImageResolver?
     private let health: @Sendable (EngineEndpoint) async -> EngineHealth?
     private let startHealthDeadlineSeconds: Int
 
     private var handle: ContainerHandle?
     private var allocatedPort: UInt16?
     private var lastHealth: EngineHealth?
+    /// Host-reachable address from inside the container — used for Ollama routing and tool callbacks.
+    public private(set) var hostGateway: String = "host.docker.internal"
+    /// The image reference last used or resolved for the engine container.
+    public var currentImageReference: ImageReference { image }
     private var history: [String] = []
     private var continuations: [UUID: AsyncStream<RuntimeEvent>.Continuation] = [:]
 
@@ -36,6 +41,7 @@ public actor RuntimeController {
     public init(
         driver: any ContainerDriver,
         image: ImageReference,
+        imageResolver: EngineImageResolver? = nil,
         health: @escaping @Sendable (EngineEndpoint) async -> EngineHealth?,
         startHealthDeadlineSeconds: Int = 120,
         /// Injected so a test gets its own storage rather than the one live preference domain.
@@ -43,6 +49,7 @@ public actor RuntimeController {
     ) {
         self.driver = driver
         self.image = image
+        self.imageResolver = imageResolver
         self.health = health
         self.startHealthDeadlineSeconds = startHealthDeadlineSeconds
         self.ports = ports
@@ -98,6 +105,10 @@ public actor RuntimeController {
             return
         }
 
+        if let imageResolver {
+            image = await imageResolver.resolve(fallback: image)
+        }
+
         do {
             if await !driver.imageExists(image) {
                 state = .pulling(PullProgress(layersComplete: 0, layersTotal: 0, fraction: nil))
@@ -129,6 +140,7 @@ public actor RuntimeController {
 
             state = .starting(.container)
             let gateway = try await driver.hostGatewayAddress()
+            hostGateway = gateway
             let spec = ContainerSpec(
                 name: Self.engineContainerName,
                 image: image,
@@ -253,6 +265,127 @@ public actor RuntimeController {
     public func restart(environment: (UInt16, String) -> [String: String]) async {
         await stop()
         await start(environment: environment)
+    }
+
+    /// Stop the running container, pull a new image if needed, and start fresh against the same
+    /// volumes. Does not adopt an existing container — the whole point is a new digest.
+    ///
+    /// When the new image fails health, `rollingBackTo` is started against the same volumes if
+    /// provided. See docs/11-packaging-and-updates.md step 8.
+    @discardableResult
+    public func upgrade(
+        to newImage: ImageReference,
+        rollingBackTo rollbackImage: ImageReference,
+        environment: (UInt16, String) -> [String: String]
+    ) async -> EngineUpgradeOutcome {
+        await removeEngineContainer()
+        image = newImage
+
+        guard await ensureRuntimeReady() else { return .failed }
+
+        if await launchEngineWithoutAdoption(environment: environment) {
+            return .succeeded
+        }
+
+        await removeEngineContainer()
+        image = rollbackImage
+
+        if await launchEngineWithoutAdoption(environment: environment) {
+            return .rolledBack
+        }
+
+        return .failed
+    }
+
+    private func ensureRuntimeReady() async -> Bool {
+        var probe = await driver.probe()
+        if case .installedNotRunning = probe {
+            state = .starting(.runtime)
+            try? await driver.ensureDaemonRunning()
+            probe = await driver.probe()
+        }
+        guard case .ready = probe else {
+            state = .notDetected(probe)
+            return false
+        }
+        return true
+    }
+
+    private func removeEngineContainer() async {
+        let previousHandle = handle
+        await stop()
+        if let previousHandle {
+            try? await driver.remove(previousHandle)
+        }
+        if let existing = await driver.containerNamed(Self.engineContainerName) {
+            try? await driver.remove(existing)
+        }
+        handle = nil
+    }
+
+    /// Pull if needed, run a fresh container, and wait for health. Does not adopt leftovers.
+    private func launchEngineWithoutAdoption(
+        environment: (UInt16, String) -> [String: String]
+    ) async -> Bool {
+        do {
+            if await !driver.imageExists(image) {
+                state = .pulling(PullProgress(layersComplete: 0, layersTotal: 0, fraction: nil))
+                try await driver.pullImage(image) { progress in
+                    Task { await self.report(progress) }
+                }
+            }
+
+            state = .starting(.volumes)
+            for volume in [Self.dataVolume, Self.workspaceVolume, Self.profilesVolume]
+            where await !driver.volumeExists(volume) {
+                try await driver.createVolume(volume)
+            }
+
+            state = .starting(.ports)
+            let port = try PortAllocator.allocate(
+                preferred: allocatedPort ?? 3001,
+                range: 49_152...49_400
+            )
+            allocatedPort = port
+            ports.save(port)
+            let endpoint = EngineEndpoint(port: port)
+
+            state = .starting(.container)
+            let gateway = try await driver.hostGatewayAddress()
+            hostGateway = gateway
+            let spec = ContainerSpec(
+                name: Self.engineContainerName,
+                image: image,
+                ports: [port: port],
+                volumes: [
+                    Self.dataVolume: "/var/lib/postgresql/data",
+                    Self.workspaceVolume: "/workspace",
+                    Self.profilesVolume: "/profiles",
+                ],
+                environment: environment(port, gateway),
+                memoryLimitBytes: EngineEnvironment.memoryLimitBytes(
+                    forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
+                )
+            )
+            handle = try await driver.run(spec)
+
+            state = .starting(.migrations)
+            state = .starting(.health)
+            let deadline = startHealthDeadlineSeconds
+            guard await waitForHealth(endpoint, seconds: deadline) else {
+                state = .failed(.healthTimedOut(seconds: deadline))
+                return false
+            }
+
+            state = .running(endpoint)
+            return true
+        } catch let error as RuntimeError {
+            state = .failed(error)
+            return false
+        } catch {
+            state = .failed(.commandFailed(command: "upgrade", exitCode: -1, message: "\(error)"))
+            return false
+        }
     }
 
     /// Health was lost while running. Degraded, not failed — the conversation stays readable and

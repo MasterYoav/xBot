@@ -63,7 +63,7 @@ generates support mail from people who cannot describe it.
 
 ## Build pipeline (today)
 
-Unsigned local releases are scripted; signing and Sparkle remain open (M7). Step-by-step:
+Unsigned local releases are scripted; signing runs when CI secrets are set (M7). Step-by-step:
 [`scripts/README-packaging.md`](../scripts/README-packaging.md).
 
 | Script | Purpose |
@@ -73,14 +73,29 @@ Unsigned local releases are scripted; signing and Sparkle remain open (M7). Step
 | `scripts/create-dmg.sh` | Unsigned DMG with Applications alias |
 | `scripts/build-engine-image.sh` | Local dev image `xbot/engine:1` |
 | `scripts/generate-engine-manifest.sh` | Pinned digest manifest for updates |
+| `scripts/sign-mac-app.sh` | Developer ID sign + optional notarization when env vars are set |
+| `scripts/inject-sparkle-plist.sh` | Injects `SUFeedURL` / `SUPublicEDKey` from CI env at bundle time |
+| `scripts/generate-appcast.sh` | Builds `dist/releases/appcast.xml` from a signed DMG + EdDSA key |
 | `scripts/build-engine-manifest.py` | Assembles that JSON from environment values |
 | `scripts/read-health-field.py` | Reads one field from a `/health` response |
 | `scripts/verify-m5-handoff.sh` | Smoke check against a live engine |
 
-CI: `.github/workflows/mac-release.yml` builds and uploads an unsigned artifact;
-`.github/workflows/engine-image.yml` builds the engine image, **pushes it to
-`ghcr.io/masteryoav/xbot-engine`**, and uploads a manifest pinning the pushed digest. Developer ID
-signing, notarization, and Sparkle appcast generation are **not wired yet**.
+CI: `.github/workflows/mac-release.yml` builds, optionally signs/notarizes, generates a Sparkle
+appcast when EdDSA secrets are set, and uploads `dist/xBot.dmg` plus `dist/releases/`; signing and
+appcast steps no-op when their secrets are absent. `.github/workflows/engine-image.yml` builds the
+engine image, **pushes it to `ghcr.io/masteryoav/xbot-engine`**, and uploads a manifest pinning the
+pushed digest.
+
+**`mac-release` CI secrets** (all optional until publish):
+
+| Secret | Purpose |
+| --- | --- |
+| `MACOS_SIGNING_IDENTITY` | Developer ID Application identity |
+| `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | Notarization |
+| `XBOT_APPCAST_URL` | Sparkle feed URL injected into the bundled app |
+| `XBOT_SPARKLE_PUBLIC_KEY` | EdDSA public key for update verification |
+| `SPARKLE_EDDSA_PRIVATE_KEY` | Signs update archives and the appcast |
+| `XBOT_RELEASE_DOWNLOAD_PREFIX` | Optional CDN prefix for enclosure URLs |
 
 ### Two ordering rules in CI that are not obvious
 
