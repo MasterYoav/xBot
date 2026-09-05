@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo-animated.gif" alt="xBot" width="220">
+
 <img src="assets/banner.png" alt="xBot" width="100%">
 
 
@@ -41,10 +43,12 @@ vendor.
 ## Status
 
 **In development.** The native Mac client ships rail, conversation, composer, panel, command palette,
-onboarding (five steps), agent settings (model picker, plugins reach, handoff grants), plugins admin
-webview, and a settings skeleton — all wired to `RuntimeController` and `HTTPEngineClient` when the
-engine is running. A published engine image (M3) is still required before a non-developer install path
-works end to end.
+onboarding (five steps), in-window settings (General, Models, Agents, Computer, Usage, Updates,
+Advanced), agent settings (model picker,
+plugins reach, handoff grants), plugins admin webview — all wired to `RuntimeController` and
+`HTTPEngineClient` when the engine is running. The app pulls a pinned ghcr engine digest from
+`manifests/engine-stable.json` on start. M2's model router is built but not yet proven against live
+vendors; M6 VM validation and M7 signing/Sparkle remain open.
 
 Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 [`docs/12-roadmap.md`](docs/12-roadmap.md).
@@ -61,8 +65,10 @@ scripts/generate-app-icon.sh      # compile xBot.icon → Assets.car + xBot.icns
 scripts/bundle-mac-app.sh          # wrap release binary in XBot.app (after swift build -c release)
 ```
 
-Release builds always use the runtime path. The runtime path needs a local `xbot/engine:1` image
-(built above) until M3 publishes a pinned digest manifest. Bearer token and encryption key are
+Release builds always use the runtime path. On start the app fetches the pinned engine manifest
+(`manifests/engine-stable.json`) and pulls `ghcr.io/masteryoav/xbot-engine@sha256:…`. For local
+development, build `xbot/engine:1` with `scripts/build-engine-image.sh` or set
+`XBOT_ENGINE_IMAGE=xbot/engine:1`. Bearer token and encryption key are
 generated on first run and held in the Keychain. First Start can take up to ~2 minutes while
 Postgres initializes. If a start fails mid-boot, `docker rm -f xbot-engine` clears the container
 for a clean retry (volumes are kept).

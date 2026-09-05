@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xBot mark</title>
+  <style>
+    :root {
+      --sakura: #fff3ec;
+      --coral: #ffc9a3;
+      --ibis: #f08a8c;
+      --bellflower: #b65e8c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 50% 120%, #2a1820, #140c10);
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .stage {
+      position: relative;
+      width: min(92vw, 420px);
+      aspect-ratio: 1;
+      border-radius: 32px;
+      overflow: hidden;
+      background: var(--sakura);
+      box-shadow: 0 24px 80px rgba(42, 24, 32, 0.35);
+    }
+    .aurora {
+      position: absolute;
+      inset: -20%;
+      filter: blur(48px);
+      opacity: 0.55;
+    }
+    .blob {
+      position: absolute;
+      width: 58%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      animation: drift 8s ease-in-out infinite;
+    }
+    .blob.coral { background: var(--coral); top: 8%; left: 4%; animation-duration: 9s; }
+    .blob.ibis { background: var(--ibis); top: 12%; right: 2%; animation-duration: 10.5s; animation-delay: -2s; }
+    .blob.bellflower { background: var(--bellflower); bottom: 6%; right: 18%; animation-duration: 11s; animation-delay: -4s; }
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(6%, -4%) scale(1.04); }
+      66% { transform: translate(-5%, 5%) scale(0.97); }
+    }
+    .mark-wrap {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+    }
+    .mark {
+      width: 62%;
+      animation: float 4s ease-in-out infinite;
+      filter: drop-shadow(0 18px 28px rgba(42, 24, 32, 0.22));
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-8px) scale(1.03); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .blob, .mark { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" aria-label="xBot animated mark">
+    <div class="aurora" aria-hidden="true">
+      <div class="blob coral"></div>
+      <div class="blob ibis"></div>
+      <div class="blob bellflower"></div>
+    </div>
+    <div class="mark-wrap">
+      <img class="mark" src="logo-mark.png" alt="xBot" width="512" height="512" />
+    </div>
+  </div>
+</body>
+</html>
