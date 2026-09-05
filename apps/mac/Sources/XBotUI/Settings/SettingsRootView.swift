@@ -143,6 +143,26 @@ public struct SettingsRootView: View {
             }
         }
         .background(Palette.windowBackground)
+        /*
+         * Escape closes settings — scoped here, not registered on the window.
+         *
+         * It was a hidden `Button().keyboardShortcut(.escape)` in `MainWindow`'s background. A key
+         * equivalent is matched before `onExitCommand` reaches the focused view, and it was always
+         * present, so it swallowed every Escape in the app: the command palette stopped closing,
+         * because the button fired, saw that settings were not showing, and did nothing at all.
+         *
+         * `onExitCommand` on the view that actually wants the key leaves every other Escape alone.
+         */
+        /*
+         * Escape closes settings, scoped to this view rather than registered on the window.
+         *
+         * It was a hidden `Button().keyboardShortcut(.escape)` in `MainWindow`'s background, which
+         * claimed Escape for the whole app and did nothing whenever settings were closed — so
+         * every other Escape in the app went to a handler that ignored it.
+         */
+        .onExitCommand {
+            withAnimation(Motion.panel) { state.isShowingSettings = false }
+        }
     }
 
     private var header: some View {

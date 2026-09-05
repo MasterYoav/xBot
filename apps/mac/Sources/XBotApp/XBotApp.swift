@@ -40,13 +40,25 @@ struct XBotApp: App {
         environment: @escaping @Sendable (UInt16, String) -> [String: String],
         appUpdates: SparkleAppUpdateController
     ) -> AppState {
-        let engineToken = (try? EngineTokenStore.token()) ?? ""
-
         return AppState(
             runtime: runtime,
             environment: environment,
             engineFactory: { endpoint in
-                HTTPEngineClient(baseURL: endpoint.baseURL, token: engineToken)
+                /*
+                 * Read when the engine is actually reachable, not while the app is starting.
+                 *
+                 * This used to run in `init`, before any scene existed. The first Keychain read
+                 * after a build's signing identity changes puts up a system password prompt, and
+                 * because it happened during `init` the window was not created until somebody
+                 * answered it — the app looked like it had failed to launch. A signed release
+                 * prompts once rather than every build, but launch is the wrong place for it
+                 * either way: nothing on screen can explain a prompt that is blocking the screen.
+                 *
+                 * Here it happens when the runtime reports `.running`, by which point there is a
+                 * window to show the prompt over.
+                 */
+                let token = (try? EngineTokenStore.token()) ?? ""
+                return HTTPEngineClient(baseURL: endpoint.baseURL, token: token)
             },
             appUpdates: appUpdates
         )

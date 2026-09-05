@@ -109,13 +109,6 @@ public struct MainWindow: View {
             }
             .keyboardShortcut(",", modifiers: .command)
 
-            Button("") {
-                if state.isShowingSettings {
-                    withAnimation(Motion.panel) { state.isShowingSettings = false }
-                }
-            }
-            .keyboardShortcut(.escape, modifiers: [])
-
             ForEach(Array(state.agents.prefix(9).enumerated()), id: \.element.id) { index, agent in
                 Button("") { state.select(agent.id) }
                     .keyboardShortcut(
