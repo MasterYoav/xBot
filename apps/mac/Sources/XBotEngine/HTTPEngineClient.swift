@@ -60,16 +60,19 @@ public actor HTTPEngineClient: EngineClient {
         // Name, title and roleDescription are all required by the engine's parser, even when the
         // user only typed a name. Visibility is private: this is a laptop, not a hosted roster.
         let title = draft.label.isEmpty ? draft.name : draft.label
+        let role = draft.roleDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        var body: [String: Any] = [
+            "name": draft.name,
+            "title": title,
+            "roleDescription": role.isEmpty ? title : role,
+            "visibility": "private",
+        ]
+        if let model = draft.model { body["modelSelection"] = model.wireFormat }
         let (data, _) = try await send(
             request(
                 .post,
                 "/api/agents",
-                body: [
-                    "name": draft.name,
-                    "title": title,
-                    "roleDescription": title,
-                    "visibility": "private",
-                ]
+                body: body
             )
         )
         guard
@@ -178,6 +181,26 @@ public actor HTTPEngineClient: EngineClient {
             throw EngineError.unknownChannel(id)
         }
         return (object["agent"] as? [String: Any]) ?? object
+    }
+
+    public func actionPolicy() async throws -> ActionPolicy {
+        let (data, response) = try await send(request(.get, "/api/computers/policy"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw EngineError.notRunning }
+        let wrapper = try JSONDecoder().decode(PolicyResponse.self, from: data)
+        return wrapper.policy
+    }
+
+    public func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy {
+        let encoded = try JSONEncoder().encode(policy)
+        let body = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] ?? [:]
+        let (data, response) = try await send(request(.put, "/api/computers/policy", body: body))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw EngineError.notRunning }
+        let wrapper = try JSONDecoder().decode(PolicyResponse.self, from: data)
+        return wrapper.policy
+    }
+
+    private struct PolicyResponse: Decodable {
+        let policy: ActionPolicy
     }
 
     public func availableModels() async throws -> [ModelSelection] {
@@ -381,6 +404,7 @@ public actor HTTPEngineClient: EngineClient {
     private enum Method: String {
         case get = "GET"
         case post = "POST"
+        case put = "PUT"
         case patch = "PATCH"
         case delete = "DELETE"
     }

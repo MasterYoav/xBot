@@ -32,13 +32,16 @@ jobs:
         run: swift build -c release
 
       - name: Bundle .app
+        env:
+          XBOT_APPCAST_URL: ${{ secrets.XBOT_APPCAST_URL }}
+          XBOT_SPARKLE_PUBLIC_KEY: ${{ secrets.XBOT_SPARKLE_PUBLIC_KEY }}
         run: scripts/bundle-mac-app.sh
 
       - name: Create DMG
         run: scripts/create-dmg.sh
 
       - name: Sign and notarize
-        if: env.MACOS_SIGNING_IDENTITY != ''
+        if: ${{ secrets.MACOS_SIGNING_IDENTITY != '' }}
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -46,7 +49,16 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: scripts/sign-mac-app.sh
 
+      - name: Generate Sparkle appcast
+        if: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY != '' }}
+        env:
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+          XBOT_RELEASE_DOWNLOAD_PREFIX: ${{ secrets.XBOT_RELEASE_DOWNLOAD_PREFIX }}
+        run: scripts/generate-appcast.sh
+
       - uses: actions/upload-artifact@v4
         with:
-          name: xbot-dmg
-          path: dist/xBot.dmg
+          name: xbot-release
+          path: |
+            dist/xBot.dmg
+            dist/releases/

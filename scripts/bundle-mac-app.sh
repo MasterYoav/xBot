@@ -29,6 +29,7 @@ cp "${BUILD}" "${APP}/Contents/MacOS/XBot"
 cp "${RES}/Assets.car" "${APP}/Contents/Resources/Assets.car"
 cp "${RES}/xBot.icns" "${APP}/Contents/Resources/xBot.icns"
 cp "${MAC}/Resources/Info.plist" "${APP}/Contents/Info.plist"
+"${ROOT}/scripts/inject-sparkle-plist.sh" "${APP}/Contents/Info.plist"
 
 chmod +x "${APP}/Contents/MacOS/XBot"
 

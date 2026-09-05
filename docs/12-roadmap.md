@@ -25,7 +25,7 @@ and the ones marked ⚠️ have the widest error bars.
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
 | M5 | Connected | **Client done.** `scripts/verify-m5-handoff.sh` smoke check; model picker fallback from connected providers |
 | M6 | Onboarding | **In progress.** Five steps built, install-for-me, adoption, handoff transition, failure branches, runtime choice persistence; VM testing still open |
-| M7 | Ship v1.0 | **In progress (unsigned).** Icon pipeline, bundle script, unsigned DMG + `mac-release` CI, Settings (General/Models/Updates with Sparkle scaffold + engine install/Advanced), uninstall, `sign-mac-app.sh`; appcast EdDSA + CI secrets, migration dump rollback still open |
+| M7 | Ship v1.0 | **In progress (unsigned).** Settings tabs (Agents, Computer, Usage) wired; Sparkle scaffold + appcast scripts done; CI secrets + publish still open |
 
 ---
 
@@ -220,8 +220,9 @@ it.**
 **2–3 weeks**
 
 - DMG, signing, notarization, stapling. Verified on a clean machine. **Unsigned DMG + bundle scripts
-  exist locally and in `mac-release` CI; signing/Sparkle still open.**
-- Sparkle with EdDSA. Appcast published.
+  exist locally and in `mac-release` CI; signing runs when secrets are set.**
+- Sparkle with EdDSA. **Appcast generation scripted (`generate-appcast.sh`); publish + CI secrets
+  still open.**
 - Engine update flow including rollback, and **the migration-rollback decision made and implemented**.
 - Uninstall, complete.
 - Admin surfaces embedded (webview). **Plugins admin ships; audit, credentials, playground, etc. open.**

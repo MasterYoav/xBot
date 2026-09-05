@@ -369,6 +369,16 @@ public actor StubEngineClient: EngineClient {
             grantable: true
         )
     }
+
+    private var actionPolicy = ActionPolicy.default
+
+    public func actionPolicy() async throws -> ActionPolicy { actionPolicy }
+
+    public func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy {
+        actionPolicy = policy
+        return policy
+    }
+
     public func channels() async throws -> [Channel] { fixedChannels }
 
     public func messages(in channel: Channel.ID) async throws -> [Message] {

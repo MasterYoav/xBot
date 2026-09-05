@@ -25,7 +25,7 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 | Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine, container adoption. A stopped-but-installed runtime is now **started** rather than reported as missing. Image published to ghcr; the app fetches `manifests/engine-stable.json` for a pinned digest before each pull |
 | Design system | Built — tokens, aurora field, frosted glass, Reduce Motion and Reduce Transparency inside tokens |
 | Onboarding | **Built (M6 in progress)** — five steps, Colima install-for-me, engine adoption, provider keys, handoff to main window. VM clean-machine validation still open |
-| Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General (engine status, version, address, start/stop/restart, diagnostics), Models (providers, custom providers), Updates (check + install), Advanced (Plugins, uninstall). Agents, Computer, Usage **not yet** |
+| Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General, Models, **Agents** (defaults), **Computer** (policy presets + boundaries admin), **Usage** (placeholder), Updates, Advanced |
 | Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). Other admin surfaces (audit, credentials, playground, …) **not embedded** |
 
 ## The main window
@@ -280,7 +280,7 @@ footer states both, because a keyboard affordance nobody knows about does not ex
 
 A standard macOS `Settings` scene. Tabs, not a sidebar-in-a-sheet.
 
-**Shipped today:** General, Models, Updates (Sparkle scaffold — active when appcast keys are bundled; engine check on launch + install with health rollback; blocked while a turn is streaming; schema migration dump still open), and Advanced (Plugins, uninstall). Agents, Computer, Usage **not yet**.
+**Shipped today:** General, Models, **Agents** (default model + description; shared preamble deferred), **Computer** (auto-review + preset deny rules + boundaries admin webview), **Usage** (honest placeholder — engine accounting still open), Updates (Sparkle scaffold + engine install with health rollback), Advanced (Plugins, uninstall).
 
 | Tab | Contents |
 | --- | --- |

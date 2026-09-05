@@ -97,6 +97,9 @@ public struct SettingsRootView: View {
     enum Section: String, CaseIterable, Identifiable {
         case general
         case models
+        case agents
+        case computer
+        case usage
         case updates
         case advanced
 
@@ -106,6 +109,9 @@ public struct SettingsRootView: View {
             switch self {
             case .general: String(localized: "General")
             case .models: String(localized: "Models")
+            case .agents: String(localized: "Agents")
+            case .computer: String(localized: "Computer")
+            case .usage: String(localized: "Usage")
             case .updates: String(localized: "Updates")
             case .advanced: String(localized: "Advanced")
             }
@@ -115,6 +121,9 @@ public struct SettingsRootView: View {
             switch self {
             case .general: "gearshape"
             case .models: "cpu"
+            case .agents: "person.2"
+            case .computer: "desktopcomputer"
+            case .usage: "chart.bar"
             case .updates: "arrow.triangle.2.circlepath"
             case .advanced: "slider.horizontal.3"
             }
@@ -193,6 +202,9 @@ public struct SettingsRootView: View {
         switch section {
         case .general: GeneralSettingsView()
         case .models: ModelsSettingsView()
+        case .agents: AgentsSettingsView()
+        case .computer: ComputerSettingsView()
+        case .usage: UsageSettingsView()
         case .updates: UpdatesSettingsView()
         case .advanced: AdvancedSettingsView()
         }

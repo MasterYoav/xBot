@@ -44,7 +44,8 @@ Sparkle 2 is linked through SwiftPM (`Package.swift`). It stays **inert** until 
 `Info.plist` includes `SUFeedURL` and `SUPublicEDKey` (EdDSA public key from
 `generate_keys` / `generate_appcast`).
 
-Release Info.plist keys (injected at CI pack time, not committed with secrets):
+Release Info.plist keys (injected at CI pack time via `scripts/inject-sparkle-plist.sh`, not
+committed with secrets):
 
 ```xml
 <key>SUFeedURL</key>
@@ -57,8 +58,9 @@ Release Info.plist keys (injected at CI pack time, not committed with secrets):
 <false/>
 ```
 
-`scripts/bundle-mac-app.sh` embeds `Sparkle.framework` when present. Settings → Updates exposes
-**Check for app update**; checks are deferred while a turn is streaming.
+`scripts/bundle-mac-app.sh` embeds `Sparkle.framework` when present and calls
+`inject-sparkle-plist.sh`. Settings → Updates exposes **Check for app update**; checks are deferred
+while a turn is streaming.
 
 When CI has signing credentials:
 
@@ -70,5 +72,20 @@ export APPLE_APP_PASSWORD=…
 scripts/sign-mac-app.sh
 ```
 
-Until appcast + EdDSA key exist in CI, ship via signed DMG only.
+When CI has Sparkle EdDSA credentials:
+
+```sh
+export SPARKLE_EDDSA_PRIVATE_KEY=…          # or SPARKLE_EDDSA_PRIVATE_KEY_FILE
+export XBOT_RELEASE_DOWNLOAD_PREFIX=https://… # optional CDN prefix for enclosure URLs
+scripts/generate-appcast.sh                   # writes dist/releases/appcast.xml
+```
+
+Generate an EdDSA key pair once (from the Sparkle SPM checkout after `swift build`):
+
+```sh
+apps/mac/.build/artifacts/sparkle/Sparkle/bin/generate_keys
+```
+
+Commit the public key to CI as `XBOT_SPARKLE_PUBLIC_KEY`; keep the private key in
+`SPARKLE_EDDSA_PRIVATE_KEY` only.
 

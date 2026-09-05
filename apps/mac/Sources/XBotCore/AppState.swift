@@ -437,6 +437,14 @@ public final class AppState {
         appUpdates.checkForUpdates(userInitiated: true)
     }
 
+    public func fetchActionPolicy() async throws -> ActionPolicy {
+        try await engine.actionPolicy()
+    }
+
+    public func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy {
+        try await engine.saveActionPolicy(policy)
+    }
+
     /// Fetch the published engine manifest and compare it to what is running.
     public func checkForEngineUpdate() async {
         guard runtime != nil else { return }
@@ -518,6 +526,7 @@ public final class AppState {
 
         EngineUpdateCheckStore.reset()
         AppUpdateCheckStore.reset()
+        AgentDefaultsStore.reset()
         providers.reset()
         RuntimeChoiceStore.reset()
         OnboardingVersion.reset()
@@ -553,9 +562,11 @@ public final class AppState {
     /// round-trip finishes, so the fill never waits on a second request.
     public func createAgent(named name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let agentName = trimmed.isEmpty ? String(localized: "New agent") : trimmed
         let draft = AgentDraft(
-            name: trimmed.isEmpty ? String(localized: "New agent") : trimmed,
-            label: ""
+            name: agentName,
+            roleDescription: AgentDefaultsStore.roleDescription(),
+            model: AgentDefaultsStore.defaultModel()
         )
         Task { [engine] in
             guard let agent = try? await engine.createAgent(draft) else { return }
