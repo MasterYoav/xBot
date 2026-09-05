@@ -10,6 +10,8 @@ public struct ComputerSettingsView: View {
 
     public init() {}
 
+    private var isEnforcing: Bool { settings.policy?.mode == .enforce }
+
     public var body: some View {
         Form {
             if let problem = settings.problem {
@@ -20,8 +22,11 @@ public struct ComputerSettingsView: View {
 
             if settings.policy != nil {
                 Section {
+                    // "Auto-review" was ambiguous in the worst direction for a safety control: it
+                    // reads as "approve automatically", so somebody could turn it off believing
+                    // they were tightening things, and instead switch enforcement off entirely.
                     Toggle(
-                        String(localized: "Auto-review"),
+                        String(localized: "Check every action before it runs"),
                         isOn: Binding(
                             get: { settings.policy?.mode == .enforce },
                             set: { enabled in
@@ -35,12 +40,20 @@ public struct ComputerSettingsView: View {
                     )
                     .disabled(settings.isSaving)
                 } footer: {
+                    // Says what *off* means. It used to describe only the on state, so the one
+                    // setting that stops the boundary acting explained nothing about doing so.
                     Text(
-                        String(
-                            localized:
-                                "xBot checks each action before it runs and asks you first when needed. Add rules to customise what agents can do automatically."
-                        )
+                        isEnforcing
+                            ? String(
+                                localized:
+                                    "xBot checks each action against your rules before it runs, and asks you first when one matches."
+                            )
+                            : String(
+                                localized:
+                                    "Off. Actions are still recorded, but none are stopped — agents can do anything, including the things listed below."
+                            )
                     )
+                    .foregroundStyle(isEnforcing ? Palette.textSecondary : Palette.stateFailed)
                 }
 
                 Section {
@@ -62,6 +75,18 @@ public struct ComputerSettingsView: View {
                     }
                 } header: {
                     Text(String(localized: "Always ask before…"))
+                } footer: {
+                    // A rule that is switched on and not being applied is worse than no rule: the
+                    // person believes an agent will be stopped and it will not be.
+                    if !isEnforcing {
+                        Text(
+                            String(
+                                localized:
+                                    "These are saved, but not in force while checking is off."
+                            )
+                        )
+                        .foregroundStyle(Palette.stateFailed)
+                    }
                 }
 
                 Section {
