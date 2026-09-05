@@ -6,6 +6,16 @@ on:
 permissions:
   contents: read
 
+# Hoisted to the job so the optional steps can be gated on them.
+#
+# `if: ${{ secrets.X != '' }}` is not valid — the `secrets` context is not available in a step's
+# `if`, and GitHub rejects the whole file rather than the one expression, so the workflow could
+# never run at all. Only `env` is readable there, so the secrets are lifted here and the conditions
+# below test the environment.
+env:
+  MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+  SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+
 jobs:
   build:
     name: mac — release build + dmg
@@ -41,18 +51,16 @@ jobs:
         run: scripts/create-dmg.sh
 
       - name: Sign and notarize
-        if: ${{ secrets.MACOS_SIGNING_IDENTITY != '' }}
+        if: env.MACOS_SIGNING_IDENTITY != ''
         env:
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: scripts/sign-mac-app.sh
 
       - name: Generate Sparkle appcast
-        if: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY != '' }}
+        if: env.SPARKLE_EDDSA_PRIVATE_KEY != ''
         env:
-          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
           XBOT_RELEASE_DOWNLOAD_PREFIX: ${{ secrets.XBOT_RELEASE_DOWNLOAD_PREFIX }}
         run: scripts/generate-appcast.sh
 
