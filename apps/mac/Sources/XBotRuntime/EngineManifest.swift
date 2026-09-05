@@ -16,7 +16,20 @@ public struct EngineManifest: Codable, Sendable, Equatable {
         public let backwardCompatibleWith: Int
     }
 
-    public var imageReference: ImageReference? { ImageReference(parsing: image) }
+    /// The image to run, or nil when the manifest carries no real one.
+    ///
+    /// `scripts/engine-manifest.template.json` uses an all-zero digest as a placeholder, and a copy
+    /// of it reached both `manifests/engine-stable.json` and the app's bundled fallback. Nothing
+    /// rejected it — the reference parsed, resolution returned it, and the runtime tried to pull an
+    /// image that cannot exist, so the engine never started and the failure read as a pull error
+    /// rather than "nothing has been published yet".
+    ///
+    /// Nil lets resolution fall through to the caller's own fallback, which is the honest answer.
+    public var imageReference: ImageReference? {
+        guard let reference = ImageReference(parsing: image) else { return nil }
+        if let digest = reference.digest, digest.allSatisfy({ $0 == "0" }) { return nil }
+        return reference
+    }
 }
 
 public enum EngineManifestDecoding {

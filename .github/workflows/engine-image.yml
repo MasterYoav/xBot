@@ -9,6 +9,12 @@ on:
       - scripts/build-engine-image.sh
       - scripts/generate-engine-manifest.sh
       - scripts/engine-manifest.template.json
+      - scripts/build-engine-manifest.py
+      - scripts/read-health-field.py
+      # Itself, or a change to how the manifest is built and published never runs. That is how a
+      # publish step was added and then never executed once: the placeholder manifest it was meant
+      # to replace stayed live.
+      - .github/workflows/engine-image.yml
 
 permissions:
   contents: write

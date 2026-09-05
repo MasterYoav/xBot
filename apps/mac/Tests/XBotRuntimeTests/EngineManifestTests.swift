@@ -155,4 +155,46 @@ struct EngineImageResolverTests {
             )
         )
     }
+
+    /**
+     A template digest is not an image, and must never be resolved as one.
+
+     `scripts/engine-manifest.template.json` carries an all-zero digest as a placeholder, and a copy
+     of it was published to `manifests/engine-stable.json` and shipped as the app's bundled
+     fallback. Nothing rejected it: the reference parsed, resolution returned it, and the runtime
+     tried to pull `ghcr.io/…@sha256:0000…` — an image that cannot exist. The engine could not start
+     at all, and the failure surfaced as a pull error rather than as "there is no published image".
+
+     Returning nil lets resolution fall through to the caller's own fallback, which is the honest
+     answer when no real image has been published yet.
+     */
+    @Test func aPlaceholderDigestIsNotAnImageReference() throws {
+        let placeholder = """
+        {
+          "channel": "stable",
+          "version": "0.0.0-dev",
+          "image": "ghcr.io/masteryoav/xbot-engine@sha256:\(String(repeating: "0", count: 64))",
+          "size": 0,
+          "minimumAppVersion": "1.0.0",
+          "migration": { "schemaVersion": 0, "backwardCompatibleWith": 0 }
+        }
+        """
+        let manifest = try EngineManifestDecoding.decode(from: Data(placeholder.utf8))
+        #expect(manifest.imageReference == nil)
+    }
+
+    @Test func aRealDigestStillResolves() throws {
+        let real = """
+        {
+          "channel": "stable",
+          "version": "9a4c111",
+          "image": "ghcr.io/masteryoav/xbot-engine@sha256:0aa44a0d597a4d6fb7aa23f1a7cc70b2f4c0cd33678b367f32bdfdacd766e2d9",
+          "size": 4520919161,
+          "minimumAppVersion": "1.0.0",
+          "migration": { "schemaVersion": 0, "backwardCompatibleWith": 0 }
+        }
+        """
+        let manifest = try EngineManifestDecoding.decode(from: Data(real.utf8))
+        #expect(manifest.imageReference != nil)
+    }
 }

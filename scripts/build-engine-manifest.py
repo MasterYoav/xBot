@@ -29,7 +29,26 @@ def schema_version(tag: str) -> int:
     return int(match.group(1)) if match else 0
 
 
+def refuse_placeholder(image: str) -> None:
+    """Stop a template manifest from being published as a real one.
+
+    The template's all-zero digest was copied into `manifests/engine-stable.json` and into the
+    app's bundled fallback, and nothing objected. The app then resolved an image that cannot
+    exist, so the engine could not start at all. A placeholder is easy to produce by accident —
+    it is what you get from the template when a digest is not passed in — so the refusal belongs
+    here, where the manifest is written, rather than in whatever reads it later.
+    """
+    digest = image.rsplit("@sha256:", 1)[-1] if "@sha256:" in image else ""
+    if digest and set(digest) == {"0"}:
+        raise SystemExit(
+            "refusing to write a manifest with the template's placeholder digest — "
+            "pass the pushed image reference, e.g. ghcr.io/owner/xbot-engine@sha256:<digest>"
+        )
+
+
 def main() -> int:
+    refuse_placeholder(os.environ["IMAGE_REF"])
+
     template = json.loads(Path(os.environ["TEMPLATE_PATH"]).read_text())
     template.update(
         {
