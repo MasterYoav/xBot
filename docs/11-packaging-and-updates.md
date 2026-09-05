@@ -160,6 +160,14 @@ schedule and on any team change.
 **An update channel is a code-execution channel.** EdDSA verification is not optional and the private
 key does not live anywhere a build machine can be compromised into revealing it.
 
+**The public key is trusted only from the signed bundle.** `scripts/inject-sparkle-plist.sh` writes
+`SUFeedURL` and `SUPublicEDKey` into `Info.plist` at build time, inside the code-signed app where
+they cannot be changed without breaking the signature. The controller also read both from the
+environment, which handed the update channel to anything able to set a variable for the process: its
+own feed, signed with its own key, verified against that same key and installed. The environment is
+honoured in debug builds only — see `AppUpdateTrust` — and the feed must be HTTPS, because the
+appcast also carries the version and the download URL, which is enough to stage a downgrade.
+
 **Never interrupt.** Sparkle does not prompt while a turn is streaming or an agent is mid-task. The
 prompt waits for an idle moment or for the next launch. An update dialog that appears over a running
 agent will be dismissed, and dismissed updates do not get installed.

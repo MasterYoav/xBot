@@ -50,27 +50,35 @@ final class SparkleAppUpdateController: NSObject, AppUpdateControlling, SPUUpdat
         }
     }
 
+    /// The appcast, from the signed bundle — and from the environment only in a debug build.
+    ///
+    /// See `AppUpdateTrust`. Both this and the key below used to fall back to the environment
+    /// unconditionally, which handed the update channel to anything able to set a variable for this
+    /// process.
     private var resolvedFeedURL: String? {
         if let url = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
-           !url.isEmpty
+           AppUpdateTrust.isAcceptableFeed(url)
         {
             return url
         }
-        if let url = ProcessInfo.processInfo.environment["XBOT_APPCAST_URL"], !url.isEmpty {
-            return url
-        }
-        return nil
+        guard AppUpdateTrust.allowsEnvironmentOverride,
+              let url = ProcessInfo.processInfo.environment["XBOT_APPCAST_URL"],
+              AppUpdateTrust.isAcceptableFeed(url)
+        else { return nil }
+        return url
     }
 
+    /// The EdDSA public key. Whoever controls this controls what the app installs.
     private var resolvedPublicKey: String? {
         if let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String,
            !key.isEmpty
         {
             return key
         }
-        if let key = ProcessInfo.processInfo.environment["XBOT_SPARKLE_PUBLIC_KEY"], !key.isEmpty {
-            return key
-        }
-        return nil
+        guard AppUpdateTrust.allowsEnvironmentOverride,
+              let key = ProcessInfo.processInfo.environment["XBOT_SPARKLE_PUBLIC_KEY"],
+              !key.isEmpty
+        else { return nil }
+        return key
     }
 }
