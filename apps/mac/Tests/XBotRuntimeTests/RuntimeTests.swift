@@ -407,6 +407,47 @@ struct RuntimeControllerTests {
         #expect(!(await driver.removedHandles.isEmpty))
     }
 
+    /**
+     A pull that fails must leave the running engine exactly where it was.
+
+     `upgrade` removed the container first and pulled second, so the engine was down for the whole
+     download — minutes, over several gigabytes — and docs/11-packaging-and-updates.md is explicit
+     that the pull must never block use of the running engine. Worse, a pull that failed left the
+     person with no engine at all until the rollback re-ran the old image.
+
+     Pulling first costs nothing when it succeeds and costs the outage when it does not.
+     */
+    @Test func aFailedPullLeavesTheRunningEngineAlone() async {
+        // `imagePresent` seeds xbot/engine:1, so the initial start does not pull; the upgrade's
+        // new digest is absent, so that pull is the one that fails.
+        let driver = FakeDriver(script: FakeDriver.Script(imagePresent: true, pullFails: true))
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+        await controller.start(environment: environment)
+        guard case .running = await controller.state else {
+            Issue.record("expected a running engine to upgrade from")
+            return
+        }
+
+        let outcome = await controller.upgrade(
+            to: ImageReference(repository: "ghcr.io/masteryoav/xbot-engine", digest: String(repeating: "a", count: 64)),
+            rollingBackTo: ImageReference(repository: "xbot/engine", tag: "1"),
+            environment: environment
+        )
+
+        #expect(outcome == .failed)
+        // Still up. The engine was never taken down for an update that could not happen.
+        guard case .running = await controller.state else {
+            Issue.record("a failed pull must not take the engine down, got \(await controller.state)")
+            return
+        }
+        #expect(await !driver.stopped)
+    }
+
     @Test func upgradeRollsBackWhenNewImageFailsHealth() async {
         final class HealthScript: @unchecked Sendable {
             private let lock = NSLock()

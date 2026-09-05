@@ -278,10 +278,33 @@ public actor RuntimeController {
         rollingBackTo rollbackImage: ImageReference,
         environment: (UInt16, String) -> [String: String]
     ) async -> EngineUpgradeOutcome {
+        guard await ensureRuntimeReady() else { return .failed }
+
+        /*
+         * Pull before taking anything down.
+         *
+         * This used to remove the container first and pull second, so the engine was off for the
+         * whole download — minutes, over several gigabytes — and a pull that failed left the person
+         * with nothing running until the rollback re-ran the old image. docs/11 is explicit that
+         * the pull must never block use of the running engine.
+         *
+         * The state is deliberately not moved to `.pulling` here: the engine is still up and still
+         * serving, and saying "starting up" over a working conversation would be a worse lie than
+         * showing no progress. `report` only writes while already pulling, so the download is
+         * quiet by construction. The Updates pane is where an update announces itself.
+         */
+        if await !driver.imageExists(newImage) {
+            do {
+                try await driver.pullImage(newImage) { _ in }
+            } catch {
+                // Nothing has been touched, so there is nothing to roll back to — the engine that
+                // was running a moment ago is still the engine that is running.
+                return .failed
+            }
+        }
+
         await removeEngineContainer()
         image = newImage
-
-        guard await ensureRuntimeReady() else { return .failed }
 
         if await launchEngineWithoutAdoption(environment: environment) {
             return .succeeded

@@ -16,6 +16,8 @@ public actor FakeDriver: ContainerDriver {
         public var imagePresent: Bool
         public var pullSteps: Int
         public var runFails: Bool
+        /// A pull that cannot complete — no network, registry down, disk full.
+        public var pullFails = false
         /// Health answers only after this many polls. Zero is immediate.
         public var healthAfterPolls: Int
         /// When set, a container with this name already exists and should be adopted.
@@ -28,6 +30,7 @@ public actor FakeDriver: ContainerDriver {
             imagePresent: Bool = true,
             pullSteps: Int = 4,
             runFails: Bool = false,
+            pullFails: Bool = false,
             healthAfterPolls: Int = 0,
             existingContainerPort: UInt16? = nil,
             existingContainerStopped: Bool = false,
@@ -37,6 +40,7 @@ public actor FakeDriver: ContainerDriver {
             self.imagePresent = imagePresent
             self.pullSteps = pullSteps
             self.runFails = runFails
+            self.pullFails = pullFails
             self.healthAfterPolls = healthAfterPolls
             self.existingContainerPort = existingContainerPort
             self.existingContainerStopped = existingContainerStopped
@@ -91,6 +95,7 @@ public actor FakeDriver: ContainerDriver {
         _ reference: ImageReference,
         progress: @Sendable @escaping (PullProgress) -> Void
     ) async throws {
+        if script.pullFails { throw RuntimeError.commandFailed(command: "pull", exitCode: 1, message: "no space left on device") }
         for step in 1...max(1, script.pullSteps) {
             progress(
                 PullProgress(
