@@ -52,7 +52,12 @@ jobs:
       - name: Generate manifest
         run: scripts/generate-engine-manifest.sh '${{ steps.push.outputs.ref }}' > engine-manifest.json
 
+      # Only from master. A dispatch on a branch would otherwise publish that branch's manifest as
+      # the stable one, which is the file every installed app fetches.
       - name: Publish manifest to repo
+        if: github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           cp engine-manifest.json manifests/engine-stable.json
@@ -60,8 +65,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add manifests/engine-stable.json apps/mac/Sources/XBotApp/Resources/engine-manifest-fallback.json
-          git diff --staged --quiet || git commit -m "CI: update pinned engine manifest"
-          git push
+          git diff --staged --quiet && exit 0
+          git commit -m "CI: update pinned engine manifest"
+          # The checkout deliberately does not persist credentials — this job runs `docker build`
+          # over repository contents, and a write-scoped token sitting in .git/config for every
+          # later step is exactly the thing not to leave lying around. So the token is handed to
+          # this one push and nowhere else. Without it the step failed with "could not read
+          # Username for https://github.com", so the manifest was never actually published.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:master
 
       - uses: actions/upload-artifact@v4
         with:
