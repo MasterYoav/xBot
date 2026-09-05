@@ -9,9 +9,10 @@ public final class AgentDefaultsState {
     public var defaultDescription = ""
     public var defaultModelID: String?
 
-    private let defaults: UserDefaults
+    /// `UserDefaults` is documented thread-safe but is not marked `Sendable`.
+    nonisolated(unsafe) private let defaults: any KeyValueDefaults
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: any KeyValueDefaults = UserDefaults.standard) {
         self.defaults = defaults
     }
 

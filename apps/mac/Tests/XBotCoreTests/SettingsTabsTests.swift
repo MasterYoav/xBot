@@ -17,9 +17,10 @@ import XBotEngine
 
 @Suite struct AgentDefaultsStoreTests {
     @Test func roundTripsDescriptionAndModel() {
-        let suite = "AgentDefaultsStoreTests.roundTrip"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
+        // In memory, not a `UserDefaults(suiteName:)`. A suite name is a plist in the developer's
+        // ~/Library/Preferences, and a test suite should leave nothing behind on the machine that
+        // ran it.
+        let defaults = MemoryDefaults()
 
         AgentDefaultsStore.saveRoleDescription("Research the web", defaults: defaults)
         let model = ModelSelection(

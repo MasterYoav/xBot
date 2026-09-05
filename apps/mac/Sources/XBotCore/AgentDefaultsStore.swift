@@ -6,15 +6,15 @@ public enum AgentDefaultsStore: Sendable {
     private static let descriptionKey = "xbot.agentDefaults.roleDescription"
     private static let modelKey = "xbot.agentDefaults.modelSelection"
 
-    public static func roleDescription(defaults: UserDefaults = .standard) -> String {
+    public static func roleDescription(defaults: any KeyValueDefaults = UserDefaults.standard) -> String {
         defaults.string(forKey: descriptionKey) ?? ""
     }
 
-    public static func saveRoleDescription(_ text: String, defaults: UserDefaults = .standard) {
+    public static func saveRoleDescription(_ text: String, defaults: any KeyValueDefaults = UserDefaults.standard) {
         defaults.set(text, forKey: descriptionKey)
     }
 
-    public static func defaultModel(defaults: UserDefaults = .standard) -> ModelSelection? {
+    public static func defaultModel(defaults: any KeyValueDefaults = UserDefaults.standard) -> ModelSelection? {
         guard let dict = defaults.dictionary(forKey: modelKey) else { return nil }
         guard let providerID = dict["providerId"] as? String,
               let model = dict["model"] as? String
@@ -29,7 +29,7 @@ public enum AgentDefaultsStore: Sendable {
         )
     }
 
-    public static func saveDefaultModel(_ model: ModelSelection?, defaults: UserDefaults = .standard) {
+    public static func saveDefaultModel(_ model: ModelSelection?, defaults: any KeyValueDefaults = UserDefaults.standard) {
         guard let model else {
             defaults.removeObject(forKey: modelKey)
             return
@@ -41,7 +41,7 @@ public enum AgentDefaultsStore: Sendable {
         defaults.set(dict, forKey: modelKey)
     }
 
-    public static func reset(defaults: UserDefaults = .standard) {
+    public static func reset(defaults: any KeyValueDefaults = UserDefaults.standard) {
         defaults.removeObject(forKey: descriptionKey)
         defaults.removeObject(forKey: modelKey)
     }

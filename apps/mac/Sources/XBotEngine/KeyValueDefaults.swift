@@ -10,6 +10,8 @@ public protocol KeyValueDefaults: AnyObject {
     func stringArray(forKey defaultName: String) -> [String]?
     func bool(forKey defaultName: String) -> Bool
     func integer(forKey defaultName: String) -> Int
+    func string(forKey defaultName: String) -> String?
+    func dictionary(forKey defaultName: String) -> [String: Any]?
     func set(_ value: Any?, forKey defaultName: String)
     func removeObject(forKey defaultName: String)
 }

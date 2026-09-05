@@ -632,6 +632,14 @@ final class MemoryDefaults: KeyValueDefaults, @unchecked Sendable {
         lock.withLock { values[defaultName] as? Int ?? 0 }
     }
 
+    func string(forKey defaultName: String) -> String? {
+        lock.withLock { values[defaultName] as? String }
+    }
+
+    func dictionary(forKey defaultName: String) -> [String: Any]? {
+        lock.withLock { values[defaultName] as? [String: Any] }
+    }
+
     func set(_ value: Any?, forKey defaultName: String) {
         lock.withLock { values[defaultName] = value }
     }
