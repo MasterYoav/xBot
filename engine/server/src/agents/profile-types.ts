@@ -23,6 +23,16 @@ export type AgentProfile = {
   /** Whether a key is set for it. Never the key. */
   hasAuth: boolean;
   /**
+   * Which model this coworker answers on, or undefined if it never chose.
+   *
+   * Read back so the settings pane can show what is stored — without it a person picks a model,
+   * the agent answers on it, and the pane says "Not set" again on the next load.
+   *
+   * **Never carries a key.** The selection can hold one on the way in; it is stripped on the way
+   * out, because this profile is published by `GET /api/agents` to every surface there is.
+   */
+  modelSelection?: ModelSelection;
+  /**
    * Whether this agent holds a credential for calling tools back.
    *
    * A boolean, never the token: the token exists in a readable form once, in the response that issued

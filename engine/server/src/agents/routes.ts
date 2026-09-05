@@ -584,6 +584,9 @@ function agentDto(actor: AgentActor, agent: AgentProfile) {
     // and any credential for it lives in the vault, never in this row.
     endpoint: agent.endpoint,
     hasAuth: agent.hasAuth,
+    // Which model it answers on, so the settings pane can show what is stored. Stripped of any
+    // key by the store — see `publishableSelection`.
+    modelSelection: agent.modelSelection,
     // Whether one exists, never what it is.
     hasCallbackToken: agent.hasCallbackToken,
     canManage: canManageAgent(actor, agent),

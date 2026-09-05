@@ -724,6 +724,61 @@ describe("agent profile store integration", () => {
     });
   });
 
+  /**
+   * The selection has to come back out, or the picker forgets it.
+   *
+   * It was stored and routed on but never read back into the profile, so `GET /api/agents` never
+   * carried it: a person chose a model, the agent answered on it, and the settings pane showed
+   * "Not set" again on the next load. Storing a setting nobody can read is its own kind of
+   * silence — the same failure as dropping it, one step later.
+   */
+  test("reads a stored model selection back out of the profile", async () => {
+    const owner = await createUser();
+    const created = await store.create(owner, {
+      name: `Created ${randomUUID()}`,
+      title: "Created Title",
+      roleDescription: "Created role description.",
+      visibility: "private",
+      modelSelection: { providerId: "anthropic", model: "claude-sonnet-4-5" },
+    } as CreateAgentInput);
+    createdAgentIds.push(created.id);
+
+    expect(created.modelSelection).toEqual({
+      providerId: "anthropic",
+      model: "claude-sonnet-4-5",
+    });
+    const fetched = await store.get(owner, created.id);
+    expect(fetched?.modelSelection).toMatchObject({ providerId: "anthropic" });
+  });
+
+  /**
+   * A per-agent key may live on the selection, and it must never come back out.
+   *
+   * docs/10-security.md: a secret's value is never echoed. The endpoint beside it is published on
+   * purpose — it is an address a person typed — but a key is not, and `GET /api/agents` is read by
+   * every surface including a webview.
+   */
+  test("never reads a key back out of a stored selection", async () => {
+    const owner = await createUser();
+    const created = await store.create(owner, {
+      name: `Created ${randomUUID()}`,
+      title: "Created Title",
+      roleDescription: "Created role description.",
+      visibility: "private",
+      modelSelection: {
+        providerId: "openai-compatible",
+        model: "grok-4",
+        baseURL: "https://api.x.ai/v1",
+        apiKey: "xai-secret-value",
+      },
+    } as CreateAgentInput);
+    createdAgentIds.push(created.id);
+
+    expect(created.modelSelection?.baseURL).toBe("https://api.x.ai/v1");
+    expect(created.modelSelection).not.toHaveProperty("apiKey");
+    expect(JSON.stringify(created)).not.toContain("xai-secret-value");
+  });
+
   test("creates a caller-owned remote AG-UI profile with the requested visibility", async () => {
     const owner = await createUser();
     const input: CreateAgentInput = {
