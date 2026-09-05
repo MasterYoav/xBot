@@ -47,10 +47,14 @@ jobs:
           XBOT_SPARKLE_PUBLIC_KEY: ${{ secrets.XBOT_SPARKLE_PUBLIC_KEY }}
         run: scripts/bundle-mac-app.sh
 
+      # An unsigned DMG, so a run with no signing secrets still produces something to download.
+      # When secrets exist the next step rebuilds it from the signed app — the app has to be signed
+      # and stapled *before* the disk image is made, or the image ships an unsigned app inside a
+      # signed wrapper, and Gatekeeper checks the app.
       - name: Create DMG
         run: scripts/create-dmg.sh
 
-      - name: Sign and notarize
+      - name: Sign, notarize, and rebuild the DMG
         if: env.MACOS_SIGNING_IDENTITY != ''
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}

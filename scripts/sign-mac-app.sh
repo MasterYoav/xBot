@@ -43,24 +43,44 @@ sign_app() {
 
 sign_app
 
-if [[ -f "${DMG}" ]]; then
-  codesign --force --timestamp --sign "${MACOS_SIGNING_IDENTITY}" "${DMG}"
-fi
-
 if [[ -z "${APPLE_ID:-}" || -z "${APPLE_TEAM_ID:-}" || -z "${APPLE_APP_PASSWORD:-}" ]]; then
-  echo "Notarization credentials not set — signed locally only." >&2
+  echo "Notarization credentials not set — the app is signed but not notarized." >&2
+  # Still rebuild the DMG, so what ships contains the signed app rather than the unsigned one.
+  "${ROOT}/scripts/create-dmg.sh" >/dev/null
   exit 0
 fi
 
-if [[ -f "${DMG}" ]]; then
-  xcrun notarytool submit "${DMG}" --wait \
-    --apple-id "${APPLE_ID}" \
-    --team-id "${APPLE_TEAM_ID}" \
-    --password "${APPLE_APP_PASSWORD}"
-  xcrun stapler staple "${DMG}"
-fi
-
+# Notarize the app itself, via a zip, so the ticket can be stapled to the bundle.
+#
+# Stapling the DMG alone is not enough: the person drags the app out of it, and an unstapled app
+# fails to open on a machine that is offline at first launch — docs/11-packaging-and-updates.md.
+# A ticket only exists once the thing has been notarized, so the app is notarized before the DMG
+# is built rather than after.
+ZIP="$(mktemp -d)/XBot.zip"
+ditto -c -k --keepParent "${APP}" "${ZIP}"
+xcrun notarytool submit "${ZIP}" --wait \
+  --apple-id "${APPLE_ID}" \
+  --team-id "${APPLE_TEAM_ID}" \
+  --password "${APPLE_APP_PASSWORD}"
 xcrun stapler staple "${APP}"
 xcrun stapler validate "${APP}"
 
-echo "Signed and notarized ${APP}"
+# Only now is the DMG built, so it carries a signed and stapled app.
+#
+# It used to be created before any of this and never rebuilt, so the shipped disk image contained an
+# unsigned app while the signature went on the wrapper around it. Gatekeeper checks the app, so that
+# ships the exact dialog docs/11 says stops a non-technical person permanently.
+"${ROOT}/scripts/create-dmg.sh" >/dev/null
+
+codesign --force --timestamp --sign "${MACOS_SIGNING_IDENTITY}" "${DMG}"
+xcrun notarytool submit "${DMG}" --wait \
+  --apple-id "${APPLE_ID}" \
+  --team-id "${APPLE_TEAM_ID}" \
+  --password "${APPLE_APP_PASSWORD}"
+xcrun stapler staple "${DMG}"
+xcrun stapler validate "${DMG}"
+
+# What a clean machine will check. Failing here is the whole point of checking here.
+spctl --assess --type execute --verbose "${APP}"
+
+echo "Signed, notarized and stapled ${APP} and ${DMG}"
