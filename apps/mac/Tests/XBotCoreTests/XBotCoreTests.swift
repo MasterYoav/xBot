@@ -81,6 +81,65 @@ struct SendTests {
         #expect(state.activity.contains { $0.summary.contains("browser.navigate") })
     }
 
+    /**
+     Glancing at another agent does not throw away the reply you were waiting for.
+
+     `select` cancelled the in-flight turn, so switching agents mid-answer discarded it silently,
+     half-written bubble and all. Messages are keyed by channel now, so the turn keeps writing where
+     it started.
+     */
+    @Test func switchingAgentsDoesNotKillTheReply() async throws {
+        let state = state()
+        await state.load()
+        let first = try #require(state.selectedAgentID)
+        let second = try #require(state.agents.first { $0.id != first }?.id)
+
+        state.send("hello")
+        state.select(second)
+        try await settle(state)
+
+        // Back where the turn was: the answer is there and complete.
+        state.select(first)
+        try await settle(state)
+        let reply = try #require(state.messages.last)
+        #expect(reply.state == .complete)
+        #expect(!reply.text.isEmpty)
+    }
+
+    /// And the rail says so, which is the whole point of letting it finish out of sight.
+    @Test func aReplyThatLandsElsewhereMarksThatAgentUnread() async throws {
+        let state = state()
+        await state.load()
+        let first = try #require(state.selectedAgentID)
+        let second = try #require(state.agents.first { $0.id != first }?.id)
+
+        state.send("hello")
+        state.select(second)
+        try await settle(state)
+
+        #expect(state.unreadAgents.contains(first))
+
+        // Reading it clears it.
+        state.select(first)
+        #expect(!state.unreadAgents.contains(first))
+    }
+
+    /// The ring follows the work, not the selection — they were the same thing only while a turn
+    /// could not outlive the agent that started it.
+    @Test func theWorkingRingStaysOnTheAgentThatIsAnswering() async throws {
+        let state = state()
+        await state.load()
+        let first = try #require(state.selectedAgentID)
+        let second = try #require(state.agents.first { $0.id != first }?.id)
+
+        state.send("hello")
+        state.select(second)
+        #expect(state.workingAgentID == first)
+
+        try await settle(state)
+        #expect(state.workingAgentID == nil)
+    }
+
     /// The arguments turn a bare tool name into what it actually did.
     ///
     /// `TOOL_CALL_START` names the tool and nothing else, so a row read "browser.navigate" with no

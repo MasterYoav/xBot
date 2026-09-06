@@ -26,7 +26,24 @@ public final class AppState {
 
     public private(set) var agents: [Agent] = []
     public private(set) var channels: [Channel] = []
-    public private(set) var messages: [Message] = []
+    /// Every open conversation's messages, keyed by channel.
+    ///
+    /// Keyed rather than a single array because a turn outlives the selection. Switching agents used
+    /// to cancel the reply that was streaming — the agent was mid-answer and it was silently thrown
+    /// away — and a single array is why: there was nowhere for a background turn to write.
+    private var messagesByChannel: [Channel.ID: [Message]] = [:]
+
+    /// The selected conversation. Unchanged for every reader; only the storage moved.
+    public var messages: [Message] {
+        guard let channel = selectedChannelID else { return [] }
+        return messagesByChannel[channel] ?? []
+    }
+
+    /// Agents whose reply arrived while you were looking at someone else.
+    ///
+    /// The rail's dot, and the reason a background turn is worth keeping: an answer that finished
+    /// somewhere you were not looking is exactly what a badge is for.
+    public private(set) var unreadAgents: Set<Agent.ID> = []
 
     /// Nil until the first load resolves, so the rail does not paint a selection that then moves.
     public var selectedAgentID: Agent.ID?
@@ -161,13 +178,19 @@ public final class AppState {
 
     private var screenTask: Task<Void, Never>?
 
+    /// The conversation a turn is streaming into, if any.
+    private var runningChannel: Channel.ID?
+    /// The agent answering it. Held separately because the selection may have moved on.
+    private var runningAgent: Agent.ID?
+
     /// True while a turn is in flight, which is what makes the screen poll fast.
-    private var isTurnRunning = false
+    private var isTurnRunning: Bool { runningChannel != nil }
 
     /// The agent currently answering, if any. The rail draws its working ring from this.
-    public var workingAgentID: Agent.ID? {
-        isTurnRunning ? selectedAgentID : nil
-    }
+    ///
+    /// The agent that is answering, not the one that is selected. Those were the same thing while a
+    /// turn could not outlive the selection; now the ring follows the work.
+    public var workingAgentID: Agent.ID? { runningAgent }
 
     /// Whether a reply is currently streaming. Engine updates must wait for this to finish.
     public var isTurnInFlight: Bool { isTurnRunning }
@@ -401,7 +424,7 @@ public final class AppState {
             localized:
                 "Hi. I'm your first agent.\n\nI have a browser and files of my own, and I'll ask before doing anything that matters.\n\nTry me with something like:\n• \"Find three well-reviewed ramen places near me\"\n• \"Open my calendar and summarise this week\""
         )
-        messages = [
+        messagesByChannel[selectedChannelID ?? ""] = [
             Message(
                 id: "onboarding-welcome",
                 author: .agent(agentID),
@@ -549,7 +572,8 @@ public final class AppState {
 
         agents = []
         channels = []
-        messages = []
+        messagesByChannel = [:]
+        unreadAgents = []
         engineHealth = nil
         engineBaseURL = nil
     }
@@ -598,10 +622,16 @@ public final class AppState {
     public func select(_ id: Agent.ID) {
         guard id != selectedAgentID else { return }
         selectedAgentID = id
+        unreadAgents.remove(id)
+        /*
+         * The turn is deliberately left running.
+         *
+         * It used to be cancelled here, so glancing at another agent threw away the reply the first
+         * one was part-way through writing — silently, with the half-finished bubble going with it.
+         * Messages are keyed by channel, so it keeps writing where it started and the rail shows a
+         * dot when it lands.
+         */
         // The selection does not wait for the conversation. It is applied now; messages catch up.
-        turn?.cancel()
-        turn = nil
-        messages = []
         activity = []
         grantedPlugins = nil
         pluginsPage = nil
@@ -764,11 +794,11 @@ public final class AppState {
     }
 
     private func loadMessages() async {
-        guard let channel = selectedChannelID else {
-            messages = []
-            return
-        }
-        messages = (try? await engine.messages(in: channel)) ?? []
+        guard let channel = selectedChannelID else { return }
+        // Never over a conversation that is still being written to. A background turn's own
+        // messages are newer than anything a reload would fetch.
+        guard runningChannel != channel else { return }
+        messagesByChannel[channel] = (try? await engine.messages(in: channel)) ?? []
     }
 
     /// Send, optimistically.
@@ -780,15 +810,26 @@ public final class AppState {
         guard !trimmed.isEmpty, composerBlock == nil, let channel = selectedChannelID else { return }
 
         let sent = Message(id: "local-\(UUID().uuidString)", author: .user, text: trimmed, state: .sending)
-        messages.append(sent)
+        messagesByChannel[channel, default: []].append(sent)
 
         let agentID = selectedAgentID ?? ""
         turn?.cancel()
-        isTurnRunning = true
+        runningChannel = channel
+        runningAgent = agentID
         retuneScreen()
         turn = Task { [engine] in
             defer {
-                isTurnRunning = false
+                runningChannel = nil
+                runningAgent = nil
+                /*
+                 * An answer that finished where nobody was looking.
+                 *
+                 * The turn no longer dies when the selection moves, so it can land on a channel
+                 * that is not on screen. Without the dot that reply is simply invisible until
+                 * somebody happens to click back, which is the failure docs/09 calls out: an agent
+                 * waiting on a person that nobody notices makes the whole product feel unreliable.
+                 */
+                if selectedChannelID != channel { unreadAgents.insert(agentID) }
                 retuneScreen()
             }
             var replyID: String?
@@ -797,45 +838,51 @@ public final class AppState {
                     switch event {
                     case .started(let id):
                         replyID = id
-                        mark(sent.id, as: .complete)
-                        messages.append(
+                        mark(sent.id, as: .complete, in: channel)
+                        messagesByChannel[channel, default: []].append(
                             Message(id: id, author: .agent(agentID), text: "", state: .streaming)
                         )
                     case .textDelta(let id, let text):
-                        append(text, to: id)
+                        append(text, to: id, in: channel)
                     case .toolCall(let id, let callId, let name, let target):
-                        recordTool(callId: callId, name: name, target: target, on: id)
+                        recordTool(callId: callId, name: name, target: target, on: id, in: channel)
                     case .toolArguments(let callId, let json):
                         applyToolArguments(callId: callId, json: json)
                     case .finished(let id):
-                        mark(id, as: .complete)
+                        mark(id, as: .complete, in: channel)
                     case .failed(let id, let reason):
-                        mark(id, as: .failed(reason: reason))
+                        mark(id, as: .failed(reason: reason), in: channel)
                     case .usage(let input, let output):
                         recordUsage(inputTokens: input, outputTokens: output, for: agentID)
                     }
                 }
             } catch {
-                mark(replyID ?? sent.id, as: .failed(reason: error.localizedDescription))
+                mark(replyID ?? sent.id, as: .failed(reason: error.localizedDescription), in: channel)
             }
         }
     }
 
-    private func append(_ text: String, to id: Message.ID) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[index].text += text
+    private func append(_ text: String, to id: Message.ID, in channel: Channel.ID) {
+        guard let index = messagesByChannel[channel]?.firstIndex(where: { $0.id == id }) else { return }
+        messagesByChannel[channel]?[index].text += text
     }
 
     /// Where a tool call landed, so its arguments can find it when they arrive separately.
-    private var toolCallSites: [String: (message: Message.ID, name: String)] = [:]
+    private var toolCallSites: [String: (message: Message.ID, name: String, channel: Channel.ID)] = [:]
 
-    private func recordTool(callId: String, name: String, target: String, on id: Message.ID) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        let callIndex = messages[index].toolCalls.count
-        messages[index].toolCalls.append(
+    private func recordTool(
+        callId: String,
+        name: String,
+        target: String,
+        on id: Message.ID,
+        in channel: Channel.ID
+    ) {
+        guard let index = messagesByChannel[channel]?.firstIndex(where: { $0.id == id }) else { return }
+        let callIndex = messagesByChannel[channel]?[index].toolCalls.count ?? 0
+        messagesByChannel[channel]?[index].toolCalls.append(
             Message.ToolCall(id: callId, name: name, target: target)
         )
-        toolCallSites[callId] = (message: id, name: name)
+        toolCallSites[callId] = (message: id, name: name, channel: channel)
 
         /*
          * The same call, in the Activity panel.
@@ -868,12 +915,13 @@ public final class AppState {
         guard let site = toolCallSites[callId] else { return }
 
         let target = ToolArguments.summary(toolName: site.name, argumentsJSON: json)
-        if let messageIndex = messages.firstIndex(where: { $0.id == site.message }),
-           let callIndex = messages[messageIndex].toolCalls.firstIndex(where: { $0.id == callId }),
-           messages[messageIndex].toolCalls[callIndex].target.isEmpty {
+        if let messageIndex = messagesByChannel[site.channel]?.firstIndex(where: { $0.id == site.message }),
+           let callIndex = messagesByChannel[site.channel]?[messageIndex].toolCalls
+               .firstIndex(where: { $0.id == callId }),
+           messagesByChannel[site.channel]?[messageIndex].toolCalls[callIndex].target.isEmpty == true {
             // Only when the stream did not already name one. A target the engine sent is better
             // than one inferred here.
-            messages[messageIndex].toolCalls[callIndex].target =
+            messagesByChannel[site.channel]?[messageIndex].toolCalls[callIndex].target =
                 target == site.name ? "" : String(target.dropFirst(site.name.count + 1))
         }
 
@@ -888,8 +936,8 @@ public final class AppState {
         )
     }
 
-    private func mark(_ id: Message.ID, as state: Message.State) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[index].state = state
+    private func mark(_ id: Message.ID, as state: Message.State, in channel: Channel.ID) {
+        guard let index = messagesByChannel[channel]?.firstIndex(where: { $0.id == id }) else { return }
+        messagesByChannel[channel]?[index].state = state
     }
 }

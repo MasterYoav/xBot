@@ -16,7 +16,7 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 
 | Surface | State |
 | --- | --- |
-| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring while a turn is in flight. Unread and attention badges specified, **not wired** |
+| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring, which follows the agent that is answering rather than the one selected. **Unread dot wired**: a turn now outlives the selection, so a reply can land out of sight and say so. Attention badge still **not wired** — see below |
 | Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up. Empty states distinguish engine-down, runtime-missing, failed-start, and no-agents |
 | Message bubbles | Built for text and compact tool-call rows. Images, handover and secret cards **not yet** |
 | The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
@@ -92,6 +92,15 @@ Fixed 68 pt. `Material.bar`. Vertical, top-aligned.
 The third is the important one and gets the strongest treatment, plus a dock badge and a
 notification. An agent waiting for a human that nobody notices is the failure mode that makes the
 whole product feel unreliable.
+
+**Two are wired; the third has nothing to read yet.** The ring follows `workingAgentID`, and the dot
+follows `unreadAgents` — a turn keeps running when the selection moves, so a reply can finish on a
+conversation nobody is looking at, which is precisely what the dot is for.
+
+The attention badge is not wired because **no event on the wire means "blocked on you"**. Handover,
+secret and decision cards are the message types that would carry it and they are not built either
+(see the table above). Wiring a badge to invented state would be worse than leaving it dark: it is
+the one badge whose whole job is to be trusted.
 
 ---
 

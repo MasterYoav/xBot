@@ -16,6 +16,10 @@ public struct Rail: View {
                 RailItem(
                     agent: agent,
                     isSelected: agent.id == state.selectedAgentID,
+                    // An answer that landed while you were looking elsewhere. The component drew
+                    // this dot already; nothing had ever passed it, because a turn could not
+                    // outlive the selection that started it.
+                    hasUnread: state.unreadAgents.contains(agent.id),
                     activity: agent.id == state.workingAgentID ? .working : .idle
                 ) {
                     // Selection is applied on the intent, not after the conversation loads. The
