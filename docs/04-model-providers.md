@@ -248,6 +248,13 @@ are tested rather than trusted: an unknown model has **no** price rather than a 
 running on this Mac is **not** priced at zero, and absent usage is absent rather than zero — a
 provider that reported nothing must not read as a turn that cost nothing.
 
+**The hop to the server is verified too.** The server reaches a remote agent with `HttpAgent` from
+`@ag-ui/client`, and driving that against the running agent yields
+`CUSTOM:xbot.usage={"inputTokens":864,"outputTokens":10}` in order, between `TEXT_MESSAGE_END` and
+`RUN_FINISHED`. So the event survives the client the server actually uses. What remains unproven is
+only CopilotKit's runtime re-serialising it to the app, which needs Intelligence credentials to
+exercise.
+
 ## Testing
 
 - **Unit:** resolution order (agent → workspace default → error), key lookup, client caching, error
