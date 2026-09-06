@@ -51,6 +51,11 @@ Ordered by likelihood, not drama.
 
 ### Passing keys to the engine
 
+**The engine token is compared in constant time.** It is the whole boundary — behind it are the
+agents, their browser profiles, which hold real logins, and the credential vault — and anything
+running as this user can reach the loopback port. `!==` stops at the first byte that differs, which
+leaks the token to something patient enough to measure. `server/src/xbot/bearer-auth.ts`.
+
 **⚠️ The tension worth naming.** Upstream passes provider keys to the agent container as environment
 variables (`ANTHROPIC_API_KEY` and friends). Environment variables leak — into `/proc`, into child
 processes, into crash dumps. The container also runs a shell that a model controls.
