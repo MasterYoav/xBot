@@ -62,6 +62,37 @@ struct SendTests {
         #expect(!reply.text.contains("browser.navigate"))
     }
 
+    /**
+     A tool call reaches the Activity panel, not only the message bubble.
+
+     `recordTool` appended to the message's own tool-call rows and nowhere else, and the HTTP client
+     returns an empty list from `activity(for:)` — deliberately, because the panel is described as
+     held for the open conversation rather than fetched. So on a live engine the panel always read
+     "Nothing yet. Commands, files, and pages will show up here", promising content that nothing
+     could ever deliver. An empty state that cannot stop being empty is the dishonest kind.
+     */
+    @Test func aToolCallAlsoLandsInActivity() async throws {
+        let state = state()
+        await state.load()
+
+        state.send("browse the flights")
+        try await settle(state)
+
+        #expect(state.activity.contains { $0.summary.contains("browser.navigate") })
+    }
+
+    /// Newest first, which is the order the panel renders and the order a person reads.
+    @Test func activityIsNewestFirst() async throws {
+        let state = state()
+        await state.load()
+
+        state.send("browse the flights")
+        try await settle(state)
+
+        let times = state.activity.map(\.at)
+        #expect(times == times.sorted(by: >))
+    }
+
     @Test func aFailedTurnKeepsTheTextAndIsMarkedFailed() async throws {
         let state = state()
         await state.load()

@@ -10,6 +10,13 @@ public struct ActivityEntry: Identifiable, Hashable, Sendable {
         case fileRead(path: String)
         case fileWrite(path: String, bytes: Int)
         case navigate(url: String)
+        /// A tool the agent called, when the stream said which but not with what.
+        ///
+        /// `TOOL_CALL_START` carries the name; the arguments arrive separately as
+        /// `TOOL_CALL_ARGS`, keyed by tool-call id rather than by message. Rather than invent an
+        /// exit code or a URL to fit one of the cases above — a fabricated `command(exitCode: 0)`
+        /// would claim the call succeeded — the entry says what is actually known.
+        case tool(name: String)
     }
 
     public let id: String

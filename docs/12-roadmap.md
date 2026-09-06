@@ -216,7 +216,10 @@ digest from `manifests/engine-stable.json`.
 - Handover: take control, release control (client ready; needs a computer).
 - Agent creation and settings, including the model picker and **plugins reach / handoff grants**
   (creation is in; engine-side model routing waits on M2).
-- Activity panel (stub fixtures; live activity still empty on HTTP).
+- Activity panel — **fills from the stream.** Every tool call the agent makes becomes an entry, so
+  it works against a live engine and not only the stub. It used to reach the message bubble and
+  nowhere else, and `activity(for:)` returns an empty list on HTTP by design, so the panel promised
+  "commands, files, and pages will show up here" and nothing could deliver it.
 - Plugins admin webview + native grant toggles (partial — other admin surfaces still open).
 
 **Done when:** create an agent in the app, send a message, watch it browse, take control, hand it

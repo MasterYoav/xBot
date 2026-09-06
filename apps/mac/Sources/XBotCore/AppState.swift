@@ -826,8 +826,29 @@ public final class AppState {
 
     private func recordTool(name: String, target: String, on id: Message.ID) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+        let callIndex = messages[index].toolCalls.count
         messages[index].toolCalls.append(
-            Message.ToolCall(id: "\(id)-\(messages[index].toolCalls.count)", name: name, target: target)
+            Message.ToolCall(id: "\(id)-\(callIndex)", name: name, target: target)
+        )
+
+        /*
+         * The same call, in the Activity panel.
+         *
+         * It only ever reached the message bubble, and `HTTPEngineClient.activity(for:)` returns an
+         * empty list on purpose — the panel is held for the open conversation rather than fetched.
+         * So against a live engine it always read "Nothing yet. Commands, files, and pages will show
+         * up here", promising something nothing could deliver. An empty state that cannot stop being
+         * empty is the dishonest kind (invariant 7).
+         *
+         * Newest first, which is the order the panel renders and a person reads.
+         */
+        activity.insert(
+            ActivityEntry(
+                id: "activity-\(id)-\(callIndex)",
+                kind: .tool(name: name),
+                summary: target.isEmpty ? name : "\(name) \(target)"
+            ),
+            at: 0
         )
     }
 

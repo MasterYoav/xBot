@@ -62,6 +62,7 @@ struct ActivityRow: View {
         case .fileRead: "doc"
         case .fileWrite: "square.and.pencil"
         case .navigate: "safari"
+        case .tool: "wrench.and.screwdriver"
         }
     }
 

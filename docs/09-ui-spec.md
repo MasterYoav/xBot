@@ -186,6 +186,14 @@ trail** — server-side, survives restarts, and is what an investigation reads. 
 A saved file contributes its path and size, never its contents. An agent may be saving something it
 was told in confidence.
 
+**What is built.** Entries come from the turn's own stream — every `TOOL_CALL_START` becomes one —
+rather than from a fetch, which is what "held for the open conversation" means in practice. So a
+call carries the tool's name and, for now, an `ActivityEntry.Kind.tool` rather than a command's exit
+code or a page's URL: `TOOL_CALL_ARGS` arrives separately, keyed by tool-call id rather than by
+message, and inventing `command(exitCode: 0)` to fill the richer shape would claim a call succeeded
+when nothing said so. Pairing the arguments back to their call is what turns these into the command,
+file and page rows described above.
+
 ### Routines
 
 Recurring scheduled tasks. Empty state, from the reference:
