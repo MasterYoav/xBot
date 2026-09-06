@@ -108,6 +108,17 @@ public enum AGUIDecoder {
         case "TEXT_MESSAGE_END", "RUN_FINISHED":
             return .finished(messageId: messageId)
 
+        case "CUSTOM":
+            // The engine's own usage report. Any other CUSTOM event is somebody else's and is
+            // ignored, the same as an event type this app does not draw.
+            guard object["name"] as? String == "xbot.usage",
+                  let value = object["value"] as? [String: Any]
+            else { return nil }
+            return .usage(
+                inputTokens: value["inputTokens"] as? Int ?? 0,
+                outputTokens: value["outputTokens"] as? Int ?? 0
+            )
+
         case "RUN_ERROR":
             // The engine's own sentence, not one we invent. It is written for a person and it is
             // the only thing that will tell them what to do next.

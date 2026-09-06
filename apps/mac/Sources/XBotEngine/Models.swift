@@ -172,6 +172,11 @@ public enum TurnEvent: Sendable {
     case toolCall(messageId: String, name: String, target: String)
     case finished(messageId: String)
     case failed(messageId: String, reason: String)
+    /// What the turn cost, reported once by the engine before the run closes.
+    ///
+    /// Tokens only. The cost is estimated where it is displayed, from a local price table — see
+    /// `ModelPrices` — because only the app knows which model answered and what it charges.
+    case usage(inputTokens: Int, outputTokens: Int)
 }
 
 /// Why the composer is disabled, if it is.

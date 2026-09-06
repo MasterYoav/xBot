@@ -236,6 +236,18 @@ enforce. A number the user cannot verify and we cannot guarantee is worse than n
 
 For Ollama, usage shows tokens and no cost.
 
+**Built.** The agent reads `usage_metadata` off the model's reply and accumulates it across the
+turn — one turn is several model calls once the tool loop runs — then reports it once as a CUSTOM
+AG-UI event, `xbot.usage`, before the run closes. A CUSTOM event rather than a field on
+`RUN_FINISHED`, so a surface that does not know about usage ignores it rather than failing to parse
+the event that ends every run. Verified live against Anthropic: 864 in, 10 out on a one-word reply.
+
+The app accumulates per agent and prices it from `ModelPrices`, a local table matched on the model
+family prefix so a dated id like `claude-haiku-4-5-20251001` does not need its own row. Three rules
+are tested rather than trusted: an unknown model has **no** price rather than a free one, a model
+running on this Mac is **not** priced at zero, and absent usage is absent rather than zero — a
+provider that reported nothing must not read as a turn that cost nothing.
+
 ## Testing
 
 - **Unit:** resolution order (agent → workspace default → error), key lookup, client caching, error

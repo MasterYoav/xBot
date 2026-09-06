@@ -247,3 +247,74 @@ describe("a failure mid-stream", () => {
     expect(sent[0]).toMatchObject({ message: "could not build graph" });
   });
 });
+
+/**
+ * Token usage, read off the model's own reply and reported once per run.
+ *
+ * docs/04-model-providers.md is specific about what may be shown: token counts the APIs actually
+ * return, and a spend estimated from a local price table. Never a percentage of a quota — that
+ * implies a limit we do not know and cannot enforce, and a number a person cannot verify is worse
+ * than no number.
+ *
+ * Accumulated across the run rather than emitted per model call, because the tool loop means one
+ * turn can be several calls, and a person reading "this reply cost N tokens" means the whole turn.
+ */
+describe("token usage", () => {
+  const usage = (input: number, output: number) =>
+    ({
+      event: "on_chat_model_end",
+      data: {
+        output: {
+          usage_metadata: { input_tokens: input, output_tokens: output },
+        },
+      },
+    }) as unknown as RunStreamEvent;
+
+  test("reports what one model call used", async () => {
+    const sent = await collect([
+      { event: "on_chat_model_stream", data: { chunk: { content: "hi" } } },
+      usage(120, 34),
+    ]);
+    const custom = sent.find((event) => event.type === "CUSTOM");
+    expect(custom).toBeDefined();
+    expect(custom?.name).toBe("xbot.usage");
+    expect(custom?.value).toEqual({ inputTokens: 120, outputTokens: 34 });
+  });
+
+  test("adds up every call in a turn, because the tool loop makes several", async () => {
+    const sent = await collect([
+      { event: "on_chat_model_stream", data: { chunk: { content: "one" } } },
+      usage(100, 10),
+      { event: "on_chat_model_stream", data: { chunk: { content: "two" } } },
+      usage(50, 5),
+    ]);
+    const custom = sent.find((event) => event.type === "CUSTOM");
+    expect(custom?.value).toEqual({ inputTokens: 150, outputTokens: 15 });
+  });
+
+  test("says nothing when the provider reported nothing", async () => {
+    // Not zero. Zero is a measurement; absent is the honest answer when a provider does not
+    // report usage, and a Usage screen showing 0 tokens for a real turn would be a lie.
+    const sent = await collect([
+      { event: "on_chat_model_stream", data: { chunk: { content: "hi" } } },
+      {
+        event: "on_chat_model_end",
+        data: { output: {} },
+      } as unknown as RunStreamEvent,
+    ]);
+    expect(sent.find((event) => event.type === "CUSTOM")).toBeUndefined();
+  });
+
+  test("arrives before the run is finished, so a reader has it in the same stream", async () => {
+    const sent = await collect([
+      { event: "on_chat_model_stream", data: { chunk: { content: "hi" } } },
+      usage(1, 2),
+    ]);
+    const usageIndex = sent.findIndex((event) => event.type === "CUSTOM");
+    const finishedIndex = sent.findIndex(
+      (event) => event.type === "RUN_FINISHED",
+    );
+    expect(usageIndex).toBeGreaterThan(-1);
+    expect(usageIndex).toBeLessThan(finishedIndex);
+  });
+});

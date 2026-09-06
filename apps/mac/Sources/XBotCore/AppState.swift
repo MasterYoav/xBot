@@ -379,6 +379,19 @@ public final class AppState {
         }
     }
 
+    /// Tokens each agent has used since the app started, keyed by agent.
+    ///
+    /// In memory, not persisted. The engine's audit trail is the durable record; this is the
+    /// "what has this agent cost me today" number, and inventing a lifetime total the app cannot
+    /// reconcile with the vendor's bill would be worse than showing a session.
+    public private(set) var usageByAgent: [Agent.ID: AgentUsage] = [:]
+
+    private func recordUsage(inputTokens: Int, outputTokens: Int, for agent: Agent.ID) {
+        var usage = usageByAgent[agent] ?? AgentUsage()
+        usage.add(inputTokens: inputTokens, outputTokens: outputTokens)
+        usageByAgent[agent] = usage
+    }
+
     public func dismissModelBanner() {
         modelBannerDismissed = true
     }
@@ -796,6 +809,8 @@ public final class AppState {
                         mark(id, as: .complete)
                     case .failed(let id, let reason):
                         mark(id, as: .failed(reason: reason))
+                    case .usage(let input, let output):
+                        recordUsage(inputTokens: input, outputTokens: output, for: agentID)
                     }
                 }
             } catch {

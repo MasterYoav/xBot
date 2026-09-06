@@ -79,6 +79,17 @@ export async function streamRun(
   let sentVisibleText = false;
   let sentToolCall = false;
 
+  /*
+   * What this turn cost, added up across the run.
+   *
+   * One turn is several model calls once the tool loop is running, and a person reading "this reply
+   * used N tokens" means the whole turn rather than the last call in it. Undefined until a provider
+   * actually reports something: absent and zero are different answers, and a Usage screen showing 0
+   * tokens for a real turn would be a lie about a number nobody can check.
+   */
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
+
   try {
     const events = await makeEvents();
 
@@ -122,6 +133,11 @@ export async function streamRun(
 
       if (event.event === "on_chat_model_end") {
         const output = event.data?.output as AIMessage | undefined;
+        const usage = output?.usage_metadata;
+        if (usage) {
+          inputTokens = (inputTokens ?? 0) + (usage.input_tokens ?? 0);
+          outputTokens = (outputTokens ?? 0) + (usage.output_tokens ?? 0);
+        }
         if (output) {
           for (const call of output.tool_calls ?? []) {
             pending.set(call.id ?? call.name, {
@@ -215,6 +231,25 @@ export async function streamRun(
         delta: EMPTY_REPLY_FALLBACK,
       } as BaseEvent);
       send({ type: "TEXT_MESSAGE_END", messageId } as BaseEvent);
+    }
+
+    /*
+     * What the turn cost, before the run closes so a reader has it in the same stream.
+     *
+     * A CUSTOM event rather than a field on RUN_FINISHED: AG-UI's finish event has a fixed shape,
+     * and a surface that does not know about usage should be able to ignore this entirely rather
+     * than fail to parse the event that ends every run.
+     *
+     * Tokens only. docs/04-model-providers.md: a cost is estimated from a local price table by
+     * whoever displays it, and a percentage of quota is never shown at all — we do not know the
+     * person's limit and cannot enforce it, and a number they cannot verify is worse than none.
+     */
+    if (inputTokens !== undefined || outputTokens !== undefined) {
+      send({
+        type: "CUSTOM",
+        name: "xbot.usage",
+        value: { inputTokens, outputTokens },
+      } as unknown as BaseEvent);
     }
 
     send({
