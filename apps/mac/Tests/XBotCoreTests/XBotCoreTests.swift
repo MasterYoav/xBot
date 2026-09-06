@@ -81,6 +81,23 @@ struct SendTests {
         #expect(state.activity.contains { $0.summary.contains("browser.navigate") })
     }
 
+    /// The arguments turn a bare tool name into what it actually did.
+    ///
+    /// `TOOL_CALL_START` names the tool and nothing else, so a row read "browser.navigate" with no
+    /// page. The arguments arrive as their own event keyed by tool-call id, and pairing them is
+    /// what makes the panel show the command, file and page rows docs/09 describes.
+    @Test func toolArgumentsUpgradeTheActivityRow() async throws {
+        let state = state()
+        await state.load()
+
+        state.send("browse the flights")
+        try await settle(state)
+
+        let entry = try #require(state.activity.first { $0.summary.contains("browser.navigate") })
+        #expect(entry.kind == .navigate(url: "https://airline.example/flights"))
+        #expect(entry.summary.contains("https://airline.example/flights"))
+    }
+
     /// Newest first, which is the order the panel renders and the order a person reads.
     @Test func activityIsNewestFirst() async throws {
         let state = state()

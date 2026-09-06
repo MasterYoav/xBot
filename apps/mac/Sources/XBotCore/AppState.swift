@@ -803,8 +803,10 @@ public final class AppState {
                         )
                     case .textDelta(let id, let text):
                         append(text, to: id)
-                    case .toolCall(let id, let name, let target):
-                        recordTool(name: name, target: target, on: id)
+                    case .toolCall(let id, let callId, let name, let target):
+                        recordTool(callId: callId, name: name, target: target, on: id)
+                    case .toolArguments(let callId, let json):
+                        applyToolArguments(callId: callId, json: json)
                     case .finished(let id):
                         mark(id, as: .complete)
                     case .failed(let id, let reason):
@@ -824,12 +826,16 @@ public final class AppState {
         messages[index].text += text
     }
 
-    private func recordTool(name: String, target: String, on id: Message.ID) {
+    /// Where a tool call landed, so its arguments can find it when they arrive separately.
+    private var toolCallSites: [String: (message: Message.ID, name: String)] = [:]
+
+    private func recordTool(callId: String, name: String, target: String, on id: Message.ID) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         let callIndex = messages[index].toolCalls.count
         messages[index].toolCalls.append(
-            Message.ToolCall(id: "\(id)-\(callIndex)", name: name, target: target)
+            Message.ToolCall(id: callId, name: name, target: target)
         )
+        toolCallSites[callId] = (message: id, name: name)
 
         /*
          * The same call, in the Activity panel.
@@ -844,11 +850,41 @@ public final class AppState {
          */
         activity.insert(
             ActivityEntry(
-                id: "activity-\(id)-\(callIndex)",
+                id: callId,
                 kind: .tool(name: name),
                 summary: target.isEmpty ? name : "\(name) \(target)"
             ),
             at: 0
+        )
+    }
+
+    /// Fill in what the call was actually for, once its arguments arrive.
+    ///
+    /// AG-UI announces a call and sends its arguments as two events, keyed by tool-call id rather
+    /// than by message, so only a reader that saw the start can pair them. Until this ran, an
+    /// Activity row could say "computer_navigate" and nothing about where — see `ToolArguments` for
+    /// what the arguments are allowed to turn into, and what they are not.
+    private func applyToolArguments(callId: String, json: String) {
+        guard let site = toolCallSites[callId] else { return }
+
+        let target = ToolArguments.summary(toolName: site.name, argumentsJSON: json)
+        if let messageIndex = messages.firstIndex(where: { $0.id == site.message }),
+           let callIndex = messages[messageIndex].toolCalls.firstIndex(where: { $0.id == callId }),
+           messages[messageIndex].toolCalls[callIndex].target.isEmpty {
+            // Only when the stream did not already name one. A target the engine sent is better
+            // than one inferred here.
+            messages[messageIndex].toolCalls[callIndex].target =
+                target == site.name ? "" : String(target.dropFirst(site.name.count + 1))
+        }
+
+        guard let entryIndex = activity.firstIndex(where: { $0.id == callId }) else { return }
+        let existing = activity[entryIndex]
+        activity[entryIndex] = ActivityEntry(
+            id: existing.id,
+            kind: ToolArguments.kind(toolName: site.name, argumentsJSON: json),
+            summary: target,
+            detail: existing.detail,
+            at: existing.at
         )
     }
 

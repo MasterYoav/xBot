@@ -169,7 +169,12 @@ public struct Message: Identifiable, Hashable, Sendable {
 public enum TurnEvent: Sendable {
     case started(messageId: String)
     case textDelta(messageId: String, text: String)
-    case toolCall(messageId: String, name: String, target: String)
+    case toolCall(messageId: String, callId: String, name: String, target: String)
+    /// The arguments for a call already announced, which arrive as their own event.
+    ///
+    /// Separate because AG-UI sends them separately, keyed by `toolCallId` rather than by message:
+    /// only the reader that has seen the start can say which call these belong to.
+    case toolArguments(callId: String, json: String)
     case finished(messageId: String)
     case failed(messageId: String, reason: String)
     /// What the turn cost, reported once by the engine before the run closes.

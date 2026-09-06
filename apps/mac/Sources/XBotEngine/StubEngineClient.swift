@@ -423,7 +423,15 @@ public actor StubEngineClient: EngineClient {
         }
 
         if text.lowercased().contains("browse") || text.lowercased().contains("check") {
-            continuation.yield(.toolCall(messageId: id, name: "browser.navigate", target: "flights"))
+            // Start then arguments, in the order a real engine sends them — so the pairing the app
+            // does is exercised by the stub rather than only against a live model.
+            let callId = "\(id)-call-0"
+            continuation.yield(
+                .toolCall(messageId: id, callId: callId, name: "browser.navigate", target: "flights")
+            )
+            continuation.yield(
+                .toolArguments(callId: callId, json: #"{"url":"https://airline.example/flights"}"#)
+            )
         }
 
         let reply = Self.reply(to: text)

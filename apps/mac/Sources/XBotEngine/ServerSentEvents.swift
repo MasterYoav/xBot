@@ -103,7 +103,20 @@ public enum AGUIDecoder {
 
         case "TOOL_CALL_START":
             let name = object["toolCallName"] as? String ?? "tool"
-            return .toolCall(messageId: messageId, name: name, target: "")
+            return .toolCall(
+                messageId: messageId,
+                callId: object["toolCallId"] as? String ?? messageId,
+                name: name,
+                target: ""
+            )
+
+        case "TOOL_CALL_ARGS":
+            // The whole argument object arrives as one delta from this engine. Kept as text and
+            // read by `ToolArguments`, which decides what may be shown — never rendered raw.
+            guard let callId = object["toolCallId"] as? String,
+                  let delta = object["delta"] as? String, !delta.isEmpty
+            else { return nil }
+            return .toolArguments(callId: callId, json: delta)
 
         case "TEXT_MESSAGE_END", "RUN_FINISHED":
             return .finished(messageId: messageId)
