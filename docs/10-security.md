@@ -51,6 +51,12 @@ Ordered by likelihood, not drama.
 
 ### Passing keys to the engine
 
+**Diagnostics redact on three passes.** A maintained list of secret variable names, a heuristic on
+the name itself — anything containing KEY, TOKEN, SECRET or PASSWORD — and patterns matched on the
+value's shape. The middle one exists because a list is what goes stale: an upstream merge or a
+custom provider's own variable arrives under a name nobody added, and a gateway key that is only a
+random string matches none of the value shapes. It would have gone into a report in the clear.
+
 **The engine token is compared in constant time.** It is the whole boundary — behind it are the
 agents, their browser profiles, which hold real logins, and the credential vault — and anything
 running as this user can reach the loopback port. `!==` stops at the first byte that differs, which

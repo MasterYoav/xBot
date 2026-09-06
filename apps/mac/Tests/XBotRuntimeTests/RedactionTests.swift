@@ -121,3 +121,52 @@ struct RedactionTests {
         #expect(!rendered.contains("ck_live_9f8e7d6c5b4a39281706"))
     }
 }
+
+/**
+ * A variable this app has never heard of, whose value looks like nothing in particular.
+ *
+ * `secretKeys` is a list somebody maintains, and a list is exactly what goes stale: the next
+ * upstream merge, or a custom provider's own variable, arrives with a name nobody added. The value
+ * patterns catch the shapes we know — `sk-ant-…`, a JWT, a URL with credentials — but a gateway key
+ * that is just a random string matches none of them.
+ *
+ * So the *name* is a signal in its own right. Anything called KEY, TOKEN, SECRET or PASSWORD has
+ * its value dropped whether or not this app has heard of it, which is the same heuristic the text
+ * scrubber already applies to `NAME=value` lines.
+ */
+@Suite
+struct EnvironmentNameRedactionTests {
+    @Test func anUnlistedSecretIsDroppedOnItsNameAlone() {
+        let scrubbed = Redaction.scrub(environment: [
+            // Not in `secretKeys`, and the value matches no vendor shape.
+            "MY_GATEWAY_KEY": "hunter2plainstring",
+            "SOME_SERVICE_TOKEN": "abcdefgh",
+            "LEGACY_PASSWORD": "correct-horse",
+            "VAULT_SECRET": "opaque",
+        ])
+
+        #expect(scrubbed["MY_GATEWAY_KEY"] == Redaction.placeholder)
+        #expect(scrubbed["SOME_SERVICE_TOKEN"] == Redaction.placeholder)
+        #expect(scrubbed["LEGACY_PASSWORD"] == Redaction.placeholder)
+        #expect(scrubbed["VAULT_SECRET"] == Redaction.placeholder)
+    }
+
+    @Test func ordinarySettingsStillComeThrough() {
+        // The point of the report is knowing what was set. Redacting everything would be safe and
+        // useless, and a diagnostics file nobody can read is one nobody sends.
+        let scrubbed = Redaction.scrub(environment: [
+            "PORT": "49152",
+            "EMBEDDED_POSTGRES": "on",
+            "COMPUTER_MAX_BROWSERS": "2",
+            "TRUSTED_ORIGINS": "xbot://app",
+            // "monkey" contains no secret word; the substring match must be on the whole token.
+            "OPENBOT_SINGLE_USER": "true",
+        ])
+
+        #expect(scrubbed["PORT"] == "49152")
+        #expect(scrubbed["EMBEDDED_POSTGRES"] == "on")
+        #expect(scrubbed["COMPUTER_MAX_BROWSERS"] == "2")
+        #expect(scrubbed["TRUSTED_ORIGINS"] == "xbot://app")
+        #expect(scrubbed["OPENBOT_SINGLE_USER"] == "true")
+    }
+}

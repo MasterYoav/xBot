@@ -110,12 +110,30 @@ public enum Redaction {
     ///
     /// Keys are kept and values are dropped for anything named as a secret. Which variables were
     /// set is genuinely useful for debugging; what they were set to never is.
+    ///
+    /// Three passes, because each catches what the others miss. `EngineEnvironment.secretKeys` is
+    /// the list we maintain; the name heuristic catches what the list has not been told about; and
+    /// the value patterns catch a secret that arrived under a name suggesting nothing at all.
     public static func scrub(environment: [String: String]) -> [String: String] {
         environment.reduce(into: [:]) { result, pair in
-            result[pair.key] =
+            let named =
                 EngineEnvironment.secretKeys.contains(pair.key)
-                ? placeholder
-                : scrub(pair.value)
+                || namesASecret(pair.key)
+            result[pair.key] = named ? placeholder : scrub(pair.value)
         }
+    }
+
+    /// Whether a variable's name says its value is a secret.
+    ///
+    /// `secretKeys` is a list somebody maintains, and a list is what goes stale — the next upstream
+    /// merge, or a custom provider's own variable, arrives with a name nobody added. The value
+    /// patterns catch the shapes we know, but a gateway key that is only a random string matches
+    /// none of them, and it would have gone into a diagnostics report in the clear.
+    ///
+    /// The same four words the text scrubber already looks for in a `NAME=value` line. Applying
+    /// them to a dictionary key too costs nothing and needs no maintenance.
+    static func namesASecret(_ name: String) -> Bool {
+        let upper = name.uppercased()
+        return ["KEY", "TOKEN", "SECRET", "PASSWORD"].contains { upper.contains($0) }
     }
 }
