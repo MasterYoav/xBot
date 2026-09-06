@@ -20,7 +20,7 @@ and the ones marked ⚠️ have the widest error bars.
 | --- | --- | --- |
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
 | M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
-| M2 | Model router | **Built end to end, unproven against live vendors.** Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent, forwarded, and read back, Settings → Models, custom providers, **Ollama host-gateway routing**. **Not yet done:** native adapters beyond compatible mode, usage accounting, live smoke against two real vendors |
+| M2 | Model router | **Proven live against a real vendor** (see below). Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent, forwarded, and read back, Settings → Models, custom providers, **Ollama host-gateway routing**. **Not yet done:** the same run through `copilot.ts` rather than straight at the agent, a second real vendor, usage accounting |
 | M3 | Engine runs headless | **Done.** Image published to ghcr on every push to master; manifest pinned and fetched by the app at start |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
 | M5 | Connected | **Client done.** `scripts/verify-m5-handoff.sh` smoke check; model picker fallback from connected providers |
@@ -122,8 +122,37 @@ entirely, and the client sent a display name under the wrong key on a partial PA
 engine's PUT-shaped parser rejected with a 400 — so **every** agent edit failed while the app
 reported success.
 
-**Still open:** native Anthropic/OpenAI/Google adapters (compatible mode covers them for now),
-usage accounting, and the live two-vendor smoke that closes the milestone.
+### The live smoke, and what it actually showed
+
+Run against `agent-langgraph` with a real Anthropic key, one process, no restarts between requests:
+
+| Check | Result |
+| --- | --- |
+| No selection — deployment fallback | answered |
+| Selection naming a different model | answered |
+| Selection naming a **bogus** model | `RUN_ERROR` 404 from the vendor |
+| `openai-compatible` adapter, same process | answered |
+| Switched back to the native adapter | answered |
+| Custom provider with no base URL | "A custom provider needs the address of its endpoint." |
+| Unknown provider | "bedrock is not a provider this engine knows. Use one of: …" |
+
+**The third row is the one that proves it.** A bogus model in the selection reaching the vendor as a
+404 means the selection's model is what gets sent — if it were being ignored the run would have
+answered on `BOT_MODEL` and looked fine. That is precisely how this path failed three times already:
+parsed but dropped, sent under the wrong key, stored but never read back. Each looked identical from
+outside.
+
+**What it did not show.** The run went straight at the agent's `/ag-ui`, so `copilot.ts` forwarding
+`xbotModel` off the stored agent record is still only unit-tested. And one vendor key exists on this
+machine, so "two agents on different providers" was met as two *adapters* — the native Anthropic one
+and `openai-compatible` — rather than two vendors.
+
+An end-to-end conversation through the server needs Intelligence credentials:
+`runtimeCapabilities()` takes all four `INTELLIGENCE_*` variables or none, and none selects
+`LocalIntelligence`, which is a spike that throws (ADR-0007).
+
+**Still open:** native OpenAI/Google adapters (compatible mode covers them for now), usage
+accounting, and the two gaps above.
 
 ---
 
