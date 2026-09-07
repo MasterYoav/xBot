@@ -757,3 +757,33 @@ func isolatedDumpURL() -> URL {
         .appendingPathComponent("xbot-tests-\(UUID().uuidString)")
         .appendingPathComponent("dump.sql")
 }
+
+/// What a probe tells the person, which the settings pane used to decide for itself and get wrong.
+@Suite
+struct ProbeSentenceTests {
+    /**
+     The bug this exists to prevent.
+
+     The settings pane matched on `RuntimeState.notDetected` and ignored the `ProbeResult` inside
+     it, so a Mac with a container runtime installed but asleep read "No container runtime — xBot
+     needs one" — while the composer in the same window said "the engine isn't running". Two
+     surfaces contradicting each other, and the wrong one sending somebody off to install software
+     they already had.
+     */
+    @Test func anAsleepRuntimeIsNotAMissingOne() {
+        #expect(ProbeResult.installedNotRunning.sentence != ProbeResult.absent.sentence)
+        #expect(!ProbeResult.installedNotRunning.sentence.contains("No container runtime"))
+    }
+
+    /// Red is for a wall. A runtime one press from waking is not one, and alarming somebody about
+    /// it makes the press look risky.
+    @Test func onlyAGenuinelyMissingRuntimeBlocks() {
+        #expect(ProbeResult.absent.isBlocking)
+        #expect(!ProbeResult.installedNotRunning.isBlocking)
+        #expect(!ProbeResult.ready(version: "27.0").isBlocking)
+    }
+
+    @Test func aReadyRuntimeNamesItsVersion() {
+        #expect(ProbeResult.ready(version: "27.0").sentence.contains("27.0"))
+    }
+}

@@ -99,8 +99,10 @@ public struct GeneralSettingsView: View {
         case .starting(let stage): stage.sentence
         case .pulling: String(localized: "Downloading the engine")
         case .failed(let error): error.sentence
-        case .notDetected:
-            String(localized: "No container runtime — xBot needs one to run your agents")
+        case .notDetected(let probe):
+            // The probe, not just the case. Ignoring it is what told somebody with a runtime
+            // installed and asleep that they had none.
+            probe.sentence
         case .none:
             // No runtime at all: a stub build, where there is nothing to report and saying
             // "stopped" would be a guess about something that does not exist.
@@ -112,7 +114,10 @@ public struct GeneralSettingsView: View {
         switch state.runtimeState {
         case .running: Palette.stateRunning
         case .degraded, .pulling, .starting: Palette.stateReconnecting
-        case .failed, .notDetected: Palette.stateFailed
+        case .failed: Palette.stateFailed
+        // Red only when it is genuinely a wall. A runtime that is merely asleep is one press away,
+        // and alarming somebody about it makes the press look risky.
+        case .notDetected(let probe): probe.isBlocking ? Palette.stateFailed : Palette.stateReconnecting
         default: Palette.textSecondary
         }
     }

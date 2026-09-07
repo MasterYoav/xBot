@@ -26,6 +26,33 @@ public enum ProbeResult: Sendable, Equatable {
     case installedNotRunning
     /// Nothing found.
     case absent
+
+    /// What to tell a person about this, and whether it is their problem to solve.
+    ///
+    /// It lives on the type rather than in the settings pane because the settings pane got it
+    /// wrong: it matched on `notDetected` and ignored the probe inside it, so a Mac with a runtime
+    /// installed and merely asleep was told it had none. The same window's composer said "the
+    /// engine isn't running" at the same moment, which is the honest version — two surfaces
+    /// contradicting each other, and the wrong one sending somebody off to install software they
+    /// already had.
+    public var sentence: String {
+        switch self {
+        case .ready(let version):
+            String(localized: "Ready (\(version))")
+        case .installedNotRunning:
+            // Recoverable without installing anything, and Start really does wake it — the
+            // controller's own start path asks the daemon to come up before giving up.
+            String(localized: "The container runtime isn't running — Start will wake it")
+        case .absent:
+            String(localized: "No container runtime — xBot needs one to run your agents")
+        }
+    }
+
+    /// Whether this is a wall or a step. A red status for "one click fixes this" is just alarming.
+    public var isBlocking: Bool {
+        if case .absent = self { return true }
+        return false
+    }
 }
 
 public struct ImageReference: Sendable, Hashable {
