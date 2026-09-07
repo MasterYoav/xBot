@@ -173,8 +173,17 @@ the user is at the bottom, and **releases the moment they scroll up** — with a
 affordance. Yanking someone back to the bottom mid-read is the single most-hated behaviour in chat
 UIs.
 
-**Hover actions** appear on the bubble: `…` (more), forward, react. Instant on hover, no delay.
-Visible in the reference on both incoming and outgoing bubbles.
+**Hover actions.** Forward and react are **not built and are not coming in v1**. There is nobody to
+forward a message to — one person, their own agents — and nothing anywhere stores a reaction, so both
+would be controls that exist to do nothing. The reference is a group-chat app; this is not one.
+
+What a person actually needs from a reply is its text, and that already works two ways: the whole
+bubble is selectable, and every fenced code block carries its own copy button, which is the case
+that matters because it is the one somebody would otherwise retype.
+
+A control revealed only on hover must still be in the view tree when it is not hovered — faded, not
+absent. There is no pointer to put over it with a keyboard or VoiceOver, so a control that only
+exists on hover cannot be reached at all. `CodeBlockView` and the routine rows both do it this way.
 
 ### The composer
 
