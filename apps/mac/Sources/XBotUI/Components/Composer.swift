@@ -42,16 +42,24 @@ public struct Composer: View {
                 }
             }
 
+            /*
+             * No attach button, and no microphone.
+             *
+             * Both were drawn from docs/09 and both did nothing when clicked, which is the failure
+             * this product's seventh invariant is about: a control that no-ops is worse than a
+             * control that is absent, because absent is honest and dead is a bug the person blames
+             * themselves for.
+             *
+             * Attach cannot work yet. The engine has no attachment path — `agents/message-text.ts`
+             * says so in as many words, "the day attachments ship" — so the button needs upstream to
+             * gain a feature first, and inventing one here is the re-engineering CLAUDE.md rules out.
+             *
+             * The microphone needs nothing, because macOS already does it. System dictation works in
+             * any standard text field, this one included, and it is the recogniser docs/09 asked for
+             * reached the way the person already knows. A button of ours would be a second, worse
+             * door to the same room, with a permission prompt in front of it.
+             */
             HStack(alignment: .bottom, spacing: Space.s) {
-                Button {
-                } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Palette.textSecondary)
-                }
-                .buttonStyle(XBotButtonStyle())
-                .accessibilityLabel(String(localized: "Attach"))
-
                 TextField(
                     String(localized: "Message \(agentName)"),
                     text: $text,
@@ -63,15 +71,6 @@ public struct Composer: View {
                 .focused($focused)
                 .disabled(block != nil)
                 .onSubmit(send)
-
-                Button {
-                } label: {
-                    Image(systemName: "mic")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Palette.textSecondary)
-                }
-                .buttonStyle(XBotButtonStyle())
-                .accessibilityLabel(String(localized: "Dictate"))
             }
             .padding(.horizontal, Space.m)
             .padding(.vertical, Space.s)

@@ -180,13 +180,20 @@ Visible in the reference on both incoming and outgoing bubbles.
 
 ```
   ┌──────────────────────────────────────────────────┐
-  │  ⊕   Message Orchestrator                    🎤  │
+  │  Message Orchestrator                            │
   └──────────────────────────────────────────────────┘
 ```
 
 - **Grows to five lines**, then scrolls. `Radius.xlarge`.
-- **`⊕`** — attach files, attach an image, insert a skill.
-- **`🎤`** — push-to-talk dictation, using the system speech recogniser. Filled circle when active.
+- **No `⊕` and no `🎤`.** Both were drawn and both did nothing, which the seventh invariant in
+  CLAUDE.md forbids — a dead control is worse than an absent one, because absent is honest.
+  - **Attach** needs the engine to gain attachments first; `agents/message-text.ts` says upstream
+    has none ("the day attachments ship"). Building the request here is re-engineering upstream
+    rather than surfacing it. It comes back when upstream does.
+  - **Dictation** needs nothing from us. macOS dictation works in any standard text field, this one
+    included — the system recogniser this spec asked for, reached the way the person already knows.
+    Our own button would be a second, worse door to the same room with a permission prompt in front
+    of it.
 - **`⏎` sends. `⇧⏎` newline.** Not configurable. Every chat app on this machine works this way.
 - **Disabled with a reason, inline.** "Connect a model to start" with a Settings link. Never a toast,
   never a silent no-op.
