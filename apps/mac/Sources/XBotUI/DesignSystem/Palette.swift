@@ -33,6 +33,15 @@ public enum Palette {
     public static let stateFailed = dynamic(light: 0xD04A52, dark: 0xF08A8C)
     public static let attention = dynamic(light: 0xF08A8C, dark: 0xF0A0A2)
 
+    // Code — syntax colour for a fenced block in a reply. Hue only; the weight stays regular,
+    // because a snippet in a bubble is a few lines and bolding half of them makes it louder than
+    // the sentence that introduced it.
+    public static let codeBackground = dynamic(light: 0xFFF8F3, dark: 0x140E12)
+    public static let codeKeyword = dynamic(light: 0x8E4A6E, dark: 0xE0A0C0)
+    public static let codeString = dynamic(light: 0x3D7A52, dark: 0x8CC8A0)
+    public static let codeComment = dynamic(light: 0x9A7080, dark: 0x8A7080)
+    public static let codeNumber = dynamic(light: 0xC06A2A, dark: 0xE0A060)
+
     // Aurora background — the four official brand colours.
     public static let auroraBase = dynamic(light: 0xFFF3EC, dark: 0x140C10)
     public static let auroraCoral = dynamic(light: 0xFFC9A3, dark: 0xA87858)

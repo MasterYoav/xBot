@@ -1,4 +1,5 @@
 import SwiftUI
+import XBotCore
 import XBotEngine
 
 /// One message. Incoming light and left; outgoing near-black and right; both capped so a bubble
@@ -36,19 +37,28 @@ public struct MessageBubble: View {
             }
 
             if !message.text.isEmpty {
-                Text(message.text)
-                    .bodyText()
-                    .textSelection(.enabled)
-                    .foregroundStyle(
-                        message.isFromUser ? Palette.bubbleOutgoingText : Palette.bubbleIncomingText
-                    )
-                    .padding(.horizontal, Space.m)
-                    .padding(.vertical, Space.s)
-                    .background(
-                        message.isFromUser ? Palette.bubbleOutgoing : Palette.bubbleIncoming,
-                        in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous)
-                    )
-                    .opacity(isSending ? 0.55 : 1)
+                VStack(alignment: .leading, spacing: Space.s) {
+                    ForEach(blocks) { block in
+                        switch block {
+                        case .prose(let text):
+                            Text(MessageMarkdown.inline(text))
+                                .bodyText()
+                                .textSelection(.enabled)
+                        case .code(let code, let language):
+                            CodeBlockView(code: code, language: language)
+                        }
+                    }
+                }
+                .foregroundStyle(
+                    message.isFromUser ? Palette.bubbleOutgoingText : Palette.bubbleIncomingText
+                )
+                .padding(.horizontal, Space.m)
+                .padding(.vertical, Space.s)
+                .background(
+                    message.isFromUser ? Palette.bubbleOutgoing : Palette.bubbleIncoming,
+                    in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous)
+                )
+                .opacity(isSending ? 0.55 : 1)
             }
 
             if case .failed(let reason) = message.state {
@@ -67,6 +77,18 @@ public struct MessageBubble: View {
             alignment: message.isFromUser ? .trailing : .leading
         )
         .motion(Motion.quick, value: message.state)
+    }
+
+    /*
+     * What the reply is made of.
+     *
+     * A person's own message is left exactly as typed — they can see what they wrote, and silently
+     * restyling it is the one place where rendering markdown is a lie about the text. A reply is
+     * rendered, because a model emits lists, bold runs and fences constantly and every one of them
+     * used to arrive as its own punctuation.
+     */
+    private var blocks: [MessageMarkdown.Block] {
+        message.isFromUser ? [.prose(message.text)] : MessageMarkdown.blocks(of: message.text)
     }
 
     private var isSending: Bool {
