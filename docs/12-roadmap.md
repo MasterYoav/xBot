@@ -20,7 +20,7 @@ and the ones marked ⚠️ have the widest error bars.
 | --- | --- | --- |
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
 | M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
-| M2 | Model router | **Proven live against a real vendor** (see below). Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent, forwarded, and read back, Settings → Models, custom providers, **Ollama host-gateway routing**. **Not yet done:** the same run through `copilot.ts` rather than straight at the agent, a second real vendor, usage accounting |
+| M2 | Model router | **Proven live against a real vendor** (see below). Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent, forwarded, and read back, Settings → Models, custom providers, **Ollama host-gateway routing**. **The `copilot.ts` hop is now covered by a test that drives the real client and asserts on the posted body** (`server/tests/copilot-model-selection.test.ts`). **Not yet done:** a second real vendor |
 | M3 | Engine runs headless | **Done.** Image published to ghcr on every push to master; manifest pinned and fetched by the app at start |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
 | M5 | Connected | **Client done.** `scripts/verify-m5-handoff.sh` smoke check; model picker fallback from connected providers |
