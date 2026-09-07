@@ -72,6 +72,7 @@ struct RoutineRow: View {
     let onDelete: () -> Void
 
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xxs) {
@@ -83,18 +84,28 @@ struct RoutineRow: View {
 
                 Spacer(minLength: Space.s)
 
-                if hovering {
-                    Button(role: .destructive, action: onDelete) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Palette.textSecondary)
-                    .accessibilityLabel(String(localized: "Delete routine"))
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(Palette.textSecondary)
+                .accessibilityLabel(String(localized: "Delete routine"))
+                /*
+                 * Faded rather than absent, which is not the same thing.
+                 *
+                 * A control that only exists on hover cannot be reached by a keyboard or by
+                 * VoiceOver at all — there is no pointer to put over it. Keeping it in the tree and
+                 * only changing its opacity leaves it focusable and readable, and stops the row
+                 * from resizing under the pointer as a bonus.
+                 */
+                .opacity(hovering || reduceMotion ? 1 : 0)
+                .motion(Motion.quick, value: hovering)
 
+                // Labelled with the instruction, not "On". Several of these sit in a column, and
+                // "On, switch" three times over says nothing about which routine is which.
                 Toggle(
-                    String(localized: "On"),
+                    routine.instruction,
                     isOn: Binding(get: { routine.enabled }, set: onToggle)
                 )
                 .toggleStyle(.switch)
