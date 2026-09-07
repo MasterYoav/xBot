@@ -14,6 +14,7 @@ permissions:
 # below test the environment.
 env:
   MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+  MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
   SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
 
 jobs:
@@ -53,6 +54,49 @@ jobs:
       # signed wrapper, and Gatekeeper checks the app.
       - name: Create DMG
         run: scripts/create-dmg.sh
+
+      # Naming an identity does not make one exist.
+      #
+      # `codesign --sign "Developer ID Application: …"` looks the identity up in the keychain search
+      # list, and a fresh runner's keychain holds no certificates at all. Without this step, setting
+      # the four Apple secrets produces "error: The specified item could not be found in the
+      # keychain" — which reads like a wrong identity string and is actually a missing certificate.
+      #
+      # A throwaway keychain rather than the login one: the runner is ephemeral, but the login
+      # keychain is what `security` mutates by default, and a build should not be reaching for it.
+      - name: Import the signing certificate
+        if: env.MACOS_CERTIFICATE_P12 != ''
+        env:
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="${RUNNER_TEMP}/signing.keychain-db"
+          # Random, and never leaves this job. It guards a keychain that is deleted with the runner.
+          password="$(openssl rand -base64 24)"
+
+          security create-keychain -p "${password}" "${keychain}"
+          # -lut 21600: no auto-lock on idle, and a six-hour timeout. A keychain that relocks
+          # partway through notarization fails the sign with the same unhelpful "item not found".
+          security set-keychain-settings -lut 21600 "${keychain}"
+          security unlock-keychain -p "${password}" "${keychain}"
+
+          printf '%s' "${MACOS_CERTIFICATE_P12}" | base64 --decode > "${RUNNER_TEMP}/cert.p12"
+          security import "${RUNNER_TEMP}/cert.p12" -k "${keychain}" \
+            -P "${MACOS_CERTIFICATE_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "${RUNNER_TEMP}/cert.p12"
+
+          # Without this, codesign wants to ask a human for permission to use the key — and on a
+          # runner there is nobody to ask, so it hangs until the job times out.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "${password}" "${keychain}" >/dev/null
+
+          # Added to the search list rather than replacing it, so the system keychains that hold
+          # Apple's intermediate certificates stay reachable — the signature needs to chain to them.
+          security list-keychains -d user -s "${keychain}" \
+            $(security list-keychains -d user | tr -d '"')
+
+          echo "Identities available to codesign:"
+          security find-identity -v -p codesigning "${keychain}"
 
       - name: Sign, notarize, and rebuild the DMG
         if: env.MACOS_SIGNING_IDENTITY != ''

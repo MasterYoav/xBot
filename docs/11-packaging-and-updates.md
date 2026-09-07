@@ -90,12 +90,20 @@ pushed digest.
 
 | Secret | Purpose |
 | --- | --- |
-| `MACOS_SIGNING_IDENTITY` | Developer ID Application identity |
+| `MACOS_SIGNING_IDENTITY` | Developer ID Application identity, e.g. `Developer ID Application: Name (TEAMID)` |
+| `MACOS_CERTIFICATE_P12` | The certificate and private key, base64 of a `.p12` export |
+| `MACOS_CERTIFICATE_PASSWORD` | The password set when exporting that `.p12` |
 | `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | Notarization |
 | `XBOT_APPCAST_URL` | Sparkle feed URL injected into the bundled app |
 | `XBOT_SPARKLE_PUBLIC_KEY` | EdDSA public key for update verification |
 | `SPARKLE_EDDSA_PRIVATE_KEY` | Signs update archives and the appcast |
 | `XBOT_RELEASE_DOWNLOAD_PREFIX` | Optional CDN prefix for enclosure URLs |
+
+**Naming an identity does not make one exist.** `MACOS_SIGNING_IDENTITY` is a string that `codesign`
+looks up in the keychain search list, and a fresh runner's keychain holds no certificates. The
+certificate itself has to be imported, which is what `MACOS_CERTIFICATE_P12` is for; without it the
+sign step fails with "The specified item could not be found in the keychain", which reads like a
+wrong identity string and is actually a missing certificate.
 
 ### Two ordering rules in CI that are not obvious
 
