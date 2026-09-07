@@ -201,6 +201,18 @@ public enum ComposerBlock: Hashable, Sendable {
     /// conversation. ADR-0007 keeps Intelligence for v1; without it `LocalIntelligence` throws past
     /// wiring, and the engine still starts and answers `/health` — so nothing else would say this.
     case noConversationStore
+    /**
+     A key is stored and the Keychain would not hand it over.
+
+     Separate from `noConversationStore`, which means nobody has connected one. Collapsing the two
+     tells somebody who already connected a key to go and connect it — they open Settings, see their
+     key sitting there, and have nowhere left to look. It is the same mistake the engine status made
+     about a container runtime that was installed and merely asleep.
+
+     The usual cause is a locked login Keychain or a denied prompt, and both are recoverable, so the
+     action is to try again rather than to go anywhere.
+     */
+    case conversationStoreUnreadable
     case humanHoldsControl
 
     public var sentence: String {
@@ -212,6 +224,8 @@ public enum ComposerBlock: Hashable, Sendable {
         case .noModelConnected: String(localized: "Connect a model to start")
         case .noConversationStore:
             String(localized: "Connect a CopilotKit key so xBot can keep your conversations")
+        case .conversationStoreUnreadable:
+            String(localized: "xBot couldn't read your CopilotKit key from the Keychain")
         case .humanHoldsControl: String(localized: "You're controlling the browser")
         }
     }
@@ -224,6 +238,7 @@ public enum ComposerBlock: Hashable, Sendable {
         case .engineFailed: String(localized: "Try again")
         case .noModelConnected: String(localized: "Open Settings")
         case .noConversationStore: String(localized: "Open Settings")
+        case .conversationStoreUnreadable: String(localized: "Try again")
         case .humanHoldsControl: String(localized: "Give it back")
         }
     }

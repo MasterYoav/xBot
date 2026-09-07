@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import XBotEngine
 import XBotRuntime
 @testable import XBotCore
 
@@ -70,5 +71,41 @@ struct IntelligenceCredentialTests {
     /// services — sharing one would mean rotating the loopback guard rotated the account key too.
     @Test func theCredentialsAreSeparate() throws {
         #expect(IntelligenceCredentialStore.apiURL != IntelligenceCredentialStore.gatewayWebSocketURL)
+    }
+}
+
+/// The three answers to "can this engine keep a conversation", which used to be two.
+@Suite
+struct ConversationStoreStateTests {
+    /**
+     Why this is not a Bool.
+
+     A missing key and an unreadable one need opposite sentences. The Bool made them one, so
+     somebody whose login Keychain was locked — or who dismissed the prompt — was told to connect a
+     CopilotKit key. They open Settings, see their key sitting right there, and have nowhere left to
+     look. It is the same mistake the engine status made about a container runtime that was
+     installed and merely asleep.
+     */
+    @Test func aMissingKeyAndAnUnreadableOneSayDifferentThings() {
+        #expect(
+            ComposerBlock.noConversationStore.sentence
+                != ComposerBlock.conversationStoreUnreadable.sentence
+        )
+        // The one thing it must never say to somebody who already has a key.
+        #expect(!ComposerBlock.conversationStoreUnreadable.sentence.contains("Connect a"))
+    }
+
+    /// There is nowhere to send them: the key is already in Settings. Asking again is the fix.
+    @Test func anUnreadableKeyOffersARetryRatherThanASettingsTrip() {
+        #expect(
+            ComposerBlock.conversationStoreUnreadable.actionTitle
+                != ComposerBlock.noConversationStore.actionTitle
+        )
+        #expect(!ComposerBlock.conversationStoreUnreadable.actionTitle.isEmpty)
+    }
+
+    @Test func everyStateIsDistinct() {
+        #expect(ConversationStore.ready != .notConnected)
+        #expect(ConversationStore.notConnected != .unreadable)
     }
 }

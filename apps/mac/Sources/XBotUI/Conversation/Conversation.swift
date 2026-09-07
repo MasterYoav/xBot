@@ -128,6 +128,9 @@ public struct Conversation: View {
             return String(localized: "Connect a model to start")
         case .noConversationStore:
             return String(localized: "xBot can't keep your conversations yet")
+        case .conversationStoreUnreadable:
+            // Not "connect a key". The key is there; the Keychain is the one saying no.
+            return String(localized: "xBot couldn't read your CopilotKit key")
         case .humanHoldsControl, nil:
             break
         }
@@ -151,6 +154,11 @@ public struct Conversation: View {
             // Says which part is missing and where it goes, rather than "something went wrong".
             return String(
                 localized: "Conversation history is stored by CopilotKit, the service xBot's engine is built on. Add a CopilotKit key in Settings → Models."
+            )
+        case .conversationStoreUnreadable:
+            // The two things that actually cause it, and the one that fixes both.
+            return String(
+                localized: "Your key is saved, but the Keychain wouldn't hand it over — usually a locked login Keychain or a dismissed prompt. Try again."
             )
         case .humanHoldsControl, nil:
             break

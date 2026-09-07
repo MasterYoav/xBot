@@ -48,7 +48,7 @@ struct RuntimeConnectedTests {
             providers: isolatedConnectionStore(),
             // These tests are about the runtime, not about whether this machine has a CopilotKit
             // key. Reading the real Keychain here is what made them depend on the machine.
-            hasConversationStore: { true }
+            conversationStore: { .ready }
         )
         return (state, runtime)
     }

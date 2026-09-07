@@ -49,20 +49,51 @@ public enum IntelligenceCredentialStore: Sendable {
         try KeychainSecretStore.remove(service: licenceService, account: "default")
     }
 
+    /// Whether the engine can be given Intelligence, and if not, why not.
+    ///
+    /// Three states rather than an optional, because "nobody connected a key" and "the Keychain
+    /// refused to hand one over" lead to opposite sentences. Collapsing them — which `settings()`
+    /// did, with `try?` — tells somebody who already connected a key to go and connect it.
+    public enum Availability: Sendable {
+        case connected(EngineEnvironment.Intelligence)
+        case notConnected
+        /// A read failed. Usually a locked login Keychain or a denied prompt; both recoverable.
+        case unreadable
+    }
+
+    public static func availability() -> Availability {
+        let key: String?
+        do {
+            key = try apiKey()
+        } catch {
+            return .unreadable
+        }
+        guard let key, !key.isEmpty else { return .notConnected }
+
+        // The licence token is generated on first read rather than pasted, so a failure here is
+        // never "nobody set one" — it is the Keychain saying no, or refusing to be written to.
+        guard let licence = try? licenseToken(), !licence.isEmpty else { return .unreadable }
+
+        return .connected(
+            EngineEnvironment.Intelligence(
+                apiURL: apiURL,
+                gatewayWsURL: gatewayWebSocketURL,
+                apiKey: key,
+                licenseToken: licence
+            )
+        )
+    }
+
     /// What the engine needs, or nil when no key has been connected.
     ///
     /// Nil rather than a half-filled block on purpose: `runtimeCapabilities()` throws on a partial
     /// set — deliberately, because somebody who set two of four meant to use Intelligence and got
     /// it wrong — so the choice here is all four or none.
     public static func settings() -> EngineEnvironment.Intelligence? {
-        guard let key = (try? apiKey()) ?? nil, !key.isEmpty,
-              let licence = try? licenseToken(), !licence.isEmpty
-        else { return nil }
-        return EngineEnvironment.Intelligence(
-            apiURL: apiURL,
-            gatewayWsURL: gatewayWebSocketURL,
-            apiKey: key,
-            licenseToken: licence
-        )
+        // Nil for both of the other two: the engine takes all four variables or none, and an
+        // unreadable key is not four. Which of the two it was is `availability()`'s job to say,
+        // and the composer's to put in front of somebody.
+        guard case .connected(let intelligence) = availability() else { return nil }
+        return intelligence
     }
 }

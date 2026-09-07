@@ -207,9 +207,9 @@ public final class AppState {
         engine: any EngineClient,
         providers: ProviderConnectionStore = .shared,
         appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared,
-        hasConversationStore: @escaping @Sendable () -> Bool = { true }
+        conversationStore: @escaping @Sendable () -> ConversationStore = { .ready }
     ) {
-        self.hasConversationStore = hasConversationStore
+        self.conversationStore = conversationStore
         self.engine = engine
         self.runtime = nil
         self.environmentFactory = nil
@@ -238,9 +238,9 @@ public final class AppState {
         providers: ProviderConnectionStore = .shared,
         appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared,
         /// Defaults to the real credential, because this initializer is the production one.
-        hasConversationStore: @escaping @Sendable () -> Bool = { EngineBootstrap.hasIntelligence }
+        conversationStore: @escaping @Sendable () -> ConversationStore = { EngineBootstrap.conversationStore }
     ) {
-        self.hasConversationStore = hasConversationStore
+        self.conversationStore = conversationStore
         self.engine = UnavailableEngineClient()
         self.runtime = runtime
         self.environmentFactory = environment
@@ -268,7 +268,7 @@ public final class AppState {
     /// Injected rather than read from the Keychain here, for the reason `ProviderConnectionStore`
     /// documents: a state object that reaches for a machine-wide store cannot be asserted without
     /// the machine's contents deciding the answer.
-    private let hasConversationStore: @Sendable () -> Bool
+    private let conversationStore: @Sendable () -> ConversationStore
 
     public var selectedAgent: Agent? {
         agents.first { $0.id == selectedAgentID }
@@ -394,18 +394,23 @@ public final class AppState {
             engineHealth = await runtime?.checkHealth()
             if providers.requiresModelForComposer() {
                 composerBlock = .noModelConnected
-            } else if !hasConversationStore() {
+            } else {
                 /*
-                 * The engine is up and cannot hold a conversation.
+                 * The engine is up and may not be able to hold a conversation.
                  *
                  * Without a CopilotKit key it boots into local mode, where the history client
                  * throws past wiring — but it still starts, still answers `/health`, and still
                  * lists agents, so every other signal in the app says everything is fine. Saying so
                  * here is invariant 7: never an empty state that implies all is well.
+                 *
+                 * Two ways to not have one, and they need opposite sentences: nobody connected a
+                 * key, or the Keychain would not hand over the key that is there.
                  */
-                composerBlock = .noConversationStore
-            } else {
-                composerBlock = nil
+                composerBlock = switch conversationStore() {
+                case .ready: nil
+                case .notConnected: .noConversationStore
+                case .unreadable: .conversationStoreUnreadable
+                }
             }
             await refreshFromEngine()
             await checkForEngineUpdateIfDue()
@@ -640,6 +645,10 @@ public final class AppState {
         case .noModelConnected, .noConversationStore:
             // Both are fixed in the same place, and settings are in this window now.
             isShowingSettings = true
+        case .conversationStoreUnreadable:
+            // Nothing to open — the key is already there. Ask the Keychain again, which is what a
+            // locked one or a dismissed prompt needs, and let the engine come back up with it.
+            startEngine()
         case .runtimeUnavailable, nil:
             // Runtime install is M6.
             break

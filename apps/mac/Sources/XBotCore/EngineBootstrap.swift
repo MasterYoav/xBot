@@ -58,6 +58,15 @@ public enum EngineBootstrap {
     /// to check rather than wait for a turn to fail.
     public static var hasIntelligence: Bool { IntelligenceCredentialStore.settings() != nil }
 
+    /// The same question, with the answer that distinguishes a missing key from an unreadable one.
+    public static var conversationStore: ConversationStore {
+        switch IntelligenceCredentialStore.availability() {
+        case .connected: .ready
+        case .notConnected: .notConnected
+        case .unreadable: .unreadable
+        }
+    }
+
     private static func loadKeyEncryptionKey() -> String {
         (try? KeyEncryptionKeyStore.key()) ?? ""
     }
@@ -65,4 +74,15 @@ public enum EngineBootstrap {
     private static func loadEngineToken() -> String {
         (try? EngineTokenStore.token()) ?? ""
     }
+}
+
+/// Whether the engine can keep a conversation, and if not, why not.
+///
+/// Its own type rather than a `Bool` because the two ways of not having a key need opposite
+/// sentences: nobody connected one, or the Keychain would not hand over the one that is there. A
+/// Bool told the second person to go and connect a key they could see in Settings.
+public enum ConversationStore: Sendable, Equatable {
+    case ready
+    case notConnected
+    case unreadable
 }
