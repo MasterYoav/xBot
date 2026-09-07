@@ -203,6 +203,94 @@ public actor HTTPEngineClient: EngineClient {
         let policy: ActionPolicy
     }
 
+
+    public func auditEvents(_ query: AuditQuery) async throws -> AuditPage {
+        var components = URLComponents(
+            url: URL(string: "/api/admin/audit-events", relativeTo: baseURL)!,
+            resolvingAgainstBaseURL: true
+        )
+        var items = [URLQueryItem(name: "limit", value: "\(query.limit)")]
+        if let eventType = query.eventType, !eventType.isEmpty {
+            items.append(URLQueryItem(name: "eventType", value: eventType))
+        }
+        if let targetId = query.targetId, !targetId.isEmpty {
+            items.append(URLQueryItem(name: "targetId", value: targetId))
+        }
+        if let cursor = query.cursor, !cursor.isEmpty {
+            items.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components?.queryItems = items
+        guard let url = components?.url else { return AuditPage(events: []) }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, _) = try await send(request)
+        return Self.auditPage(from: data)
+    }
+
+    /// Decode a page, dropping rows that cannot be read rather than failing the screen.
+    ///
+    /// A trail with one unreadable row is still worth showing: this is the screen somebody opens
+    /// when they are worried, and an error where the history should be is the least useful thing it
+    /// could do.
+    static func auditPage(from data: Data) -> AuditPage {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return AuditPage(events: [])
+        }
+        let rows = (object["events"] as? [[String: Any]]) ?? (object["items"] as? [[String: Any]]) ?? []
+        return AuditPage(
+            events: rows.compactMap(auditEvent(from:)),
+            nextCursor: object["nextCursor"] as? String ?? object["cursor"] as? String
+        )
+    }
+
+    static func auditEvent(from row: [String: Any]) -> AuditEvent? {
+        guard let id = row["id"] as? String, let eventType = row["eventType"] as? String else {
+            return nil
+        }
+        return AuditEvent(
+            id: id,
+            actorUserId: row["actorUserId"] as? String,
+            eventType: eventType,
+            targetType: row["targetType"] as? String ?? "",
+            targetId: row["targetId"] as? String,
+            createdAt: auditDate(row["createdAt"] as? String ?? "") ?? Date(),
+            summary: auditSummary(row["payload"] as? [String: Any])
+        )
+    }
+
+    /// The payload's own values, joined — never the raw JSON.
+    ///
+    /// Upstream records that a secret was supplied and its length rather than the secret, and keys
+    /// are dropped here so a payload that gains a field does not put it on screen beside somebody
+    /// without anybody deciding to.
+    static func auditSummary(_ payload: [String: Any]?) -> String {
+        guard let payload, !payload.isEmpty else { return "" }
+        return payload.keys.sorted()
+            .compactMap { key -> String? in
+                guard let value = payload[key] else { return nil }
+                if let text = value as? String { return "\(key): \(text)" }
+                if let flag = value as? Bool { return flag ? key : nil }
+                if let number = value as? NSNumber { return "\(key): \(number)" }
+                return nil
+            }
+            .joined(separator: " · ")
+    }
+
+    /// Built per call rather than shared. `ISO8601DateFormatter` is not `Sendable`, and a static
+    /// one is a mutable global under strict concurrency — the cost of making one is a rounding
+    /// error beside a network request.
+    static func auditDate(_ text: String) -> Date? {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        // Postgres timestamps arrive both ways depending on precision, and a row with a whole
+        // number of seconds must not fall back to "now" and sort itself to the top.
+        return withFraction.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+    }
+
     public func availableModels() async throws -> [ModelSelection] {
         // Comes from the router once ADR-0002 lands. Until then the engine has one provider from
         // its environment, and offering a picker over models it cannot actually reach would be a

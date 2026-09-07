@@ -66,6 +66,12 @@ public protocol EngineClient: Sendable {
     /// Which agents this one may ask via handoff.
     func handoffGrants(for agent: Agent.ID) async throws -> HandoffGrants
 
+    /// A page of the append-only audit trail, newest first.
+    ///
+    /// Native rather than a webview by ADR-0004, which makes this the one admin surface that gets a
+    /// screen of its own: it is what a worried person opens, and the worst place for a seam.
+    func auditEvents(_ query: AuditQuery) async throws -> AuditPage
+
     /// Deployment-wide browser action policy.
     func actionPolicy() async throws -> ActionPolicy
 

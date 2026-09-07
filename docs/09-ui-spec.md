@@ -26,7 +26,7 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 | Design system | Built — tokens, aurora field, frosted glass, Reduce Motion and Reduce Transparency inside tokens |
 | Onboarding | **Built (M6 in progress)** — five steps, Colima install-for-me, engine adoption, provider keys, handoff to main window. VM clean-machine validation still open |
 | Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General, Models, **Agents** (defaults), **Computer** (policy presets + boundaries admin), **Usage** (placeholder), Updates, Advanced |
-| Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). Other admin surfaces (audit, credentials, playground, …) **not embedded** |
+| Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). **The audit trail is native** (Settings → Audit), which is ADR-0004's one exception to the webview rule. Credentials, playground and the rest **not embedded** |
 
 ## The main window
 

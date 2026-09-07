@@ -237,6 +237,35 @@ public actor StubEngineClient: EngineClient {
         return agent
     }
 
+    public func auditEvents(_ query: AuditQuery) async throws -> AuditPage {
+        // Fixtures that look like a real trail: a decision, a refusal, and a grant change, because
+        // those are the three a worried person is actually looking for.
+        let rows = [
+            AuditEvent(
+                id: "ae3", actorUserId: nil, eventType: "computer.action_refused",
+                targetType: "bot", targetId: "orchestrator",
+                createdAt: Date(timeIntervalSinceNow: -180),
+                summary: "rule: password fields · page: bank.example"
+            ),
+            AuditEvent(
+                id: "ae2", actorUserId: "you", eventType: "bot.grant_added",
+                targetType: "bot", targetId: "orchestrator",
+                createdAt: Date(timeIntervalSinceNow: -900),
+                summary: "tool: google-drive/search_files"
+            ),
+            AuditEvent(
+                id: "ae1", actorUserId: nil, eventType: "computer.navigated",
+                targetType: "bot", targetId: "orchestrator",
+                createdAt: Date(timeIntervalSinceNow: -1_200),
+                summary: "url: https://airline.example/bookings"
+            ),
+        ]
+        let filtered = query.eventType.map { type in
+            rows.filter { $0.eventType.contains(type) }
+        } ?? rows
+        return AuditPage(events: filtered, nextCursor: nil)
+    }
+
     public func availableModels() async throws -> [ModelSelection] {
         [
             ModelSelection(provider: "Anthropic", providerID: "anthropic", model: "Claude Sonnet 4.5", capabilities: ["vision", "tools"]),

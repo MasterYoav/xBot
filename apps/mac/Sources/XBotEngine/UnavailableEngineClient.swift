@@ -25,6 +25,12 @@ public struct UnavailableEngineClient: EngineClient {
     public func updateAgent(_ id: Agent.ID, _ patch: AgentPatch) async throws -> Agent {
         throw EngineError.notRunning
     }
+    /// Throws like everything else here. An empty trail would read as "nothing has happened",
+    /// which is the one thing an audit screen must never say when it simply cannot ask.
+    public func auditEvents(_ query: AuditQuery) async throws -> AuditPage {
+        throw EngineError.notRunning
+    }
+
     public func availableModels() async throws -> [ModelSelection] { throw EngineError.notRunning }
     public func setControl(_ control: ScreenControl, for agent: Agent.ID) async throws {
         throw EngineError.notRunning

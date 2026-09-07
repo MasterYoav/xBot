@@ -257,7 +257,8 @@ it.**
   still open.**
 - Engine update flow including rollback, and **the migration-rollback decision made and implemented**.
 - Uninstall, complete.
-- Admin surfaces embedded (webview). **Plugins admin ships; audit, credentials, playground, etc. open.**
+- Admin surfaces embedded (webview). **Plugins admin ships; the audit trail is native rather than
+  embedded, per ADR-0004's exception; credentials, playground, etc. still open.**
 - Settings: General, Models, Agents, Computer, Advanced, Updates. **Built** — all seven panes, in the
   main window rather than a separate scene.
 - The honest v1 limitations stated in the UI: shared browser, shared workspace. **Done** — Settings →
@@ -319,10 +320,15 @@ The upstream compose topology with the supervisor: one container, one workspace,
 per agent. **This is the fix for the honest limitation v1 ships with**, and it is the highest-value
 thing after launch. gVisor where the host supports it.
 
-### v1.3 — Native audit viewer
+### v1.3 — The audit viewer, finished
 
-The product's central trust claim should not be a webview. Filter by agent, by decision, by date.
-Export.
+**The viewer itself shipped in v1** — ADR-0004 requires it before v1.0 ("a native audit viewer
+exists before v1.0 ships") and this roadmap had quietly moved it here, which is the kind of silent
+ADR reversal CLAUDE.md warns costs a week. v1 has Settings → Audit: newest first, filter by event
+type, paged.
+
+What is left for v1.3 is the rest of that entry: filter by agent and by decision rather than by
+event string, a date range, and export.
 
 ### v1.4 — Multi-agent channels
 

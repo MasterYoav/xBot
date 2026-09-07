@@ -445,6 +445,11 @@ public final class AppState {
         usageByAgent[agent] = usage
     }
 
+    /// A page of the audit trail, straight from the engine.
+    public func auditEvents(_ query: AuditQuery) async throws -> AuditPage {
+        try await engine.auditEvents(query)
+    }
+
     public func dismissModelBanner() {
         modelBannerDismissed = true
     }

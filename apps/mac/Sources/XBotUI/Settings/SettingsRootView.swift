@@ -100,6 +100,7 @@ public struct SettingsRootView: View {
         case agents
         case computer
         case usage
+        case audit
         case updates
         case advanced
 
@@ -112,6 +113,7 @@ public struct SettingsRootView: View {
             case .agents: String(localized: "Agents")
             case .computer: String(localized: "Computer")
             case .usage: String(localized: "Usage")
+            case .audit: String(localized: "Audit")
             case .updates: String(localized: "Updates")
             case .advanced: String(localized: "Advanced")
             }
@@ -124,6 +126,7 @@ public struct SettingsRootView: View {
             case .agents: "person.2"
             case .computer: "desktopcomputer"
             case .usage: "chart.bar"
+            case .audit: "checkmark.seal"
             case .updates: "arrow.triangle.2.circlepath"
             case .advanced: "slider.horizontal.3"
             }
@@ -225,6 +228,7 @@ public struct SettingsRootView: View {
         case .agents: AgentsSettingsView()
         case .computer: ComputerSettingsView()
         case .usage: UsageSettingsView()
+        case .audit: AuditSettingsView()
         case .updates: UpdatesSettingsView()
         case .advanced: AdvancedSettingsView()
         }
