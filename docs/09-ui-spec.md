@@ -16,7 +16,7 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 
 | Surface | State |
 | --- | --- |
-| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring, which follows the agent that is answering rather than the one selected. **Unread dot wired**: a turn now outlives the selection, so a reply can land out of sight and say so. Attention badge still **not wired** — see below |
+| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring, which follows the agent that is answering rather than the one selected. **All three badges wired**: unread when a reply lands out of sight, attention when an agent calls `ask_person` and stops |
 | Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up. Empty states distinguish engine-down, runtime-missing, failed-start, and no-agents |
 | Message bubbles | Built for text and compact tool-call rows. Images, handover and secret cards **not yet** |
 | The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
@@ -93,14 +93,26 @@ The third is the important one and gets the strongest treatment, plus a dock bad
 notification. An agent waiting for a human that nobody notices is the failure mode that makes the
 whole product feel unreliable.
 
-**Two are wired; the third has nothing to read yet.** The ring follows `workingAgentID`, and the dot
-follows `unreadAgents` — a turn keeps running when the selection moves, so a reply can finish on a
-conversation nobody is looking at, which is precisely what the dot is for.
+**All three are wired.** The ring follows `workingAgentID`, the dot follows `unreadAgents` — a turn
+keeps running when the selection moves, so a reply can finish where nobody is looking — and the
+attention badge follows `questionsForYou`.
 
-The attention badge is not wired because **no event on the wire means "blocked on you"**. Handover,
-secret and decision cards are the message types that would carry it and they are not built either
-(see the table above). Wiring a badge to invented state would be worse than leaving it dark: it is
-the one badge whose whole job is to be trusted.
+**What lights the attention badge** is the engine's own escalation tool,
+`server/src/agents/escalation.ts`. A Bot that needs judgement can guess, hand sideways to another
+Bot, or ask the person; `ask_person` is the third, and calling it *ends the Bot's turn*. So an
+outstanding call is exactly "blocked on you". The question comes from the call's arguments rather
+than its result — the result is a sentence written for the model ("Ask it in your own words now"),
+while the arguments carry what was actually asked. Answering in the composer clears it.
+
+Blocked outranks working in the rail. An agent that has stopped to ask something is the state a
+person most needs to see, so a working ring never covers it.
+
+The tool's *name* is the contract, and upstream's renderer matches on it too
+(`app/src/lib/copilot/escalation-tool.tsx`) — a rename there is a rename here.
+
+**Still not built:** the handover and secret *cards* in the transcript. `ask_person` currently reads
+as a compact tool row plus the agent's own prose, which is legible but is not the card with a secure
+field that a secret request needs.
 
 ---
 

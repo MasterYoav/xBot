@@ -422,6 +422,20 @@ public actor StubEngineClient: EngineClient {
             return
         }
 
+        // The engine's escalation tool, so the attention badge is reachable without a model.
+        if text.lowercased().contains("refund") || text.lowercased().contains("decide") {
+            let askId = "\(id)-ask-0"
+            continuation.yield(
+                .toolCall(messageId: id, callId: askId, name: "ask_person", target: "")
+            )
+            continuation.yield(
+                .toolArguments(
+                    callId: askId,
+                    json: #"{"question":"Should I cancel the Lisbon flight? It is non-refundable after Thursday."}"#
+                )
+            )
+        }
+
         if text.lowercased().contains("browse") || text.lowercased().contains("check") {
             // Start then arguments, in the order a real engine sends them — so the pairing the app
             // does is exercised by the stub rather than only against a live model.

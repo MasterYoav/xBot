@@ -45,6 +45,14 @@ public final class AppState {
     /// somewhere you were not looking is exactly what a badge is for.
     public private(set) var unreadAgents: Set<Agent.ID> = []
 
+    /// Agents that have stopped and put a question to you, by the question they asked.
+    ///
+    /// The engine's `ask_person` tool ends a Bot's turn by asking whoever stands behind the work
+    /// (`server/src/agents/escalation.ts`), so an outstanding call is exactly "blocked on you" —
+    /// the rail's attention badge, which docs/09 calls the important one: an agent waiting on a
+    /// person that nobody notices is what makes the product feel unreliable.
+    public private(set) var questionsForYou: [Agent.ID: String] = [:]
+
     /// Nil until the first load resolves, so the rail does not paint a selection that then moves.
     public var selectedAgentID: Agent.ID?
 
@@ -574,6 +582,7 @@ public final class AppState {
         channels = []
         messagesByChannel = [:]
         unreadAgents = []
+        questionsForYou = [:]
         engineHealth = nil
         engineBaseURL = nil
     }
@@ -641,6 +650,11 @@ public final class AppState {
             await loadMessages()
             await loadPanel()
         }
+    }
+
+    /// Which agent a channel belongs to. One agent per channel in v1; the first is the answer.
+    private func agentID(forChannel channel: Channel.ID) -> Agent.ID? {
+        channels.first { $0.id == channel }?.agentIds.first
     }
 
     private func loadPanel() async {
@@ -809,6 +823,10 @@ public final class AppState {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, composerBlock == nil, let channel = selectedChannelID else { return }
 
+        // Answering is what clears the question. The agent asked and you replied; nothing is
+        // waiting on you in this conversation any more.
+        if let agent = selectedAgentID { questionsForYou[agent] = nil }
+
         let sent = Message(id: "local-\(UUID().uuidString)", author: .user, text: trimmed, state: .sending)
         messagesByChannel[channel, default: []].append(sent)
 
@@ -923,6 +941,13 @@ public final class AppState {
             // than one inferred here.
             messagesByChannel[site.channel]?[messageIndex].toolCalls[callIndex].target =
                 target == site.name ? "" : String(target.dropFirst(site.name.count + 1))
+        }
+
+        if let question = ToolArguments.questionForPerson(
+            toolName: site.name,
+            argumentsJSON: json
+        ), let agent = agentID(forChannel: site.channel) {
+            questionsForYou[agent] = question
         }
 
         guard let entryIndex = activity.firstIndex(where: { $0.id == callId }) else { return }

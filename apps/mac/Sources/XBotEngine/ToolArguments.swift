@@ -12,6 +12,27 @@ import Foundation
 /// claim — an exit code says a command finished, a byte count says something was written — and
 /// asserting either without evidence is worse than showing the tool's name.
 public enum ToolArguments: Sendable {
+    /// The engine's tool for putting a question to a person.
+    ///
+    /// `server/src/agents/escalation.ts`: a Bot that needs judgement can guess, ask another Bot, or
+    /// ask the person, and this is the third. Calling it ends the Bot's turn — so an outstanding
+    /// call is precisely "blocked on you", which is what the rail's attention badge means.
+    ///
+    /// The name is the contract. Upstream's own renderer matches on it too
+    /// (`app/src/lib/copilot/escalation-tool.tsx`), so a rename there is a rename here.
+    public static let askPersonTool = "ask_person"
+
+    /// The question a person is being asked, if this call is that.
+    ///
+    /// Read from the arguments rather than from the tool's result: the result is a sentence written
+    /// for the model — "Ask it in your own words now" — while the arguments carry what was actually
+    /// asked.
+    public static func questionForPerson(toolName: String, argumentsJSON: String) -> String? {
+        guard toolName == askPersonTool else { return nil }
+        guard let arguments = object(from: argumentsJSON) else { return nil }
+        return string(arguments["question"]) ?? string(arguments["why"])
+    }
+
     /// Keys an agent's tools use for the thing being acted on, in the order they are preferred.
     private static let targetKeys = ["url", "path", "file", "command", "query"]
 

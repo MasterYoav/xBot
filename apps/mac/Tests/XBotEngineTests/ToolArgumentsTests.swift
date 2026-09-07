@@ -82,3 +82,33 @@ struct ToolSummaryTests {
         #expect(summary.contains("/workspace/a"))
     }
 }
+
+/// Recognising the engine's "ask a person" tool, which is what the attention badge reads.
+@Suite
+struct AskPersonTests {
+    @Test func theQuestionComesFromTheArguments() {
+        // Not from the result — that is a sentence written for the model ("Ask it in your own words
+        // now"), while the arguments carry what was actually asked.
+        #expect(
+            ToolArguments.questionForPerson(
+                toolName: "ask_person",
+                argumentsJSON: #"{"question":"Should I cancel the Lisbon flight?"}"#
+            ) == "Should I cancel the Lisbon flight?"
+        )
+    }
+
+    @Test func whyStandsInWhenNoQuestionWasGiven() {
+        #expect(
+            ToolArguments.questionForPerson(
+                toolName: "ask_person",
+                argumentsJSON: #"{"why":"the booking is non-refundable"}"#
+            ) == "the booking is non-refundable"
+        )
+    }
+
+    @Test func anyOtherToolIsNotAQuestion() {
+        #expect(ToolArguments.questionForPerson(toolName: "bash", argumentsJSON: #"{"question":"x"}"#) == nil)
+        #expect(ToolArguments.questionForPerson(toolName: "ask_person", argumentsJSON: "{}") == nil)
+        #expect(ToolArguments.questionForPerson(toolName: "ask_person", argumentsJSON: "junk") == nil)
+    }
+}

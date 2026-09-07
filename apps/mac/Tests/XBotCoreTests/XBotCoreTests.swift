@@ -140,6 +140,53 @@ struct SendTests {
         #expect(state.workingAgentID == nil)
     }
 
+    /**
+     An agent that stops to ask a person lights the attention badge.
+
+     `ask_person` ends the Bot's turn by putting the question to whoever stands behind the work, so
+     an outstanding call is exactly "blocked on you". docs/09 calls this the important badge: an
+     agent waiting on somebody that nobody notices is what makes the product feel unreliable. It was
+     dark until now because nothing on the wire had been recognised as meaning it.
+     */
+    @Test func askingAPersonBlocksOnYou() async throws {
+        let state = state()
+        await state.load()
+        let agent = try #require(state.selectedAgentID)
+
+        state.send("decide whether to cancel the refundable booking")
+        try await settle(state)
+
+        #expect(state.questionsForYou[agent]?.contains("Lisbon") == true)
+    }
+
+    /// Answering is what clears it. The agent asked and you replied.
+    @Test func answeringClearsTheQuestion() async throws {
+        let state = state()
+        await state.load()
+        let agent = try #require(state.selectedAgentID)
+
+        state.send("decide whether to cancel the refundable booking")
+        try await settle(state)
+        #expect(state.questionsForYou[agent] != nil)
+
+        state.send("yes, cancel it")
+        #expect(state.questionsForYou[agent] == nil)
+    }
+
+    /// It survives looking away — which is the point of a badge on the rail.
+    @Test func aQuestionSurvivesSwitchingAgents() async throws {
+        let state = state()
+        await state.load()
+        let first = try #require(state.selectedAgentID)
+        let second = try #require(state.agents.first { $0.id != first }?.id)
+
+        state.send("decide whether to cancel the refundable booking")
+        try await settle(state)
+        state.select(second)
+
+        #expect(state.questionsForYou[first] != nil)
+    }
+
     /// The arguments turn a bare tool name into what it actually did.
     ///
     /// `TOOL_CALL_START` names the tool and nothing else, so a row read "browser.navigate" with no

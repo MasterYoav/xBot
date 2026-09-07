@@ -1,5 +1,6 @@
 import SwiftUI
 import XBotCore
+import XBotEngine
 
 /// The 68pt vertical rail. Structural, so it takes the heaviest material.
 public struct Rail: View {
@@ -8,6 +9,16 @@ public struct Rail: View {
 
     public init(isPaletteOpen: Binding<Bool>) {
         self._isPaletteOpen = isPaletteOpen
+    }
+
+    /// Blocked on you outranks working, which outranks idle.
+    ///
+    /// An agent that has stopped to ask something is the state a person most needs to see, and
+    /// docs/09 gives it the strongest treatment for that reason. A working ring over it would hide
+    /// the one badge that is asking for attention.
+    private func railActivity(for agent: Agent) -> AgentAvatar.Activity {
+        if state.questionsForYou[agent.id] != nil { return .needsYou }
+        return agent.id == state.workingAgentID ? .working : .idle
     }
 
     public var body: some View {
@@ -20,7 +31,7 @@ public struct Rail: View {
                     // this dot already; nothing had ever passed it, because a turn could not
                     // outlive the selection that started it.
                     hasUnread: state.unreadAgents.contains(agent.id),
-                    activity: agent.id == state.workingAgentID ? .working : .idle
+                    activity: railActivity(for: agent)
                 ) {
                     // Selection is applied on the intent, not after the conversation loads. The
                     // fill must never wait on a request.
