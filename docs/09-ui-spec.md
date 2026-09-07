@@ -18,7 +18,7 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 | --- | --- |
 | The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring, which follows the agent that is answering rather than the one selected. **All three badges wired**: unread when a reply lands out of sight, attention when an agent calls `ask_person` and stops |
 | Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up. Empty states distinguish engine-down, runtime-missing, failed-start, and no-agents |
-| Message bubbles | Built for text and compact tool-call rows. Images, handover and secret cards **not yet** |
+| Message bubbles | Built — markdown, code blocks with highlighting and a copy button, compact tool-call rows. Images **not yet**. Handover and secret cards: see the note under *Content types* — the engine has no in-band request for either |
 | The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
 | The right panel | Built — Screen, Activity, Routines, Agent settings (model picker, **What it can reach**, Connection, Handoff grants) |
 | Command palette | Built — search, open, create. **`Tab` adds an agent to the current channel** (creates a multi-agent channel). Footer shows both verbs |
@@ -110,9 +110,9 @@ person most needs to see, so a working ring never covers it.
 The tool's *name* is the contract, and upstream's renderer matches on it too
 (`app/src/lib/copilot/escalation-tool.tsx`) — a rename there is a rename here.
 
-**Still not built:** the handover and secret *cards* in the transcript. `ask_person` currently reads
-as a compact tool row plus the agent's own prose, which is legible but is not the card with a secure
-field that a secret request needs.
+**On the cards this document used to promise here:** `ask_person` reads as a compact tool row plus
+the agent's own prose, and that is the whole of it — the engine has one escalation tool and it takes
+a question, not a credential. See *Content types* below for why the secret card is not coming.
 
 ---
 
@@ -146,10 +146,27 @@ Content types:
 | Text | Markdown. Code blocks with syntax highlighting and a copy button |
 | Image | Inline, tappable to a full-size window. Both directions — the reference shows the user attaching an image and the agent returning one |
 | Tool call | A compact inline row: what it did, its target, its result. Expandable |
-| Handover request | A card, not a bubble. Two buttons: Take control · Let it continue |
-| Secret request | A card with a secure field. **Never a normal message** |
+| Handover request | Not in the transcript. **Take control** lives on the Screen panel, next to the browser it hands over — which is where a person is looking when they decide to take it |
+| Secret request | **There is none, deliberately.** See below |
 | Generated UI | Sandboxed `WKWebView`, no same-origin access. Fixed height, expandable |
 | Error | Inline, with a retry action |
+
+**Why there is no secret card.** This document originally specified "a card with a secure field,
+never a normal message", and the instinct behind it is right: a secret typed into the composer goes
+into the transcript, and for v1 the transcript rests on CopilotKit Intelligence (ADR-0007). But the
+engine has no tool with which a Bot asks for one, and adding one would be re-engineering upstream
+rather than surfacing it — CLAUDE.md's first rule about the engine.
+
+It does not need one, because upstream already answers this better than a card would. The mechanism
+is the **browser takeover**: the person takes control and types the password into the real login
+form themselves. `server/src/computer/routes.ts` is explicit that this is the point — the takeover is
+the audited event, and what the person typed during it is deliberately unrecorded, "because the
+reason a takeover exists is to let them enter the thing nothing else should keep."
+
+A card would have been strictly worse: it puts the secret through our process, our transcript and our
+memory on the way to the same field. The takeover never lets it leave the browser. So the secure
+field stays where it already is — in the page — and the app's job is to make handing over easy,
+which is the button on the Screen panel.
 
 **Streaming.** Tokens append without re-laying-out the message. The scroll pins to the bottom while
 the user is at the bottom, and **releases the moment they scroll up** — with a "jump to latest"
