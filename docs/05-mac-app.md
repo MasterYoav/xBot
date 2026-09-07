@@ -27,11 +27,17 @@ XBotApp          @main, scenes, windows, app lifecycle (menu bar planned, not sh
 XBotUI       → XBotCore
 XBotCore     → XBotEngine, XBotRuntime
 XBotEngine   → (Foundation only)
-XBotRuntime  → (Foundation only)
+XBotRuntime  → Foundation, and AppKit for two system services (see below)
 ```
 
 **`XBotEngine` and `XBotRuntime` never import `XBotUI` or SwiftUI.** They are testable without a
 window. This is what lets the client develop against a stub API while the engine fork is in flight.
+
+`XBotRuntime` does import AppKit in exactly two files — `DiagnosticsClipboard` for `NSPasteboard`
+and `RuntimeLauncher` for `NSWorkspace`. Those are system services rather than a UI framework:
+neither needs a window, neither draws anything, and both stay testable headless. The rule is about
+views and SwiftUI, not about the letters A-p-p-K-i-t, and it is written down here so the next person
+who greps for it does not read a violation into it.
 
 ### XBotRuntime
 
