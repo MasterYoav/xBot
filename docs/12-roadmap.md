@@ -258,13 +258,42 @@ it.**
 - Engine update flow including rollback, and **the migration-rollback decision made and implemented**.
 - Uninstall, complete.
 - Admin surfaces embedded (webview). **Plugins admin ships; audit, credentials, playground, etc. open.**
-- Settings: General, Models, Agents, Computer, Advanced, Updates. **Skeleton only today** (General +
-  Advanced/Plugins).
-- The honest v1 limitations stated in the UI: shared browser, shared workspace.
+- Settings: General, Models, Agents, Computer, Advanced, Updates. **Built** — all seven panes, in the
+  main window rather than a separate scene.
+- The honest v1 limitations stated in the UI: shared browser, shared workspace. **Done** — Settings →
+  Computer, in the wording docs/10-security.md specifies.
 - Website with the download and the security explanation.
 
 **Done when:** someone who has never seen the project installs from the website and uses it, without
 help.
+
+### ⚠️ The launch blocker that is not a coding task
+
+**The app boots the engine into a mode where a conversation cannot work, and nothing tests that
+path.** This needs a decision before anything else in M7 matters.
+
+- `EngineBootstrap.environmentFactory()` passes no `intelligence`, so `EngineEnvironment.compose`
+  leaves all four `INTELLIGENCE_*` unset, so `runtimeCapabilities()` selects `mode: "local"`.
+- Local mode uses `LocalIntelligence`, which answers a handful of wiring-time methods and **throws
+  on everything else**. It is a spike, by its own first line.
+- Every engine test sets all four variables (`server/tests/support/environment.ts`), so the suite
+  runs in Intelligence mode and local mode is only asserted at the config level. A conversation has
+  never been driven through the mode the app actually ships.
+
+CLAUDE.md and ADR-0007 both say v1 sets all four and that onboarding discloses the transcript leaves
+the Mac. Neither is true in the code: nothing in `apps/mac/` mentions Intelligence, and the Welcome
+step says **"Everything stays here. No account, no cloud"** — which is the opposite of the
+disclosure, and false if the four variables are ever set.
+
+Two coherent versions of v1, and the repository is in neither:
+
+| | What it takes | What onboarding must say |
+| --- | --- | --- |
+| **A — ship on Intelligence** | `EngineBootstrap` sets the four variables; credentials shipped or entered | The transcript leaves the Mac. The Welcome copy must change: it is currently false under A |
+| **B — ship local** | M1 (`LocalHistoryProvider`, ADR-0001) built — currently deferred past v1 | Today's copy is already true |
+
+A is days of work and a change to the privacy claim. B is the deferred milestone. Choosing B by
+default is what has happened so far, without B being built.
 
 ---
 

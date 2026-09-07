@@ -14,6 +14,32 @@ public struct ComputerSettingsView: View {
 
     public var body: some View {
         Form {
+            /*
+             * The v1 limitation, said where a person is looking at what agents may do.
+             *
+             * The single-container shape has no supervisor, so no Docker socket, so every agent
+             * shares one Chromium profile and one workspace: agent A can read the cookies agent B
+             * used to sign into a bank. docs/10-security.md is blunt about the choice — "shipping
+             * this quietly would be the worst decision available; shipping it with a sentence is
+             * acceptable for an early version. Not shipping the sentence is not."
+             *
+             * The wording is the one that document specifies, not a paraphrase, and it is at the
+             * top rather than in a footer at the bottom because it is a thing to know before
+             * setting rules, not after.
+             */
+            Section {
+                Text(
+                    String(
+                        localized:
+                            "In this version, all your agents share one browser. An agent can see sites another agent has signed into. Give agents separate logins for anything sensitive."
+                    )
+                )
+                .foregroundStyle(Palette.textSecondary)
+            } header: {
+                Label(String(localized: "One browser, shared"), systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(Palette.stateReconnecting)
+            }
+
             if let problem = settings.problem {
                 Section {
                     Text(problem).foregroundStyle(Palette.stateFailed)
