@@ -27,6 +27,19 @@ public enum CustomProviderProblem: Sendable, Equatable {
     case urlMalformed
     /// A key would cross the network in clear text. See `insecureKeyOverPlainHTTP`.
     case insecureKeyOverPlainHTTP
+    /**
+     The address carries a credential in it — `https://user:secret@host/v1`.
+
+     Refused rather than accepted-and-redacted, because the address is stored in the preference
+     domain: a plist the person, and anything running as them, can open. CLAUDE.md's second
+     invariant is that keys live in the Keychain and "never in `UserDefaults`, never in a plist,
+     never in a file the user could open", and this type's own note says names and endpoints live in
+     preferences while keys never do. A `user:password@` URL is the hole in exactly that sentence.
+
+     There is somewhere better to put it, three fields away, so the message says where rather than
+     just no.
+     */
+    case urlCarriesCredentials
 }
 
 /// The custom providers this person has added.
@@ -93,6 +106,12 @@ public struct CustomProviderStore: Sendable {
               let host = url.host, !host.isEmpty,
               scheme == "http" || scheme == "https"
         else { return .urlMalformed }
+
+        // Before the transport check: a credential in the address is wrong over https too, so
+        // answering "use https" first would send somebody to fix the wrong half.
+        if url.user != nil || url.password != nil {
+            return .urlCarriesCredentials
+        }
 
         if hasKey, scheme == "http", !Self.isLoopback(host) {
             return .insecureKeyOverPlainHTTP

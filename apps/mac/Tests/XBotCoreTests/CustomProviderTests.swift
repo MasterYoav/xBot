@@ -122,3 +122,61 @@ struct CustomProviderValidationTests {
         )
     }
 }
+
+/// A credential hidden in the endpoint address.
+@Suite
+struct CustomProviderURLCredentialTests {
+    /**
+     Refused, not stored and redacted later.
+
+     A custom provider's address lives in the preference domain — a plist the person, and anything
+     running as them, can open. CLAUDE.md's second invariant is that keys live in the Keychain and
+     "never in `UserDefaults`, never in a plist, never in a file the user could open", and
+     `CustomProviderStore`'s own note says names and endpoints live in preferences while keys never
+     do. `https://user:secret@host` is the hole in exactly that sentence, and pasting one is an easy
+     thing to do — it is how several gateways document themselves.
+     */
+    @Test func anAddressCarryingACredentialIsRefused() {
+        for url in [
+            "https://user:secret@gateway.example.com/v1",
+            "https://token@gateway.example.com/v1",
+            "http://user:secret@localhost:1234/v1",
+        ] {
+            #expect(
+                CustomProviderStore.problem(name: "Gateway", baseURL: url, hasKey: false)
+                    == .urlCarriesCredentials,
+                "\(url) should be refused"
+            )
+        }
+    }
+
+    /// Checked before the transport rule: a credential in the address is wrong over https too, so
+    /// answering "use https" first would send somebody to fix the wrong half.
+    @Test func theCredentialIsReportedBeforeTheInsecureTransport() {
+        #expect(
+            CustomProviderStore.problem(
+                name: "Gateway",
+                baseURL: "http://user:secret@gateway.example.com/v1",
+                hasKey: true
+            ) == .urlCarriesCredentials
+        )
+    }
+
+    @Test func anOrdinaryAddressIsStillAccepted() {
+        #expect(
+            CustomProviderStore.problem(
+                name: "Gateway",
+                baseURL: "https://openrouter.ai/api/v1",
+                hasKey: true
+            ) == nil
+        )
+        // The loopback case this validator exists to keep working.
+        #expect(
+            CustomProviderStore.problem(
+                name: "Ollama",
+                baseURL: "http://localhost:11434/v1",
+                hasKey: true
+            ) == nil
+        )
+    }
+}

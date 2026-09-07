@@ -231,6 +231,13 @@ public final class ModelSettingsState {
                 localized:
                     "This address isn't secure, so a key sent to it could be read by others on the network. Use https:// instead."
             )
+        case .urlCarriesCredentials:
+            // Says where it should go instead. The key field is three fields away and reaches the
+            // Keychain; the address does not.
+            String(
+                localized:
+                    "Take the username and password out of the address — anything in it is saved in plain settings. Put the key in the Key field below, which uses your Keychain."
+            )
         }
     }
 }
