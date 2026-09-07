@@ -18,7 +18,7 @@ import {
 } from "../../shared/model-selection";
 import { toLangChainMessages } from "./history";
 import { readReasoningEffort } from "./model-options";
-import { resolveModel } from "./models/registry";
+import { explainModelError, resolveModel } from "./models/registry";
 import { streamRun } from "./stream";
 
 /**
@@ -497,6 +497,19 @@ async function runAgent(input: RunAgentInput): Promise<Response> {
           ),
         input,
         send,
+        /*
+         * Named against the provider this run actually resolved to, not the deployment's.
+         *
+         * A person reading "Anthropic rejected the key" when their agent is pointed at a local
+         * Ollama would go and check the wrong key — and per ADR-0002 the whole point of a per-agent
+         * model is that the two differ.
+         */
+        (error) =>
+          explainModelError(
+            modelSelectionOf(input)?.providerId ??
+              DEPLOYMENT_DEFAULT.providerId,
+            error,
+          )?.message,
       );
 
       controller.close();

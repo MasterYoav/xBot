@@ -294,3 +294,59 @@ export function classifyModelError(
     message: `${name} returned an error (${status}).`,
   };
 }
+
+/**
+ * The same classification, from the error a provider client actually threw.
+ *
+ * {@link classifyModelError} takes a status and a body because that is the testable shape. Nothing
+ * called it — it was exported, covered by its own tests, and invoked from nowhere else in the
+ * repository, so every vendor refusal reached the person as whatever prose the vendor's SDK put in
+ * an exception. ADR-0002 is explicit that absorbing those differences is the router's job; it had
+ * been done and then not connected.
+ *
+ * The status is read from the shapes the clients actually use. OpenAI and Anthropic both put it on
+ * `status`; some wrappers keep the response instead, and some only ever put the number in the
+ * message. Undefined when none of that finds one, which leaves the caller's own wording alone
+ * rather than guessing at a category.
+ */
+export function explainModelError(
+  providerId: string,
+  error: unknown,
+): ModelError | undefined {
+  const status = statusOf(error);
+  if (status === undefined) return undefined;
+  const body = error instanceof Error ? error.message : String(error ?? "");
+  return classifyModelError(providerId, status, body);
+}
+
+function statusOf(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const candidate = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    response?: { status?: unknown };
+    message?: unknown;
+  };
+
+  for (const value of [
+    candidate.status,
+    candidate.statusCode,
+    candidate.response?.status,
+  ]) {
+    if (typeof value === "number" && value >= 400 && value < 600) return value;
+  }
+
+  /*
+   * Last resort: the number in the sentence.
+   *
+   * Only a standalone three-digit 4xx/5xx, so a model name with digits in it — `gpt-4.1`, or a
+   * `claude-…-401` — cannot be read as a status and turn an unrelated failure into "the key was
+   * rejected". A wrong category here is worse than none: it sends somebody to check a key that was
+   * never the problem.
+   */
+  if (typeof candidate.message === "string") {
+    const match = candidate.message.match(/(?<![\w.-])([45]\d{2})(?![\w.-])/);
+    if (match) return Number(match[1]);
+  }
+  return undefined;
+}

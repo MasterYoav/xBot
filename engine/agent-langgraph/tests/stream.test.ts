@@ -318,3 +318,53 @@ describe("token usage", () => {
     expect(usageIndex).toBeLessThan(finishedIndex);
   });
 });
+
+/**
+ * The router's sentence, in place of the vendor's.
+ *
+ * `classifyModelError` was written, exported and tested, and then called from nowhere — so a
+ * provider's refusal reached the person as whatever prose the vendor SDK put in an exception.
+ * ADR-0002 says absorbing those differences is the router's job. These two tests are the wiring
+ * that had been missing, so the same thing cannot quietly come loose again.
+ */
+describe("a provider's refusal, explained", () => {
+  const failing = async (): Promise<AsyncIterable<RunStreamEvent>> => {
+    throw Object.assign(new Error('401 {"error":"invalid x-api-key"}'), {
+      status: 401,
+    });
+  };
+
+  test("the explanation replaces the vendor's own message", async () => {
+    const sent: Array<Record<string, unknown>> = [];
+    await streamRun(
+      failing,
+      RUN,
+      (event) => sent.push(event as unknown as Record<string, unknown>),
+      () => "Anthropic rejected the key. Check it in Settings.",
+    );
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: "RUN_ERROR",
+      message: "Anthropic rejected the key. Check it in Settings.",
+    });
+    // The vendor's own prose is what the person used to be shown.
+    expect(String(sent[0]?.message)).not.toContain("x-api-key");
+  });
+
+  /// Undefined means "not a provider saying no", and the error's own message is then the best
+  /// available answer — a socket that hung up is not a key problem and must not be dressed as one.
+  test("no explanation leaves the error's own message alone", async () => {
+    const sent: Array<Record<string, unknown>> = [];
+    await streamRun(
+      async () => {
+        throw new Error("socket hang up");
+      },
+      RUN,
+      (event) => sent.push(event as unknown as Record<string, unknown>),
+      () => undefined,
+    );
+
+    expect(sent[0]).toMatchObject({ message: "socket hang up" });
+  });
+});

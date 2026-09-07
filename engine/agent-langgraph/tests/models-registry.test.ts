@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   PROVIDERS,
   classifyModelError,
+  explainModelError,
   resolveModel,
 } from "../src/models/registry";
 
@@ -233,5 +234,63 @@ describe("classifying what a provider said went wrong", () => {
   test("5xx and anything unrecognised stay honest about being unrecognised", () => {
     expect(classifyModelError("openai", 500, "").kind).toBe("unknown");
     expect(classifyModelError("openai", 418, "").kind).toBe("unknown");
+  });
+});
+
+/*
+ * Reading a status off the error a client actually threw.
+ *
+ * `classifyModelError` was exported, tested, and called from nowhere in the repository, so every
+ * vendor refusal reached the person as whatever prose the vendor's SDK put in an exception —
+ * exactly what ADR-0002 says the router exists to absorb. The classification was written and then
+ * not connected; this is the half that connects it.
+ */
+describe("explaining the error a provider client threw", () => {
+  test("reads the status the vendor clients put on the error", () => {
+    for (const error of [
+      Object.assign(new Error("Unauthorized"), { status: 401 }),
+      Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
+      Object.assign(new Error("Unauthorized"), { response: { status: 401 } }),
+    ]) {
+      expect(explainModelError("anthropic", error)?.kind).toBe("badKey");
+    }
+  });
+
+  test("falls back to a status in the sentence", () => {
+    const error = new Error("Request failed with status code 429");
+    expect(explainModelError("openai", error)?.kind).toBe("rateLimited");
+  });
+
+  /*
+   * The reason the sentence match is narrow.
+   *
+   * A model name carries digits — `gpt-4.1`, or a build tagged 401 — and reading one as a status
+   * turns an unrelated failure into "the key was rejected", which sends somebody to check a key
+   * that was never the problem. A wrong category is worse than none.
+   */
+  test("does not mistake digits in a model name for a status", () => {
+    expect(
+      explainModelError("openai", new Error("unknown model gpt-4.1")),
+    ).toBeUndefined();
+    expect(
+      explainModelError("openai", new Error("no model claude-x-401-preview")),
+    ).toBeUndefined();
+  });
+
+  test("says nothing when there is no status to find", () => {
+    expect(
+      explainModelError("openai", new Error("socket hang up")),
+    ).toBeUndefined();
+    expect(explainModelError("openai", "a string")).toBeUndefined();
+    expect(explainModelError("openai", null)).toBeUndefined();
+  });
+
+  /// The provider is the agent's, so the sentence names the vendor the person actually chose.
+  test("names the provider that was actually used", () => {
+    const error = Object.assign(new Error("Unauthorized"), { status: 401 });
+    expect(explainModelError("anthropic", error)?.message).toContain(
+      "Anthropic",
+    );
+    expect(explainModelError("openai", error)?.message).toContain("OpenAI");
   });
 });

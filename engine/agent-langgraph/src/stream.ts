@@ -49,6 +49,14 @@ export async function streamRun(
   makeEvents: () => Promise<AsyncIterable<RunStreamEvent>>,
   input: Pick<RunAgentInput, "runId" | "threadId">,
   send: (event: BaseEvent) => void,
+  /**
+   * A vendor's refusal, in the router's words rather than the vendor's.
+   *
+   * A callback rather than an import, so this module keeps knowing nothing about providers — the
+   * whole reason it can be tested without a model. Returning undefined leaves the error's own
+   * message alone, which is the right answer for everything that is not a provider saying no.
+   */
+  explain?: (error: unknown) => string | undefined,
 ): Promise<void> {
   /*
    * One message id per stretch of prose.
@@ -266,7 +274,8 @@ export async function streamRun(
     send({
       type: "RUN_ERROR",
       message:
-        error instanceof Error ? error.message : "The Bot could not answer.",
+        explain?.(error) ??
+        (error instanceof Error ? error.message : "The Bot could not answer."),
     } as BaseEvent);
   }
 }
