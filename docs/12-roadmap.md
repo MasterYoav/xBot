@@ -255,7 +255,8 @@ it.**
   exist locally and in `mac-release` CI; signing runs when secrets are set.**
 - Sparkle with EdDSA. **Appcast generation scripted (`generate-appcast.sh`); publish + CI secrets
   still open.**
-- Engine update flow including rollback, and **the migration-rollback decision made and implemented**.
+- Engine update flow including rollback, and the migration-rollback decision. **Done** — the dump,
+  per docs/11's recommendation: taken before the new image can migrate, restored on rollback.
 - Uninstall, complete.
 - Admin surfaces embedded (webview). **Plugins admin ships; the audit trail is native rather than
   embedded, per ADR-0004's exception; credentials, playground, etc. still open.**

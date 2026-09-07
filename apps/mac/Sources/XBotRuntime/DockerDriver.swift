@@ -181,6 +181,46 @@ public actor DockerDriver: ContainerDriver {
         _ = try await run(["stop", "-t", "\(seconds)", handle.id])
     }
 
+    public func exec(
+        _ handle: ContainerHandle,
+        command: [String],
+        stdoutTo url: URL,
+        stdinFrom input: URL? = nil
+    ) async throws {
+        // `-i` only when there is something to read. Without it `docker exec` gives the command no
+        // stdin at all, so a `psql` restore would sit there with nothing to apply and exit happy.
+        let arguments = ["exec"] + (input == nil ? [] : ["-i"]) + [handle.id] + command
+        note(arguments)
+
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        let sink = try FileHandle(forWritingTo: url)
+        defer { try? sink.close() }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        // Straight to the file: a dump is as large as the database, and the pipe-buffer deadlock
+        // the `run` helper documents is worse the more there is to write.
+        process.standardOutput = sink
+        if let input {
+            process.standardInput = try FileHandle(forReadingFrom: input)
+        }
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+
+        try process.run()
+        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            throw RuntimeError.commandFailed(
+                command: "docker exec \(command.first ?? "")",
+                exitCode: Int(process.terminationStatus),
+                message: String(decoding: errorData, as: UTF8.self)
+            )
+        }
+    }
+
     public func remove(_ handle: ContainerHandle) async throws {
         _ = try await run(["rm", "-f", handle.id])
     }

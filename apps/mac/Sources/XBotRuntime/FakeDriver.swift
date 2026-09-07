@@ -112,6 +112,28 @@ public actor FakeDriver: ContainerDriver {
     public func createVolume(_ name: String) async throws { volumes.insert(name) }
     public func volumeExists(_ name: String) async -> Bool { volumes.contains(name) }
     public func removeVolume(_ name: String) async throws { volumes.remove(name) }
+
+    /// Records the exec and writes a stand-in file, so a caller that depends on the file existing
+    /// is exercised rather than only the call being counted.
+    public private(set) var execCommands: [[String]] = []
+    private var execFails = false
+    public func setExecFails(_ value: Bool) { execFails = value }
+    /// Make the next `run` fail, so a rollback path can be reached after a successful start.
+    public func failNextRun() { script.runFails = true }
+    public private(set) var execStdin: [URL?] = []
+    public func exec(
+        _ handle: ContainerHandle,
+        command: [String],
+        stdoutTo url: URL,
+        stdinFrom input: URL? = nil
+    ) async throws {
+        execCommands.append(command)
+        execStdin.append(input)
+        if execFails {
+            throw RuntimeError.commandFailed(command: "exec", exitCode: 1, message: "no such container")
+        }
+        try? Data("-- fake dump\n".utf8).write(to: url)
+    }
     /// What survived an uninstall, for the test that says nothing did.
     public var remainingVolumes: Set<String> { volumes }
 

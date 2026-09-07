@@ -26,6 +26,15 @@ public enum RuntimePaths: Sendable {
         return DockerDriver.defaultDockerPath()
     }
 
+    /// Where a pre-upgrade database dump is kept.
+    ///
+    /// **Outside the volume, deliberately.** docs/11-packaging-and-updates.md: the dump exists so a
+    /// rollback can undo a migration the old image cannot read, and one stored inside the volume it
+    /// is meant to restore is no use at exactly the moment it is needed.
+    public static var databaseDump: URL {
+        supportDirectory.appendingPathComponent("engine-pre-upgrade.sql")
+    }
+
     public static func ensureDirectories() throws {
         try FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
     }

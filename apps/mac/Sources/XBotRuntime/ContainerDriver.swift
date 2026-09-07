@@ -181,6 +181,18 @@ public protocol ContainerDriver: Sendable {
     func inspect(_ handle: ContainerHandle) async throws -> ContainerStatus
     func logs(_ handle: ContainerHandle, tail: Int) async throws -> [LogLine]
 
+    /// Run a command inside a container, sending its standard output to a file.
+    ///
+    /// To a file rather than a returned string because the one caller is `pg_dump`, and a database
+    /// held in memory to be written out again is the same database twice for no reason.
+    /// `stdinFrom` is how a dump gets back in: `docker exec` reads nothing without it.
+    func exec(
+        _ handle: ContainerHandle,
+        command: [String],
+        stdoutTo url: URL,
+        stdinFrom input: URL?
+    ) async throws
+
     /// An address inside the container that reaches a service on the host.
     ///
     /// Load-bearing and easy to overlook. Two things need it: the agent's tool-call callback, and

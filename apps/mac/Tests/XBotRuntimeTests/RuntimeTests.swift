@@ -179,7 +179,8 @@ struct RuntimeControllerTests {
             health: { _ in
                 healthy ? EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") : nil
             },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
     }
 
@@ -253,7 +254,8 @@ struct RuntimeControllerTests {
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in nil },
             startHealthDeadlineSeconds: 2,
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
 
@@ -271,7 +273,8 @@ struct RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
 
@@ -296,7 +299,8 @@ struct RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
 
@@ -353,7 +357,8 @@ struct RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
 
@@ -379,7 +384,8 @@ struct RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
         #expect(await controller.currentImageReference.full == "xbot/engine:1")
@@ -425,7 +431,8 @@ struct RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
         guard case .running = await controller.state else {
@@ -471,7 +478,8 @@ struct RuntimeControllerTests {
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in healthScript.answer() },
             startHealthDeadlineSeconds: 1,
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
 
@@ -498,6 +506,90 @@ struct RuntimeControllerTests {
 
 extension RuntimeControllerTests {
     /**
+     A dump is taken before the new image can migrate the database.
+
+     docs/11-packaging-and-updates.md calls this "the one that will bite": rollback is impossible if
+     a forward migration produced a schema the old image cannot read. It offered two options and
+     required one be chosen before a schema change reached a user, recommending the dump — "we do
+     not control upstream's migrations and pretending we do is how a user loses their audit trail".
+
+     The timing is the whole point. It has to happen while the old container is still there, because
+     the next thing `upgrade` does is remove it.
+     */
+    @Test func anUpgradeDumpsTheDatabaseBeforeReplacingTheContainer() async {
+        let driver = FakeDriver()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
+        )
+        await controller.start(environment: environment)
+
+        _ = await controller.upgrade(
+            to: ImageReference(repository: "xbot/engine", tag: "2"),
+            rollingBackTo: ImageReference(repository: "xbot/engine", tag: "1"),
+            environment: environment
+        )
+
+        #expect(await driver.execCommands.contains { $0.first == "pg_dump" })
+    }
+
+    /// A rollback feeds the dump back in — and through stdin, because `docker exec` reads nothing
+    /// otherwise and a restore with no input exits happily having applied nothing.
+    @Test func aRollbackRestoresTheDumpThroughStdin() async {
+        let driver = FakeDriver(script: FakeDriver.Script(healthAfterPolls: 0))
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            startHealthDeadlineSeconds: 2,
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
+        )
+        await controller.start(environment: environment)
+        // The new image runs but never answers, so the upgrade rolls back.
+        await driver.failNextRun()
+
+        let outcome = await controller.upgrade(
+            to: ImageReference(repository: "xbot/engine", tag: "2"),
+            rollingBackTo: ImageReference(repository: "xbot/engine", tag: "1"),
+            environment: environment
+        )
+
+        if outcome == .rolledBack {
+            #expect(await driver.execCommands.contains { $0.first == "psql" })
+            #expect(await driver.execStdin.contains { $0 != nil })
+        }
+    }
+
+    /// A dump that fails does not block the upgrade. It costs the ability to roll back a migration,
+    /// which only matters if the upgrade then fails — and refusing every update because a dump
+    /// failed is its own way of leaving somebody stuck on an old engine.
+    @Test func aFailedDumpDoesNotBlockTheUpgrade() async {
+        let driver = FakeDriver()
+        await driver.setExecFails(true)
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
+        )
+        await controller.start(environment: environment)
+
+        let outcome = await controller.upgrade(
+            to: ImageReference(repository: "xbot/engine", tag: "2"),
+            rollingBackTo: ImageReference(repository: "xbot/engine", tag: "1"),
+            environment: environment
+        )
+
+        #expect(outcome == .succeeded)
+    }
+
+
+    /**
      An installed-but-stopped runtime is woken, not reported and abandoned.
 
      `start()` used to probe once and return `.notDetected` for anything that was not ready. So a
@@ -511,7 +603,8 @@ extension RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
 
         await controller.start(environment: environment)
@@ -538,7 +631,8 @@ extension RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
 
         await controller.start(environment: environment)
@@ -555,7 +649,8 @@ extension RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
 
         await controller.start(environment: environment)
@@ -579,7 +674,8 @@ extension RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
         await controller.start(environment: environment)
         #expect(!(await driver.remainingVolumes.isEmpty))
@@ -600,7 +696,8 @@ extension RuntimeControllerTests {
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
             health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
-            ports: isolatedPortStore()
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
 
         // Never started: no container, no volumes, nothing to remove.
@@ -651,4 +748,12 @@ final class MemoryDefaults: KeyValueDefaults, @unchecked Sendable {
 
 func isolatedPortStore() -> EnginePortStore {
     EnginePortStore(defaults: MemoryDefaults())
+}
+
+/// A dump path per test. One shared file in Application Support is a global, and parallel suites
+/// all writing it is the same class of bug as the shared preference domain.
+func isolatedDumpURL() -> URL {
+    FileManager.default.temporaryDirectory
+        .appendingPathComponent("xbot-tests-\(UUID().uuidString)")
+        .appendingPathComponent("dump.sql")
 }

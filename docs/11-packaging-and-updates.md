@@ -236,6 +236,21 @@ Two options, and one must be chosen **before the first schema change reaches a u
 **Recommendation: the dump.** We do not control upstream's migrations and pretending we do is how a
 user loses their audit trail.
 
+**Decided and implemented.** `RuntimeController.upgrade` runs `pg_dump --clean --if-exists` inside
+the container before removing it — the last moment it can, since the next step destroys the
+container that holds the database — and writes it outside the volume, to Application Support. A
+rollback feeds it back with `psql --single-transaction`, after the old image is running, because it
+is that Postgres which has to accept it.
+
+Two judgement calls in it:
+
+- **A failed dump does not stop the upgrade.** It costs the ability to undo a migration, which only
+  matters if the upgrade then fails; refusing every update because a dump failed is its own way of
+  stranding somebody on an old engine. Whether one was taken is recorded, and a rollback only
+  attempts a restore if it was.
+- **`--single-transaction` on the way back in**, so a restore that fails part-way leaves the
+  database as it was rather than half-replaced.
+
 ---
 
 ## First-run experience from the DMG

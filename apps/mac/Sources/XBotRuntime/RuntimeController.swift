@@ -45,7 +45,10 @@ public actor RuntimeController {
         health: @escaping @Sendable (EngineEndpoint) async -> EngineHealth?,
         startHealthDeadlineSeconds: Int = 120,
         /// Injected so a test gets its own storage rather than the one live preference domain.
-        ports: EnginePortStore = .shared
+        ports: EnginePortStore = .shared,
+        /// Where the pre-upgrade dump goes. Injected for the same reason as `ports`: it is one
+        /// path in Application Support, and tests running in parallel were all writing it.
+        dumpURL: URL = RuntimePaths.databaseDump
     ) {
         self.driver = driver
         self.image = image
@@ -53,10 +56,12 @@ public actor RuntimeController {
         self.health = health
         self.startHealthDeadlineSeconds = startHealthDeadlineSeconds
         self.ports = ports
+        self.dumpURL = dumpURL
         self.allocatedPort = ports.load()
     }
 
     private let ports: EnginePortStore
+    private let dumpURL: URL
 
     public var events: AsyncStream<RuntimeEvent> {
         AsyncStream { continuation in
@@ -303,6 +308,26 @@ public actor RuntimeController {
             }
         }
 
+        /*
+         * The database, before the new image migrates it.
+         *
+         * docs/11-packaging-and-updates.md calls this "the one that will bite": rollback is
+         * impossible if a forward migration produced a schema the old image cannot read. Two options
+         * were offered and one had to be chosen before a schema change reached a user —
+         * backward-compatible migrations for one version, or a pre-migration dump — and the
+         * recommendation was the dump, because "we do not control upstream's migrations and
+         * pretending we do is how a user loses their audit trail". This is that choice, implemented.
+         *
+         * Taken here because this is the last moment it can be: the container that holds the
+         * database is removed on the next line.
+         *
+         * A dump that fails does not stop the upgrade. It costs the ability to roll back a
+         * migration, which is worse than not upgrading only if the upgrade then fails — and
+         * refusing every update because a dump failed is its own way of leaving somebody stuck.
+         * `dumpedBeforeUpgrade` records which it was.
+         */
+        dumpedBeforeUpgrade = await dumpDatabase()
+
         await removeEngineContainer()
         image = newImage
 
@@ -314,10 +339,53 @@ public actor RuntimeController {
         image = rollbackImage
 
         if await launchEngineWithoutAdoption(environment: environment) {
+            // The old image is up. If the new one migrated the schema past what it can read, the
+            // dump is the only way back — restored after the engine is running, because it is the
+            // engine's own Postgres that has to accept it.
+            if dumpedBeforeUpgrade { await restoreDatabase() }
             return .rolledBack
         }
 
         return .failed
+    }
+
+    /// Whether a dump was taken before the last upgrade, and so whether a restore is possible.
+    private var dumpedBeforeUpgrade = false
+
+    /// `pg_dump` inside the container, to a file in Application Support.
+    private func dumpDatabase() async -> Bool {
+        guard let handle else { return false }
+        do {
+            try FileManager.default.createDirectory(
+                at: dumpURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try await driver.exec(
+                handle,
+                // The role and database the engine's embedded Postgres uses. `--clean` so a restore
+                // replaces what it finds rather than colliding with it.
+                command: ["pg_dump", "--clean", "--if-exists", "-U", "openbot", "openbot"],
+                stdoutTo: dumpURL,
+                stdinFrom: nil
+            )
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Feed the dump back to the engine that is now running the old image.
+    private func restoreDatabase() async {
+        guard let handle, FileManager.default.fileExists(atPath: dumpURL.path) else { return }
+        // The dump is on the host, so it goes in through the command's stdin rather than by a
+        // path the container can see. `--single-transaction` so a restore that fails part-way
+        // leaves the database as it was rather than half-replaced.
+        try? await driver.exec(
+            handle,
+            command: ["psql", "--single-transaction", "-U", "openbot", "-d", "openbot"],
+            stdoutTo: dumpURL.deletingLastPathComponent().appendingPathComponent("restore.log"),
+            stdinFrom: dumpURL
+        )
     }
 
     private func ensureRuntimeReady() async -> Bool {
