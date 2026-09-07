@@ -9,7 +9,11 @@
 
 Create agents, give them a computer, watch them work, and take the wheel when you want to.
 Bring any model — OpenAI, Anthropic, Google, xAI, or a model running locally through Ollama.
-Nothing leaves your machine except the calls you choose to make.
+Your agents, their files, and their browsers stay on this Mac.
+
+*In v1 your conversation history is the exception: it is stored by CopilotKit, the service xBot's
+engine is built on. [ADR-0007](docs/decisions/0007-wrap-openbot-keep-intelligence.md) says why, and
+onboarding says so before you type a key.*
 
 </div>
 
@@ -47,8 +51,11 @@ onboarding (five steps), in-window settings (General, Models, Agents, Computer, 
 Advanced), agent settings (model picker,
 plugins reach, handoff grants), plugins admin webview — all wired to `RuntimeController` and
 `HTTPEngineClient` when the engine is running. The app pulls a pinned ghcr engine digest from
-`manifests/engine-stable.json` on start. M2's model router is built but not yet proven against live
-vendors; M6 VM validation and M7 signing/Sparkle remain open.
+`manifests/engine-stable.json` on start. M2's model router has been driven live against a real vendor —
+per-run selection, a deployment fallback, an `openai-compatible` endpoint in the same process, and a
+bogus model name rejected by the vendor rather than silently substituted — and the hop the product
+actually uses, through `copilot.ts` and the AG-UI client, is covered by a test that asserts on the
+posted body. A second live vendor, M6 VM validation, and M7 signing/notarization remain open.
 
 Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 [`docs/12-roadmap.md`](docs/12-roadmap.md).
@@ -58,7 +65,7 @@ Start at [`docs/README.md`](docs/README.md). The current milestone table is in
 ```sh
 cd apps/mac && swift run          # debug: stub engine, full UI, no Docker
 cd apps/mac && XBOT_USE_RUNTIME=1 swift run   # debug: real runtime path — Start in the UI
-cd apps/mac && swift test         # 99 unit tests (SwiftPM)
+cd apps/mac && swift test         # 235 unit tests (SwiftPM)
 scripts/build-engine-image.sh     # dev: build xbot/engine:1 for the runtime path
 scripts/check-engine-health.sh    # dev: read-only /health check once the engine is up
 scripts/generate-app-icon.sh      # compile xBot.icon → Assets.car + xBot.icns
