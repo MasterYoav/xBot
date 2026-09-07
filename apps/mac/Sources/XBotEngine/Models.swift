@@ -197,6 +197,10 @@ public enum ComposerBlock: Hashable, Sendable {
     /// Start ran and did not reach `.running`. The sentence is already written for a person.
     case engineFailed(reason: String)
     case noModelConnected
+    /// No CopilotKit Intelligence key, so the engine is in local mode and cannot hold a
+    /// conversation. ADR-0007 keeps Intelligence for v1; without it `LocalIntelligence` throws past
+    /// wiring, and the engine still starts and answers `/health` — so nothing else would say this.
+    case noConversationStore
     case humanHoldsControl
 
     public var sentence: String {
@@ -206,6 +210,8 @@ public enum ComposerBlock: Hashable, Sendable {
             String(localized: "xBot needs Docker Desktop, OrbStack, or Colima to run the engine")
         case .engineFailed(let reason): reason
         case .noModelConnected: String(localized: "Connect a model to start")
+        case .noConversationStore:
+            String(localized: "Connect a CopilotKit key so xBot can keep your conversations")
         case .humanHoldsControl: String(localized: "You're controlling the browser")
         }
     }
@@ -217,6 +223,7 @@ public enum ComposerBlock: Hashable, Sendable {
         case .runtimeUnavailable: ""
         case .engineFailed: String(localized: "Try again")
         case .noModelConnected: String(localized: "Open Settings")
+        case .noConversationStore: String(localized: "Open Settings")
         case .humanHoldsControl: String(localized: "Give it back")
         }
     }

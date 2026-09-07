@@ -206,8 +206,10 @@ public final class AppState {
     public init(
         engine: any EngineClient,
         providers: ProviderConnectionStore = .shared,
-        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared
+        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared,
+        hasConversationStore: @escaping @Sendable () -> Bool = { true }
     ) {
+        self.hasConversationStore = hasConversationStore
         self.engine = engine
         self.runtime = nil
         self.environmentFactory = nil
@@ -234,8 +236,11 @@ public final class AppState {
         },
         /// Injected so a test gets its own preference domain. See `ProviderConnectionStore`.
         providers: ProviderConnectionStore = .shared,
-        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared
+        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared,
+        /// Defaults to the real credential, because this initializer is the production one.
+        hasConversationStore: @escaping @Sendable () -> Bool = { EngineBootstrap.hasIntelligence }
     ) {
+        self.hasConversationStore = hasConversationStore
         self.engine = UnavailableEngineClient()
         self.runtime = runtime
         self.environmentFactory = environment
@@ -257,6 +262,13 @@ public final class AppState {
 
     /// Endpoints the person added by hand, which the agent picker offers alongside the vendors.
     private let customProviders = CustomProviderStore.shared
+
+    /// Whether the engine can keep a conversation at all.
+    ///
+    /// Injected rather than read from the Keychain here, for the reason `ProviderConnectionStore`
+    /// documents: a state object that reaches for a machine-wide store cannot be asserted without
+    /// the machine's contents deciding the answer.
+    private let hasConversationStore: @Sendable () -> Bool
 
     public var selectedAgent: Agent? {
         agents.first { $0.id == selectedAgentID }
@@ -382,6 +394,16 @@ public final class AppState {
             engineHealth = await runtime?.checkHealth()
             if providers.requiresModelForComposer() {
                 composerBlock = .noModelConnected
+            } else if !hasConversationStore() {
+                /*
+                 * The engine is up and cannot hold a conversation.
+                 *
+                 * Without a CopilotKit key it boots into local mode, where the history client
+                 * throws past wiring — but it still starts, still answers `/health`, and still
+                 * lists agents, so every other signal in the app says everything is fine. Saying so
+                 * here is invariant 7: never an empty state that implies all is well.
+                 */
+                composerBlock = .noConversationStore
             } else {
                 composerBlock = nil
             }
@@ -598,8 +620,11 @@ public final class AppState {
             startEngine()
         case .humanHoldsControl:
             setControl(.agent)
-        case .runtimeUnavailable, .noModelConnected, nil:
-            // Runtime install is M6. Settings isn't a scene yet (M6/M7).
+        case .noModelConnected, .noConversationStore:
+            // Both are fixed in the same place, and settings are in this window now.
+            isShowingSettings = true
+        case .runtimeUnavailable, nil:
+            // Runtime install is M6.
             break
         }
     }

@@ -126,6 +126,8 @@ public struct Conversation: View {
             return String(localized: "The engine couldn't start")
         case .noModelConnected:
             return String(localized: "Connect a model to start")
+        case .noConversationStore:
+            return String(localized: "xBot can't keep your conversations yet")
         case .humanHoldsControl, nil:
             break
         }
@@ -145,6 +147,11 @@ public struct Conversation: View {
             return reason
         case .noModelConnected:
             return String(localized: "Add a provider key in Settings before you send a message.")
+        case .noConversationStore:
+            // Says which part is missing and where it goes, rather than "something went wrong".
+            return String(
+                localized: "Conversation history is stored by CopilotKit, the service xBot's engine is built on. Add a CopilotKit key in Settings → Models."
+            )
         case .humanHoldsControl, nil:
             break
         }
