@@ -25,7 +25,7 @@ and the ones marked ⚠️ have the widest error bars.
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
 | M5 | Connected | **Client done.** `scripts/verify-m5-handoff.sh` smoke check; model picker fallback from connected providers |
 | M6 | Onboarding | **In progress.** Five steps built, install-for-me, adoption, handoff transition, failure branches, runtime choice persistence; VM testing still open |
-| M7 | Ship v1.0 | **In progress (unsigned).** Settings tabs (Agents, Computer, Usage) wired; Sparkle scaffold + appcast scripts done; CI secrets + publish still open |
+| M7 | Ship v1.0 | **In progress (unsigned).** Settings tabs (Agents, Computer, Usage) wired, plus a CopilotKit section so the key can be replaced or revoked; About window credits OpenBot; Sparkle scaffold + appcast scripts done. First-run supply chain verified anonymously. Signing certificates, CI secrets and publish still open — all four remaining items need a person |
 
 ---
 
@@ -265,6 +265,23 @@ it.**
 - The honest v1 limitations stated in the UI: shared browser, shared workspace. **Done** — Settings →
   Computer, in the wording docs/10-security.md specifies.
 - Website with the download and the security explanation.
+
+**The first-run supply chain is verified anonymously**, which is the part of "installs from the
+website and uses it" that does not need a person. From a shell holding no credentials: the manifest
+at `raw.githubusercontent.com/MasterYoav/xBot/master/manifests/engine-stable.json` answers 200, the
+digest it names resolves at ghcr with an anonymous pull token, the repository is public, and the
+bundled fallback in `XBotApp/Resources` is byte-identical to the published manifest — so a first run
+with the network blocked still starts from a real pin rather than a placeholder. Every outbound URL
+the app can show a person (CopilotKit, OpenBot, Ollama, the docs) answers 200.
+
+**What still needs a person, and cannot be done from here:**
+
+1. A Developer ID certificate and notarization credentials, plus the CI secrets to use them. Until
+   then every build is ad-hoc signed, which is also why local GUI verification keeps meeting a
+   Keychain prompt: the code identity changes on every rebuild.
+2. A clean-VM run of onboarding end to end.
+3. A CopilotKit key, for an end-to-end Intelligence conversation.
+4. A second live vendor key, to close the last M2 item.
 
 **Done when:** someone who has never seen the project installs from the website and uses it, without
 help.
