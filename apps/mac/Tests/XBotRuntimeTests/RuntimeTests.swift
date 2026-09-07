@@ -787,3 +787,25 @@ struct ProbeSentenceTests {
         #expect(ProbeResult.ready(version: "27.0").sentence.contains("27.0"))
     }
 }
+
+/// How far a four-gigabyte download has got, which is the longest wait in the product.
+@Suite
+struct PullProgressDetailTests {
+    /// The first seconds of every pull have no total, and "0%" then is a worse answer than saying
+    /// nothing — it reads as stuck rather than starting.
+    @Test func nothingTrueToSayYetSaysNothing() {
+        #expect(PullProgress(layersComplete: 0, layersTotal: 0, fraction: nil).detail == nil)
+    }
+
+    @Test func layersWhileTheTotalSizeIsUnknown() {
+        let detail = PullProgress(layersComplete: 3, layersTotal: 11, fraction: nil).detail
+        #expect(detail?.contains("3") == true)
+        #expect(detail?.contains("11") == true)
+    }
+
+    /// Percent wins once it exists: it is the number a person can hold a whole download in.
+    @Test func percentOnceTheTotalIsKnown() {
+        let detail = PullProgress(layersComplete: 3, layersTotal: 11, fraction: 0.42).detail
+        #expect(detail?.contains("42") == true)
+    }
+}

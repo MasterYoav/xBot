@@ -100,16 +100,9 @@ struct EngineSetupStep: View {
 
     private var pullDetail: String? {
         guard case .pulling(let progress) = runtimeState else { return nil }
-        if let fraction = progress.fraction {
-            let percent = Int(fraction * 100)
-            return String(localized: "\(percent)% complete")
-        }
-        if progress.layersTotal > 0 {
-            return String(
-                localized: "\(progress.layersComplete) of \(progress.layersTotal) layers"
-            )
-        }
-        return nil
+        // On `PullProgress` now, because the settings pane needed the same sentence and had been
+        // showing "Downloading the engine" with no number at all.
+        return progress.detail
     }
 
     @ViewBuilder

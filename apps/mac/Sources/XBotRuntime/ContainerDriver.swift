@@ -114,6 +114,27 @@ public struct PullProgress: Sendable, Equatable {
         self.layersTotal = layersTotal
         self.fraction = fraction
     }
+
+    /// How far along, in the best terms currently available. Nil only when there is nothing true to
+    /// say yet.
+    ///
+    /// The engine image is over four gigabytes, which makes this the longest wait in the product,
+    /// and `RuntimeState`'s own note is about exactly this: "There is deliberately no 'probably
+    /// starting' case. A spinner with no state behind it is how an app ends up force-quit, because
+    /// the user has no way to tell waiting from stuck." Onboarding said all this already; the
+    /// settings pane said "Downloading the engine" and nothing else for ten minutes.
+    ///
+    /// Percent when the total is known, layers while it is not — the first seconds of every pull
+    /// have no total at all, and "0%" then is a worse answer than counting what has landed.
+    public var detail: String? {
+        if let fraction {
+            return String(localized: "\(Int(fraction * 100))% complete")
+        }
+        if layersTotal > 0 {
+            return String(localized: "\(layersComplete) of \(layersTotal) layers")
+        }
+        return nil
+    }
 }
 
 public struct ContainerSpec: Sendable {

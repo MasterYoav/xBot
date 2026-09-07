@@ -97,7 +97,11 @@ public struct GeneralSettingsView: View {
         case .degraded(let reason): reason.sentence
         case .stopped: String(localized: "Stopped")
         case .starting(let stage): stage.sentence
-        case .pulling: String(localized: "Downloading the engine")
+        case .pulling(let progress):
+            // With how far along. Four gigabytes is a long time to look at a sentence that has not
+            // changed, and a person cannot tell that from stuck.
+            progress.detail.map { String(localized: "Downloading the engine — \($0)") }
+                ?? String(localized: "Downloading the engine")
         case .failed(let error): error.sentence
         case .notDetected(let probe):
             // The probe, not just the case. Ignoring it is what told somebody with a runtime
