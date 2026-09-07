@@ -14,6 +14,8 @@
 	<string>dev.xbot.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 xBot contributors. Engine © 2026 CopilotKit, MIT.</string>
 	<key>CFBundleName</key>
 	<string>xBot</string>
 	<key>CFBundlePackageType</key>

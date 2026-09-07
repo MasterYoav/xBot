@@ -75,6 +75,13 @@ struct XBotApp: App {
         .defaultSize(showOnboarding ? Metrics.onboardingWindow : Metrics.minimumWindow)
         .windowResizability(showOnboarding ? .contentSize : .automatic)
         .windowToolbarStyle(.unified)
+        .commands {
+            // Replacing the standard item rather than adding one, so there is a single About and it
+            // is where every Mac app keeps it.
+            CommandGroup(replacing: .appInfo) {
+                Button(String(localized: "About xBot")) { AboutPanel.show() }
+            }
+        }
 
         Window(String(localized: "Plugins"), id: "plugins-admin") {
             PluginsAdminView()
