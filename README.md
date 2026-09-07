@@ -96,6 +96,7 @@ for a clean retry (volumes are kept).
 | [Security](docs/10-security.md) | Keys, secrets, isolation, what never gets written down |
 | [Packaging](docs/11-packaging-and-updates.md) | Signing, notarization, updates |
 | [Roadmap](docs/12-roadmap.md) | Milestones |
+| [Launch checklist](docs/13-launch-checklist.md) | What is left between here and a download, in order |
 | [Engine environment mapping](docs/env-mapping.md) | App settings → container env vars |
 | [Decisions](docs/decisions/) | ADRs — read these before disagreeing with anything above |
 

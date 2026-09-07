@@ -274,7 +274,8 @@ bundled fallback in `XBotApp/Resources` is byte-identical to the published manif
 with the network blocked still starts from a real pin rather than a placeholder. Every outbound URL
 the app can show a person (CopilotKit, OpenBot, Ollama, the docs) answers 200.
 
-**What still needs a person, and cannot be done from here:**
+**The ordered version of all this is [13-launch-checklist.md](13-launch-checklist.md).** What still
+needs a person, and cannot be done from here:
 
 1. A Developer ID certificate and notarization credentials, plus the CI secrets to use them. Until
    then every build is ad-hoc signed, which is also why local GUI verification keeps meeting a
