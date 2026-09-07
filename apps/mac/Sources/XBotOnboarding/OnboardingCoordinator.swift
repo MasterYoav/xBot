@@ -43,6 +43,15 @@ public final class OnboardingCoordinator {
 
     public var selectedProviderID: String = ModelProviderCatalog.all[0].id
     public var apiKey = ""
+
+    /// The CopilotKit key, which is what lets the engine keep conversations at all.
+    ///
+    /// ADR-0007: "The app ships with an Intelligence key configured at onboarding alongside the
+    /// model key." Without it the engine boots into local mode and cannot hold a conversation, so
+    /// this is not optional in the way a model key is — skipping the model step leaves a usable app
+    /// with a disabled composer, while skipping this one leaves an app that looks fine and fails on
+    /// the first turn.
+    public var intelligenceKey = ""
     public private(set) var validation: ValidationState = .idle
     public private(set) var ollamaModelCount: Int?
     public private(set) var didSkipModel = false
@@ -252,6 +261,12 @@ public final class OnboardingCoordinator {
             do {
                 if selectedProviderID != "ollama" {
                     try ProviderKeyStore.save(apiKey, for: selectedProviderID)
+                }
+                // Saved beside the model key, which is the pairing ADR-0007 describes. Empty is
+                // allowed: the person can add it later in Settings, and the composer says so
+                // rather than the first turn failing.
+                if !ProviderKeyStore.normalize(intelligenceKey).isEmpty {
+                    try IntelligenceCredentialStore.save(apiKey: intelligenceKey)
                 }
                 ProviderConnectionStore.shared.markConnected(selectedProviderID)
                 validation = .succeeded(modelCount: count)

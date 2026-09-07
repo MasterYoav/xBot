@@ -267,33 +267,28 @@ it.**
 **Done when:** someone who has never seen the project installs from the website and uses it, without
 help.
 
-### ⚠️ The launch blocker that is not a coding task
+### The Intelligence wiring — resolved
 
-**The app boots the engine into a mode where a conversation cannot work, and nothing tests that
-path.** This needs a decision before anything else in M7 matters.
+**Was:** the app passed no `intelligence`, so the engine booted into local mode, whose client throws
+past wiring. It shipped a mode in which a conversation cannot work, and the first screen promised
+"Everything stays here. No account, no cloud" — both of the things ADR-0007 says do not hold in v1.
 
-- `EngineBootstrap.environmentFactory()` passes no `intelligence`, so `EngineEnvironment.compose`
-  leaves all four `INTELLIGENCE_*` unset, so `runtimeCapabilities()` selects `mode: "local"`.
-- Local mode uses `LocalIntelligence`, which answers a handful of wiring-time methods and **throws
-  on everything else**. It is a spike, by its own first line.
-- Every engine test sets all four variables (`server/tests/support/environment.ts`), so the suite
-  runs in Intelligence mode and local mode is only asserted at the config level. A conversation has
-  never been driven through the mode the app actually ships.
+**Now:** ADR-0007 is Accepted and it decided this already; the code had simply never followed.
 
-CLAUDE.md and ADR-0007 both say v1 sets all four and that onboarding discloses the transcript leaves
-the Mac. Neither is true in the code: nothing in `apps/mac/` mentions Intelligence, and the Welcome
-step says **"Everything stays here. No account, no cloud"** — which is the opposite of the
-disclosure, and false if the four variables are ever set.
+- `EngineBootstrap` passes all four `INTELLIGENCE_*`, from `IntelligenceCredentialStore`.
+- The two URLs are constants; the licence token is generated per install, because ADR-0007 measured
+  that nothing validates it and upstream's way of getting one is a terminal command; the API key is
+  pasted at onboarding beside the model key.
+- Onboarding says where conversations are kept **before** a key is typed, which is the placement the
+  ADR specifies, and the Welcome bullet no longer claims otherwise. Both strings are asserted by
+  tests, because the claim is the feature.
+- Without the key the composer says so — `ComposerBlock.noConversationStore` — rather than letting a
+  turn fail against an engine that otherwise looks healthy.
 
-Two coherent versions of v1, and the repository is in neither:
-
-| | What it takes | What onboarding must say |
-| --- | --- | --- |
-| **A — ship on Intelligence** | `EngineBootstrap` sets the four variables; credentials shipped or entered | The transcript leaves the Mac. The Welcome copy must change: it is currently false under A |
-| **B — ship local** | M1 (`LocalHistoryProvider`, ADR-0001) built — currently deferred past v1 | Today's copy is already true |
-
-A is days of work and a change to the privacy claim. B is the deferred milestone. Choosing B by
-default is what has happened so far, without B being built.
+**Still open, and the reason this is not finished:** nothing has driven a conversation end to end
+against an engine in Intelligence mode. That needs a CopilotKit key on the machine running it. Every
+engine test sets the four variables, so the suite covers the mode; the app's own path to it has
+never been exercised.
 
 ---
 

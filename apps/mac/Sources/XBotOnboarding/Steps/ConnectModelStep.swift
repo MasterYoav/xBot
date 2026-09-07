@@ -45,6 +45,8 @@ struct ConnectModelStep: View {
                     ollamaRow
                 }
 
+                intelligenceField
+
                 HStack {
                     Button(String(localized: "Skip for now"), action: coordinator.skipModelConnection)
                         .buttonStyle(XBotButtonStyle())
@@ -113,6 +115,29 @@ struct ConnectModelStep: View {
             in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
         )
         .accessibilityElement(children: .combine)
+    }
+
+    /// The CopilotKit key, beside the model key, as ADR-0007 describes.
+    ///
+    /// Its own field rather than folded into the provider list, because it is not a model — it is
+    /// where conversations are kept. Optional here so somebody evaluating the app still reaches a
+    /// window; the composer says what is missing rather than the first turn failing.
+    private var intelligenceField: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Text(String(localized: "CopilotKit key"))
+                .captionText()
+                .foregroundStyle(Palette.textSecondary)
+            SecureField(
+                String(localized: "Paste your CopilotKit key"),
+                text: $coordinator.intelligenceKey
+            )
+            .textFieldStyle(.roundedBorder)
+            Text(String(
+                localized: "Needed for xBot to keep your conversations. You can add it later in Settings — until then agents can't reply."
+            ))
+            .captionText()
+            .foregroundStyle(Palette.textTertiary)
+        }
     }
 
     private var keyField: some View {
