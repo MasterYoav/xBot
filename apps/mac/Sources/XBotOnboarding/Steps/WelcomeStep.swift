@@ -6,11 +6,26 @@ struct WelcomeStep: View {
     @State private var revealed = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let bullets = [
+    /*
+     * What v1 actually does, rather than what the pitch would prefer.
+     *
+     * The third bullet used to read "Everything stays here. No account, no cloud." ADR-0007 is
+     * explicit that both halves of that are false for v1: onboarding needs a CopilotKit key, and
+     * conversation history rests on their infrastructure. The ADR says the vision document "has
+     * been changed rather than quietly reinterpreted" — the first screen of the product is the one
+     * place that mattered most and it had not been.
+     *
+     * Agents, files and browsers really do stay on the Mac, so that claim keeps its place. The
+     * transcript is the exception and step four says so in full before a key is typed.
+     */
+    /// The promises this screen makes. Exposed so a test can hold them to ADR-0007.
+    static let bulletsForTesting = [
         String(localized: "Bring any model — or run one locally, with nothing leaving your Mac"),
         String(localized: "Watch what your agents do, and take over whenever you want"),
-        String(localized: "Everything stays here. No account, no cloud"),
+        String(localized: "Your agents, their files, and their browsers stay on this Mac"),
     ]
+
+    private let bullets = Self.bulletsForTesting
 
     var body: some View {
         OnboardingLayout(title: String(localized: "Your own AI coworkers.")) {

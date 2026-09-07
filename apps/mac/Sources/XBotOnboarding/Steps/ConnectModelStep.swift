@@ -19,6 +19,20 @@ struct ConnectModelStep: View {
                 .bodyText()
                 .foregroundStyle(Palette.textSecondary)
 
+                /*
+                 * Where conversations are kept, before a key is typed.
+                 *
+                 * ADR-0007 requires exactly this and is specific about the placement: "Onboarding
+                 * says where conversations are stored, in one sentence, before the user types a key
+                 * — not in a privacy policy, and not after. An app whose pitch is local control
+                 * must not be vague about the part that is not local."
+                 *
+                 * Above the provider list rather than under the field, because a disclosure a
+                 * person reads after choosing is a disclosure that arrived too late to inform the
+                 * choice.
+                 */
+                transcriptDisclosure
+
                 VStack(spacing: Space.xs) {
                     ForEach(ModelProviderCatalog.all) { provider in
                         providerRow(provider)
@@ -77,7 +91,30 @@ struct ConnectModelStep: View {
         .buttonStyle(.plain)
     }
 
+    /// The sentence ADR-0007 requires. One source, so a test can hold the product to it.
+    static let transcriptDisclosureText = String(
+        localized: "Your agents and their files stay on this Mac. Your conversation history is stored by CopilotKit, the service xBot's engine is built on, so it leaves your Mac."
+    )
+
+    /// Says the part that is not local, in the place it can still change a decision.
     @ViewBuilder
+    private var transcriptDisclosure: some View {
+        HStack(alignment: .top, spacing: Space.s) {
+            Image(systemName: "cloud")
+                .font(.system(size: 13))
+                .foregroundStyle(Palette.stateReconnecting)
+            Text(Self.transcriptDisclosureText)
+            .captionText()
+            .foregroundStyle(Palette.textSecondary)
+        }
+        .padding(Space.s)
+        .background(
+            Palette.elevatedSurface,
+            in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
+    }
+
     private var keyField: some View {
         VStack(alignment: .leading, spacing: Space.s) {
             SecureField(String(localized: "Paste your key here"), text: $coordinator.apiKey)
