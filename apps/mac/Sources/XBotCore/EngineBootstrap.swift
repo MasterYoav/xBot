@@ -19,7 +19,7 @@ public enum EngineBootstrap {
          * enough — no relaunch.
          *
          * Nil until somebody connects one, and nil means the engine boots into local mode, whose
-         * client throws on everything past wiring. That is why `hasIntelligence` exists: the app has
+         * client throws on everything past wiring. That is why `conversationStore` exists: the app has
          * to be able to say so rather than let a conversation fail with nothing to read.
          */
         let intelligence = IntelligenceCredentialStore.settings()
@@ -56,9 +56,7 @@ public enum EngineBootstrap {
     /// picks local mode and `LocalIntelligence` — a spike that throws past wiring. An engine in that
     /// state starts and answers `/health` and looks entirely well, which is exactly why the app has
     /// to check rather than wait for a turn to fail.
-    public static var hasIntelligence: Bool { IntelligenceCredentialStore.settings() != nil }
-
-    /// The same question, with the answer that distinguishes a missing key from an unreadable one.
+    /// Whether the engine can keep a conversation, and if not, why not.
     public static var conversationStore: ConversationStore {
         switch IntelligenceCredentialStore.availability() {
         case .connected: .ready

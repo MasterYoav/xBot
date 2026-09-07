@@ -36,23 +36,33 @@ public actor ColimaInstaller {
     ) async throws {
         try RuntimePaths.ensureDirectories()
 
-        report(RuntimeInstallProgress(
-            phase: .downloading,
-            label: String(localized: "Downloading container runtime"),
-            fraction: 0
-        ))
+        /*
+         * Nothing to download if it is already here.
+         *
+         * `isInstalled` existed and was consulted by nobody, so the common retry — the download
+         * finished, the start failed, the person pressed the button again — fetched Colima and the
+         * Docker CLI from the network a second time before doing the one part that had actually
+         * failed. Tens of megabytes to repeat a step that had already succeeded.
+         */
+        if !isInstalled {
+            report(RuntimeInstallProgress(
+                phase: .downloading,
+                label: String(localized: "Downloading container runtime"),
+                fraction: 0
+            ))
 
-        let arch = Self.machineArchitecture
-        try await downloadColima(architecture: arch, report: report)
-        try await downloadDockerCLI(architecture: arch, report: report)
+            let arch = Self.machineArchitecture
+            try await downloadColima(architecture: arch, report: report)
+            try await downloadDockerCLI(architecture: arch, report: report)
 
-        report(RuntimeInstallProgress(
-            phase: .installing,
-            label: String(localized: "Installing"),
-            fraction: nil
-        ))
-        try markExecutable(RuntimePaths.colimaExecutable)
-        try markExecutable(RuntimePaths.dockerExecutable)
+            report(RuntimeInstallProgress(
+                phase: .installing,
+                label: String(localized: "Installing"),
+                fraction: nil
+            ))
+            try markExecutable(RuntimePaths.colimaExecutable)
+            try markExecutable(RuntimePaths.dockerExecutable)
+        }
 
         report(RuntimeInstallProgress(
             phase: .starting,

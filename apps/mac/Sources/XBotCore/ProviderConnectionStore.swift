@@ -62,11 +62,6 @@ public struct ProviderConnectionStore: Sendable {
         defaults.set(true, forKey: Self.skippedKey)
     }
 
-    /// Whether the composer may send — at least one provider is connected.
-    public func canSendMessages() -> Bool {
-        hasAnyConnection
-    }
-
     /// After onboarding skip with no key, the composer stays disabled until a model is connected.
     public func requiresModelForComposer() -> Bool {
         skippedDuringOnboarding && !hasAnyConnection
