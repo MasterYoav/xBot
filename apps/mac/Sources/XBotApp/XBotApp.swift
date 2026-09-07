@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import XBotCore
 import XBotEngine
@@ -80,6 +81,34 @@ struct XBotApp: App {
             // is where every Mac app keeps it.
             CommandGroup(replacing: .appInfo) {
                 Button(String(localized: "About xBot")) { AboutPanel.show() }
+            }
+
+            /*
+             * ⌘, with no `Settings` scene to hang it on.
+             *
+             * Settings moved into the main window, which was the right call and took the menu item
+             * with it — SwiftUI only draws one for a `Settings` scene. So the shortcut every Mac
+             * user reaches for first did nothing at all, and the only way to the pane was a gear at
+             * the bottom of the rail. This puts the item back where it belongs and points it at the
+             * window we already have.
+             */
+            CommandGroup(replacing: .appSettings) {
+                Button(String(localized: "Settings…")) { state.isShowingSettings = true }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
+
+            /*
+             * The Help menu, which was a dead end.
+             *
+             * SwiftUI draws "xBot Help" by default and it opens Help Viewer, which looks for a help
+             * book this app has never had and tells the person help is not available. A menu item
+             * that exists only to say no is the same failure as a button that does nothing, and it
+             * sits in the one menu somebody opens because they are already stuck.
+             */
+            CommandGroup(replacing: .help) {
+                Button(String(localized: "xBot Documentation")) {
+                    NSWorkspace.shared.open(AboutPanel.documentationURL)
+                }
             }
         }
 

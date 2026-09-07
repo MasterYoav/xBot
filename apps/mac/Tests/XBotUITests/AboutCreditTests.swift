@@ -30,3 +30,18 @@ struct AboutCreditTests {
         #expect(found.contains { $0.absoluteString.contains("CopilotKit/openbot") })
     }
 }
+
+/// Where the Help menu goes.
+///
+/// SwiftUI's default "xBot Help" opens Help Viewer, which looks for a help book this app has never
+/// had and tells the person help is not available — a menu item that exists only to say no, in the
+/// one menu somebody opens because they are already stuck.
+@Suite
+struct DocumentationLinkTests {
+    @Test func helpPointsAtSomethingThatExists() {
+        let url = AboutPanel.documentationURL
+        #expect(url.scheme == "https")
+        #expect(url.host()?.contains("github.com") == true)
+        #expect(url.absoluteString.contains("xBot"))
+    }
+}

@@ -13,6 +13,11 @@ import SwiftUI
 /// takes an attributed string for the rest. A hand-built window would be a worse copy of it, and
 /// this is the one screen where being conventional is the whole point.
 public enum AboutPanel {
+    /// Where Help points. The repository's docs index, because that is what exists — an app that
+    /// ships a Help menu pointing at a help book it does not have is worse than one with no Help
+    /// menu at all.
+    public static let documentationURL = URL(string: "https://github.com/MasterYoav/xBot#documentation")!
+
     public static func show() {
         NSApplication.shared.orderFrontStandardAboutPanel(
             options: [.credits: credits]
