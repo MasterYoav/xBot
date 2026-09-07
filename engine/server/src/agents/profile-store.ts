@@ -187,7 +187,35 @@ function publishableSelection(configuration: unknown) {
   );
   if (!stored) return undefined;
   const { apiKey: _withheld, ...publishable } = stored;
+
+  /*
+   * And any credential hiding in the address.
+   *
+   * `openai-compatible` takes a base URL, and `https://user:secret@host/v1` is how several gateways
+   * document themselves — so a stored selection can carry a password in a field that is not the key
+   * field. The app refuses to save one now, but this is the boundary that publishes to every
+   * surface, and a row written by an older app or edited by hand still reaches it here. Stripping
+   * the userinfo keeps the promise this function already makes: the surface learns the address and
+   * the model, never the secret.
+   */
+  if (publishable.baseURL) {
+    publishable.baseURL = withoutUserInfo(publishable.baseURL);
+  }
   return publishable;
+}
+
+/** The same address with any `user:password@` removed. Unparseable strings are left alone. */
+export function withoutUserInfo(address: string): string {
+  try {
+    const url = new URL(address);
+    if (!url.username && !url.password) return address;
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    // Not a URL this runtime can parse, so there is nothing to strip and no claim to make about it.
+    return address;
+  }
 }
 
 /**
