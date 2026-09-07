@@ -72,7 +72,28 @@ jobs:
           # later step is exactly the thing not to leave lying around. So the token is handed to
           # this one push and nowhere else. Without it the step failed with "could not read
           # Username for https://github.com", so the manifest was never actually published.
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:master
+          #
+          # Rebased and retried, because this job races every other push.
+          #
+          # It builds an image before it writes the manifest, which takes minutes, and master moves
+          # in the meantime. The push is then rejected as non-fast-forward and the whole run goes
+          # red having actually succeeded at everything that matters — the image is published and
+          # the digest is real; only the commit recording it did not land. The next push then ships
+          # an app pinned to the previous digest with nothing saying so.
+          #
+          # A rebase is safe here in a way it usually is not: this commit touches exactly the two
+          # generated manifest files, nothing else in the repository writes them, and the digest it
+          # carries was just built from the tree it is being replayed onto.
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          for attempt in 1 2 3; do
+            if git push "$remote" HEAD:master; then exit 0; fi
+            echo "master moved under us; rebasing (attempt $attempt)"
+            git pull --rebase "$remote" master || exit 1
+          done
+          # Three losses in a row is not a race any more, and a silent give-up here is how a stale
+          # pin ships.
+          echo "Could not publish the manifest after three attempts." >&2
+          exit 1
 
       - uses: actions/upload-artifact@v4
         with:
