@@ -450,6 +450,18 @@ public final class AppState {
         try await engine.auditEvents(query)
     }
 
+    public func routines() async throws -> [Routine] {
+        try await engine.routines()
+    }
+
+    public func setRoutineEnabled(_ id: String, enabled: Bool) async throws {
+        try await engine.setRoutineEnabled(id, enabled: enabled)
+    }
+
+    public func deleteRoutine(_ id: String) async throws {
+        try await engine.deleteRoutine(id)
+    }
+
     public func dismissModelBanner() {
         modelBannerDismissed = true
     }

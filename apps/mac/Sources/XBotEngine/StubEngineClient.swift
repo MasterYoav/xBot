@@ -408,6 +408,57 @@ public actor StubEngineClient: EngineClient {
         return policy
     }
 
+    /// Two, because one routine cannot show what a disabled one looks like beside a live one.
+    private var storedRoutines: [Routine] = [
+        Routine(
+            id: "routine-standup",
+            agentId: "orchestrator",
+            schedule: String(localized: "Weekdays at 09:00"),
+            timezone: "Europe/London",
+            instruction: String(localized: "Summarise what changed overnight and post it."),
+            channelName: String(localized: "Morning"),
+            enabled: true,
+            nextRunAt: Date().addingTimeInterval(3600)
+        ),
+        Routine(
+            id: "routine-invoices",
+            agentId: "orchestrator",
+            schedule: String(localized: "On the 1st at 08:00"),
+            timezone: "Europe/London",
+            instruction: String(localized: "Check for invoices that came in and file them."),
+            channelName: nil,
+            channelIsGone: true,
+            enabled: false,
+            nextRunAt: Date().addingTimeInterval(86400),
+            lastRunStatus: "failed",
+            lastRunAt: Date().addingTimeInterval(-86400)
+        ),
+    ]
+
+    public func routines() async throws -> [Routine] { storedRoutines }
+
+    public func setRoutineEnabled(_ id: String, enabled: Bool) async throws {
+        guard let index = storedRoutines.firstIndex(where: { $0.id == id }) else { return }
+        let existing = storedRoutines[index]
+        storedRoutines[index] = Routine(
+            id: existing.id,
+            agentId: existing.agentId,
+            schedule: existing.schedule,
+            timezone: existing.timezone,
+            instruction: existing.instruction,
+            channelName: existing.channelName,
+            channelIsGone: existing.channelIsGone,
+            enabled: enabled,
+            nextRunAt: existing.nextRunAt,
+            lastRunStatus: existing.lastRunStatus,
+            lastRunAt: existing.lastRunAt
+        )
+    }
+
+    public func deleteRoutine(_ id: String) async throws {
+        storedRoutines.removeAll { $0.id == id }
+    }
+
     public func channels() async throws -> [Channel] { fixedChannels }
 
     public func messages(in channel: Channel.ID) async throws -> [Message] {

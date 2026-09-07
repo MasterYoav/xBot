@@ -72,4 +72,18 @@ public struct UnavailableEngineClient: EngineClient {
     public func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy {
         throw EngineError.notRunning
     }
+
+    public func routines() async throws -> [Routine] {
+        // Throwing rather than answering with none: an empty list here would read as "you have no
+        // routines", which is the opposite of "I could not ask".
+        throw EngineError.notRunning
+    }
+
+    public func setRoutineEnabled(_ id: String, enabled: Bool) async throws {
+        throw EngineError.notRunning
+    }
+
+    public func deleteRoutine(_ id: String) async throws {
+        throw EngineError.notRunning
+    }
 }

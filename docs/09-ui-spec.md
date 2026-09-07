@@ -241,14 +241,28 @@ file and page rows described above.
 
 ### Routines
 
-Recurring scheduled tasks. Empty state, from the reference:
+Recurring scheduled tasks. Each routine: its instruction, the schedule in plain language
+("Weekdays at 09:00"), when it next fires, an enable toggle, and delete on hover.
 
-> Routines are recurring tasks this Bot runs on a schedule.
->
-> [ Create Routine ]
+**There is no Create Routine button, and the reference's one was wrong.** The engine has
+deliberately no create and no edit endpoint — `server/src/routines/routes.ts` says so at length:
+making a routine and changing one are conversational, because the hard part of both is turning a
+sentence into a cron expression and a channel, which is what a conversation is for. A Bot creates
+one mid-chat through its own tools. This panel answers the narrower question a person actually
+brings to it: what is standing, and does it stay standing.
 
-Each routine: name, schedule in plain language ("Weekdays at 9:00"), last run and its outcome,
-enable toggle.
+So the empty state is an invitation to ask rather than a button: *"Nothing standing. Ask this agent
+for something on a schedule — 'check the inbox every weekday at nine' — and it will set one up."*
+A button that opened a form with a cron field in it would be the terminal this product does not
+have, wearing a different hat.
+
+**The schedule is display text and is never parsed.** The engine renders it, computes `nextRunAt`
+from the expression itself, and says in its own comment that a consumer must show it and never
+compute a time from it. A second cron reader in the client is a second answer to when something
+happens.
+
+**A routine whose channel is gone still runs**, and the row says so — it has nowhere to speak, and
+silence about that is the confusing version.
 
 ### Agent settings
 
@@ -423,7 +437,7 @@ Every empty state is a sentence and an action. Never "No items."
 | Engine stopped | "The engine isn't running" + **Start**. Not an empty list |
 | No model connected | "Connect a model to start" + **Open Settings**. Composer disabled with this reason |
 | Agent has never browsed | The monitor glyph + "*Agent*'s screen" |
-| No routines | The reference's sentence + **Create Routine** |
+| No routines | "Nothing standing" + how to ask the agent for one. **No create button** — see Routines |
 | Turn failed | The reason, inline, + **Retry** |
 | Provider rejected the key | "Anthropic didn't accept this key" + **Update key** |
 | Rate limited | "Anthropic is rate-limiting you. Try again in about a minute." |

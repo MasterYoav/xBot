@@ -203,6 +203,54 @@ public actor HTTPEngineClient: EngineClient {
         let policy: ActionPolicy
     }
 
+    // MARK: - Routines
+
+    public func routines() async throws -> [Routine] {
+        let (data, response) = try await send(request(.get, "/api/routines"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw EngineError.notRunning }
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let rows = object["routines"] as? [[String: Any]]
+        else { return [] }
+        return rows.compactMap(Self.routine(from:))
+    }
+
+    public func setRoutineEnabled(_ id: String, enabled: Bool) async throws {
+        let path = "/api/routines/\(id)/enabled"
+        let (_, response) = try await send(request(.put, path, body: ["enabled": enabled]))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw EngineError.notRunning }
+    }
+
+    public func deleteRoutine(_ id: String) async throws {
+        let (_, response) = try await send(request(.delete, "/api/routines/\(id)"))
+        // 204 on success, and 404 for a routine that is already gone — which is the state the
+        // caller wanted. Only a real failure is worth putting in front of somebody.
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 204 || status == 404 else { throw EngineError.notRunning }
+    }
+
+    private static func routine(from row: [String: Any]) -> Routine? {
+        guard let id = row["id"] as? String, let agentId = row["agentId"] as? String else {
+            return nil
+        }
+        let channel = row["channel"] as? [String: Any]
+        let lastRun = row["lastRun"] as? [String: Any]
+        return Routine(
+            id: id,
+            agentId: agentId,
+            // Shown, never parsed. The engine's own comment: treat it as opaque display text.
+            schedule: row["schedule"] as? String ?? "",
+            timezone: row["timezone"] as? String ?? "",
+            instruction: row["instruction"] as? String ?? "",
+            channelName: channel?["name"] as? String,
+            channelIsGone: channel?["gone"] as? Bool ?? false,
+            enabled: row["enabled"] as? Bool ?? true,
+            nextRunAt: (row["nextRunAt"] as? String).flatMap(auditDate),
+            lastRunStatus: lastRun?["status"] as? String,
+            lastRunAt: (lastRun?["at"] as? String).flatMap(auditDate)
+        )
+    }
+
 
     public func auditEvents(_ query: AuditQuery) async throws -> AuditPage {
         var components = URLComponents(

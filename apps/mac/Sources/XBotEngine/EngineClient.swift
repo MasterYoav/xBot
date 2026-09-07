@@ -77,6 +77,18 @@ public protocol EngineClient: Sendable {
 
     /// Replace the whole policy. The engine normalises and echoes what is in force.
     func saveActionPolicy(_ policy: ActionPolicy) async throws -> ActionPolicy
+
+    /// Every standing routine, for every agent. Narrowed to one agent by the caller.
+    ///
+    /// There is no create and no update here because the engine has neither, deliberately: a
+    /// routine is made by asking an agent for one. See `Routine`.
+    func routines() async throws -> [Routine]
+
+    /// Stop a routine without deleting it, or start it again.
+    func setRoutineEnabled(_ id: String, enabled: Bool) async throws
+
+    /// Delete a routine. The engine treats another person's id as one that does not exist.
+    func deleteRoutine(_ id: String) async throws
 }
 
 /// What creating an agent needs. The rest of the row is generated — avatar seed, id, defaults.
