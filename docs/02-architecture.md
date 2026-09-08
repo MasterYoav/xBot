@@ -210,7 +210,7 @@ Summary; details in [03-openbot-fork.md](03-openbot-fork.md).
 | Area | Upstream | xBot |
 | --- | --- | --- |
 | Threads & memory | Hosted CopilotKit Intelligence, **mandatory** | **v1: Intelligence, kept.** Local provider seam built and deferred — [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) |
-| Model selection | `BOT_PROVIDER` env var, process-wide, 3 vendors | Per-agent, resolved per run, every vendor + Ollama — **built; not yet proven against a live vendor** |
+| Model selection | `BOT_PROVIDER` env var, process-wide, 3 vendors | Per-agent, resolved per run, every vendor + Ollama — **built and proven live against a real vendor**; the `copilot.ts` hop is covered by a test asserting on the posted body |
 | Auth | OAuth/SAML/OIDC, or single-user mode | Single local user. Keychain-backed token |
 | Configuration | `.env` file | App settings → generated env → container |
 | Client | React/Vite on `:3010` | Native SwiftUI. React kept for admin only |

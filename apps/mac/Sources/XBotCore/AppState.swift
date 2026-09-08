@@ -67,13 +67,24 @@ public final class AppState {
 
     public enum Status: Hashable, Sendable {
         case startingUp
-        case reconnecting
+        /*
+         * Carrying which kind of degraded, because there are three and they are not the same news.
+         *
+         * `DegradedReason` exists to keep "the API answering while the computer is down" apart from
+         * health flapping after the Mac wakes — its own note says collapsing that into `failed`
+         * makes the app cry wolf and collapsing it into `running` makes it lie. This used to be a
+         * bare `.reconnecting`, which collapsed all three again one level further down, so an agent
+         * whose browser had crashed showed "Reconnecting": nothing was reconnecting, and the reason
+         * its screen had gone blank was the one thing the pill could have said.
+         */
+        case degraded(RuntimeState.DegradedReason)
         case updating
 
         public var sentence: String {
             switch self {
             case .startingUp: String(localized: "Starting up")
-            case .reconnecting: String(localized: "Reconnecting")
+            // The reason's own wording, so there is one source for it rather than two that drift.
+            case .degraded(let reason): reason.sentence
             case .updating: String(localized: "Updating")
             }
         }
@@ -322,7 +333,9 @@ public final class AppState {
         } catch {
             // Honest degradation: the rail is empty because the engine is down, and the composer
             // says so. Never an empty state that implies there is simply nothing here.
-            status = .reconnecting
+            // The engine stopped answering, which is what `healthLost` names — the same word the
+            // runtime uses when its own probe stops coming back.
+            status = .degraded(.healthLost)
             composerBlock = .engineNotRunning
         }
     }
@@ -415,10 +428,11 @@ public final class AppState {
             await refreshFromEngine()
             await checkForEngineUpdateIfDue()
             appUpdates.scheduleAutomaticCheckIfDue()
-        case .degraded:
+        case .degraded(let reason):
             // The conversation stays readable and usable — docs/09-ui-spec.md is explicit that a
-            // health blip must not yank away what is already loaded.
-            status = .reconnecting
+            // health blip must not yank away what is already loaded. Only the pill changes, and it
+            // says which kind of unwell rather than one word for all three.
+            status = .degraded(reason)
         }
     }
 

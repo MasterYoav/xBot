@@ -130,7 +130,10 @@ Agent avatar, name, and — centred, floating over the content — the **status 
 blur radius and scale animate together on enter, so it reads as a surface arriving rather than an
 opacity ramp. It is not part of the layout — content scrolls under it.
 
-States: `Reconnecting` · `Starting up` · `Updating` · `Model not connected`. **When everything is
+States: `Starting up` · `Updating` · `Model not connected`, and one per `DegradedReason` —
+`Reconnecting`, `The agent's computer is restarting`, `The engine is slow to respond`. Those three
+are not interchangeable: an agent whose browser has crashed is not reconnecting, and why its screen
+went blank is the one thing the pill can usefully say. **When everything is
 fine there is no pill.** Do not confirm good news.
 
 ### Messages

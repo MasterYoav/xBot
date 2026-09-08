@@ -102,7 +102,7 @@ struct RuntimeConnectedTests {
 
         await runtime.noteHealthLost(.healthLost)
 
-        try await until { state.status == .reconnecting }
+        try await until { state.status == .degraded(.healthLost) }
         // The pill changes; nothing else does. A health blip must not yank away what is already
         // loaded, per docs/09-ui-spec.md.
         #expect(state.composerBlock == nil)
@@ -168,5 +168,37 @@ struct RuntimeConnectedTests {
             try await Task.sleep(for: .milliseconds(20))
         }
         Issue.record("condition never became true")
+    }
+}
+
+/// What the status pill says when the engine is unwell.
+@MainActor
+@Suite
+struct DegradedStatusSentenceTests {
+    /**
+     Three reasons, three sentences.
+
+     `DegradedReason` exists to keep "the API answering while the computer is down" apart from health
+     flapping after the Mac wakes — its own note says collapsing that into `failed` makes the app cry
+     wolf and into `running` makes it lie. The pill then collapsed all three into "Reconnecting" one
+     level further down, so an agent whose browser had crashed reported reconnecting: nothing was
+     reconnecting, and why its screen had gone blank was the one thing the pill could have said.
+     */
+    @Test func eachReasonGetsItsOwnSentence() {
+        let sentences = Set(
+            [AppState.Status.degraded(.healthLost),
+             .degraded(.computerDown),
+             .degraded(.slowToRespond)].map(\.sentence)
+        )
+        #expect(sentences.count == 3)
+    }
+
+    /// One source for the wording. The pill used to carry its own copy of "Reconnecting" beside the
+    /// reason's, which is two strings for one fact and exactly how they drift apart.
+    @Test func thePillUsesTheReasonsOwnWording() {
+        #expect(
+            AppState.Status.degraded(.computerDown).sentence
+                == RuntimeState.DegradedReason.computerDown.sentence
+        )
     }
 }

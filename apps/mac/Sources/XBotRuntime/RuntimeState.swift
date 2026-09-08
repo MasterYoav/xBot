@@ -40,7 +40,7 @@ public enum RuntimeState: Sendable, Equatable {
     /// A real and common state that is neither running nor failed — the API answering while the
     /// computer is down, or health flapping after the Mac wakes. Collapsing it into `failed` makes
     /// the app cry wolf; collapsing it into `running` makes it lie.
-    public enum DegradedReason: String, Sendable {
+    public enum DegradedReason: String, Hashable, Sendable {
         case healthLost
         case computerDown
         case slowToRespond
