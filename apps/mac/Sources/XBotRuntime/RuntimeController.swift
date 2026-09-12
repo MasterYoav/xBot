@@ -544,6 +544,61 @@ public actor RuntimeController {
         state = .stopped
     }
 
+    /// Consecutive health checks that went unanswered while the engine should have been up.
+    private var missedHealthChecks = 0
+
+    /**
+     One health check on an engine that is meant to be up. The app calls this on a timer.
+
+     Nothing did before. `noteHealthLost` and `noteHealthRecovered` existed and were called only by
+     tests, so in the running app a crashed container or a Docker that quit mid-session left the state
+     at `.running` indefinitely: no pill, Settings saying Running, and every message failing against
+     an engine the app still believed in. The whole degraded state was unreachable outside a test.
+
+     One miss is a blip — a busy engine, a pause while a big turn loads. Two in a row is not, and then
+     it finds out which kind of gone, because they need different sentences and different buttons:
+
+     - the runtime itself is down → `.notDetected`, where Start wakes it (docs/06's "Docker stopped
+       unexpectedly");
+     - the container has exited → `.failed(.engineStoppedUnexpectedly)`, where Try again starts it;
+     - the container is still up but the API is silent → `.degraded(.healthLost)`, "Reconnecting",
+       which recovers by itself the moment health answers again.
+     */
+    public func verifyHealth() async {
+        guard let port = allocatedPort else { return }
+        switch state {
+        case .running, .degraded: break
+        default: return
+        }
+        let endpoint = EngineEndpoint(port: port)
+
+        if let answered = await health(endpoint) {
+            lastHealth = answered
+            missedHealthChecks = 0
+            if case .degraded = state { state = .running(endpoint) }
+            return
+        }
+
+        missedHealthChecks += 1
+        guard missedHealthChecks >= 2 else { return }
+
+        guard case .ready = await driver.probe() else {
+            handle = nil
+            missedHealthChecks = 0
+            state = .notDetected(await driver.probe())
+            return
+        }
+        if let handle, case .exited = (try? await driver.inspect(handle)) ?? .notFound {
+            self.handle = nil
+            missedHealthChecks = 0
+            state = .failed(.engineStoppedUnexpectedly)
+            return
+        }
+        if case .running = state {
+            state = .degraded(reason: .healthLost)
+        }
+    }
+
     public func noteHealthLost(_ reason: RuntimeState.DegradedReason) {
         guard case .running = state else { return }
         state = .degraded(reason: reason)

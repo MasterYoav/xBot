@@ -429,6 +429,13 @@ public final class AppState {
             idleWatch?.cancel()
             idleWatch = nil
         }
+        // Health is watched through `.degraded` too — that is the state it recovers from.
+        switch runtimeState {
+        case .running, .degraded: break
+        default:
+            healthWatch?.cancel()
+            healthWatch = nil
+        }
         switch runtimeState {
         case .notDetected(let probe):
             engine = UnavailableEngineClient()
@@ -501,6 +508,7 @@ public final class AppState {
             // a history reload from replacing the bubble that is waiting to be answered.
             dispatchMessageThatWokeTheEngine()
             startIdleWatch()
+            startHealthWatch()
             await refreshFromEngine()
             await checkForEngineUpdateIfDue()
             appUpdates.scheduleAutomaticCheckIfDue()
@@ -588,6 +596,23 @@ public final class AppState {
     /// Settable so a test is not waiting thirty minutes.
     var idleTimeout: TimeInterval = EngineIdlePolicy.defaultTimeout
     var idleCheckInterval: Duration = .seconds(60)
+
+    private var healthWatch: Task<Void, Never>?
+    /// Settable so a test is not waiting on a real interval.
+    var healthCheckInterval: Duration = .seconds(10)
+
+    /// Ask the runtime whether the engine is still there, every few seconds, for as long as it is
+    /// meant to be. See `RuntimeController.verifyHealth` for why this has to exist at all.
+    private func startHealthWatch() {
+        guard let runtime, healthWatch == nil else { return }
+        healthWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: self?.healthCheckInterval ?? .seconds(10))
+                guard !Task.isCancelled else { return }
+                await runtime.verifyHealth()
+            }
+        }
+    }
 
     private func noteEngineActivity() {
         lastEngineActivity = Date()

@@ -924,3 +924,92 @@ struct CommandFailureKindTests {
         #expect(!run.sentence.contains("docker"))
     }
 }
+
+/// Noticing that a running engine has gone, which nothing in the app did before.
+@Suite
+struct EngineHealthWatchTests {
+    /// Health that a test can switch off mid-run.
+    actor Pulse {
+        var beating = true
+        func stop() { beating = false }
+        func restart() { beating = true }
+    }
+
+    private nonisolated func environment(_ port: UInt16, _ hostGateway: String) -> [String: String] {
+        EngineEnvironment.compose(
+            EngineEnvironment.Inputs(port: port, keyEncryptionKey: "k", hostGateway: hostGateway, appOrigin: "xbot://app")
+        )
+    }
+
+    private func running() async -> (RuntimeController, FakeDriver, Pulse) {
+        let driver = FakeDriver()
+        let pulse = Pulse()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in
+                await pulse.beating ? EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") : nil
+            },
+            ports: isolatedPortStore()
+        )
+        await controller.start(environment: environment)
+        return (controller, driver, pulse)
+    }
+
+    /// A single silent check is a blip — a busy engine — and is not worth alarming anybody over.
+    @Test func oneMissedCheckChangesNothing() async {
+        let (controller, _, pulse) = await running()
+        await pulse.stop()
+        await controller.verifyHealth()
+        guard case .running = await controller.state else {
+            Issue.record("one miss should not change state, got \(await controller.state)")
+            return
+        }
+    }
+
+    /// Up but silent reads "Reconnecting", and comes back by itself when it answers again.
+    @Test func aSilentEngineIsDegradedAndRecovers() async {
+        let (controller, _, pulse) = await running()
+        await pulse.stop()
+        await controller.verifyHealth()
+        await controller.verifyHealth()
+        #expect(await controller.state == .degraded(reason: .healthLost))
+
+        await pulse.restart()
+        await controller.verifyHealth()
+        guard case .running = await controller.state else {
+            Issue.record("expected recovery, got \(await controller.state)")
+            return
+        }
+    }
+
+    /// A container that has exited is not "reconnecting" — nothing will reconnect to it.
+    @Test func aDeadContainerIsReportedAsStopped() async {
+        let (controller, driver, pulse) = await running()
+        await driver.killContainer()
+        await pulse.stop()
+        await controller.verifyHealth()
+        await controller.verifyHealth()
+        #expect(await controller.state == .failed(.engineStoppedUnexpectedly))
+    }
+
+    /// Docker itself going away is its own case, where Start is what wakes it.
+    @Test func aDeadRuntimeIsReportedAsNotRunning() async {
+        let (controller, driver, pulse) = await running()
+        await driver.stopDaemon()
+        await pulse.stop()
+        await controller.verifyHealth()
+        await controller.verifyHealth()
+        #expect(await controller.state == .notDetected(.installedNotRunning))
+    }
+
+    /// Checks do nothing when the engine is not meant to be up.
+    @Test func aStoppedEngineIsLeftAlone() async {
+        let (controller, _, pulse) = await running()
+        await controller.stop()
+        await pulse.stop()
+        await controller.verifyHealth()
+        await controller.verifyHealth()
+        #expect(await controller.state == .stopped)
+    }
+}

@@ -66,6 +66,14 @@ public actor FakeDriver: ContainerDriver {
         }
     }
 
+    /// The container dies under a running engine: `inspect` reports it exited.
+    public func killContainer() { stopped = true }
+    /// The runtime's own daemon goes away — Docker Desktop quit, the Colima VM stopped.
+    public func stopDaemon() {
+        daemonStarted = false
+        script.probe = .installedNotRunning
+    }
+
     public func probe() async -> ProbeResult {
         daemonStarted ? .ready(version: "fake") : script.probe
     }

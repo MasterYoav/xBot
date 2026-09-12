@@ -158,7 +158,8 @@ Every failure gets a sentence, a cause, and a button. Never a stack trace on scr
 | Registry busy (429) | "The download server is busy right now. Wait a few minutes and try again." | Try again |
 | Image refused or missing | "The engine download isn't available right now. Try again later." | Try again — this one is ours to fix |
 | Ports occupied | *(nothing — we picked others)*. Built: a refused port is retried once on another, silently | — |
-| Runtime dies | "Docker stopped unexpectedly." | Restart Docker |
+| Runtime dies | "The engine isn't running" in the composer; "The container runtime isn't running — Start will wake it" in Settings. Noticed by the health watch within about twenty seconds | Start (wakes the runtime) |
+| Engine container dies | "The engine stopped unexpectedly" | Try again |
 | Migration fails | "Couldn't set up the database." | Retry · Reset and try again |
 | Anything unclassified | "Something went wrong setting up the engine." | Retry · Copy diagnostics |
 

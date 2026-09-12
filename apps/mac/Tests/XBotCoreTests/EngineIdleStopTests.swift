@@ -246,3 +246,59 @@ struct EngineQuitTests {
         #expect(isRunning(state))
     }
 }
+
+/// The app noticing a crash on its own, through the health watch.
+@MainActor
+@Suite(.serialized)
+struct EngineCrashNoticedTests {
+    actor Pulse {
+        var beating = true
+        func stop() { beating = false }
+    }
+
+    private nonisolated func environment(_ port: UInt16, _ hostGateway: String) -> [String: String] {
+        EngineEnvironment.compose(
+            EngineEnvironment.Inputs(port: port, keyEncryptionKey: "k", hostGateway: hostGateway, appOrigin: "xbot://app")
+        )
+    }
+
+    /**
+     A container that dies mid-session shows up in the composer without anybody doing anything.
+
+     Before the watch existed the app went on reporting Running indefinitely, and the first sign of
+     trouble was a message failing against an engine it still believed in.
+     */
+    @Test func aCrashedEngineReachesTheComposerOnItsOwn() async throws {
+        let driver = FakeDriver()
+        let pulse = Pulse()
+        let state = AppState(
+            runtime: RuntimeController(
+                driver: driver,
+                image: ImageReference(repository: "xbot/engine", tag: "1"),
+                health: { _ in
+                    await pulse.beating ? EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") : nil
+                }
+            ),
+            environment: environment,
+            engineFactory: { _ in StubEngineClient(tokenDelay: .zero) },
+            providers: isolatedConnectionStore(),
+            conversationStore: { .ready }
+        )
+        state.healthCheckInterval = .milliseconds(20)
+        await state.load()
+        state.startEngine()
+        for _ in 0..<300 where state.composerBlock != nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(state.composerBlock == nil)
+
+        await driver.killContainer()
+        await pulse.stop()
+
+        for _ in 0..<300 {
+            if case .engineFailed = state.composerBlock { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(state.composerBlock == .engineFailed(reason: RuntimeError.engineStoppedUnexpectedly.sentence))
+    }
+}

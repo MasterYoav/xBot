@@ -184,6 +184,8 @@ public enum RuntimeError: Error, Sendable, Equatable {
     case commandFailed(command: String, exitCode: Int, message: String)
     case healthTimedOut(seconds: Int)
     case noFreePort(range: ClosedRange<UInt16>)
+    /// It was running and it is not any more — a crash, an out-of-memory kill, somebody's `docker rm`.
+    case engineStoppedUnexpectedly
 
     /// What actually went wrong inside a failed command, as far as a person needs to know.
     public enum FailureKind: Equatable, Sendable {
@@ -265,6 +267,8 @@ public enum RuntimeError: Error, Sendable, Equatable {
             String(localized: "The engine took too long to become ready")
         case .noFreePort:
             String(localized: "Couldn't find a free port for the engine")
+        case .engineStoppedUnexpectedly:
+            String(localized: "The engine stopped unexpectedly")
         }
     }
 }
