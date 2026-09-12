@@ -285,9 +285,13 @@ public final class AppState {
         providers: ProviderConnectionStore = .shared,
         appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared,
         /// Defaults to the real credential, because this initializer is the production one.
-        conversationStore: @escaping @Sendable () -> ConversationStore = { EngineBootstrap.conversationStore }
+        conversationStore: @escaping @Sendable () -> ConversationStore = { EngineBootstrap.conversationStore },
+        /// Whether opening the app should bring the engine up. False by default so a test's answer
+        /// never depends on whether this Mac has finished onboarding; the app passes the real one.
+        startsEngineOnLaunch: @escaping @Sendable () -> Bool = { false }
     ) {
         self.conversationStore = conversationStore
+        self.startsEngineOnLaunch = startsEngineOnLaunch
         self.engine = UnavailableEngineClient()
         self.runtime = runtime
         self.environmentFactory = environment
@@ -316,6 +320,7 @@ public final class AppState {
     /// documents: a state object that reaches for a machine-wide store cannot be asserted without
     /// the machine's contents deciding the answer.
     private let conversationStore: @Sendable () -> ConversationStore
+    private var startsEngineOnLaunch: @Sendable () -> Bool = { false }
 
     public var selectedAgent: Agent? {
         agents.first { $0.id == selectedAgentID }
@@ -341,6 +346,27 @@ public final class AppState {
         _ = await runtime.detect()
         await apply(await runtime.state)
         observeRuntime()
+
+        /*
+         * Opening the app brings the engine up.
+         *
+         * Launch used to detect and stop there. So a person who had quit and reopened was met with
+         * "The engine isn't running" and a Start button on every single launch — and when the
+         * container had in fact been running the whole time, that sentence was false: `start()` is
+         * what adopts a healthy container, and nothing called it. Invariant 7 is about exactly this,
+         * an app that says something is down when it is not.
+         *
+         * Not before onboarding, which drives its own start with its own progress screen; and not
+         * when there is no runtime to wake, where `start()` would only arrive back at the same
+         * sentence.
+         */
+        guard startsEngineOnLaunch() else { return }
+        switch await runtime.state {
+        case .stopped, .notDetected(.installedNotRunning):
+            startEngine()
+        default:
+            break
+        }
     }
 
     /// Agents, channels, the current conversation, and the model list — the one thing `load()`

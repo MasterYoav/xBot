@@ -113,3 +113,57 @@ struct EngineIdleStopTests {
         #expect(state.composerBlock == nil)
     }
 }
+
+/// Opening the app, once onboarding is done.
+@MainActor
+@Suite(.serialized)
+struct EngineLaunchTests {
+    private nonisolated func environment(_ port: UInt16, _ hostGateway: String) -> [String: String] {
+        EngineEnvironment.compose(
+            EngineEnvironment.Inputs(port: port, keyEncryptionKey: "k", hostGateway: hostGateway, appOrigin: "xbot://app")
+        )
+    }
+
+    private func app(startsOnLaunch: Bool) -> AppState {
+        AppState(
+            runtime: RuntimeController(
+                driver: FakeDriver(script: FakeDriver.Script()),
+                image: ImageReference(repository: "xbot/engine", tag: "1"),
+                health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+            ),
+            environment: environment,
+            engineFactory: { _ in StubEngineClient(tokenDelay: .zero) },
+            providers: isolatedConnectionStore(),
+            conversationStore: { .ready },
+            startsEngineOnLaunch: { startsOnLaunch }
+        )
+    }
+
+    /**
+     Launch brings the engine up, with no Start button on every open.
+
+     It used to detect and stop, so every relaunch read "The engine isn't running" — false, when the
+     container had been up the whole time, because only `start()` adopts one.
+     */
+    @Test func launchingAfterOnboardingStartsTheEngine() async throws {
+        let state = app(startsOnLaunch: true)
+        await state.load()
+        for _ in 0..<300 {
+            if case .running = state.runtimeState { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        guard case .running = state.runtimeState else {
+            Issue.record("Expected the engine to be started on launch, got \(String(describing: state.runtimeState))")
+            return
+        }
+        #expect(state.composerBlock == nil)
+    }
+
+    /// Before onboarding finishes, onboarding drives the start with its own progress screen.
+    @Test func notBeforeOnboardingIsDone() async throws {
+        let state = app(startsOnLaunch: false)
+        await state.load()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(state.composerBlock == .engineNotRunning)
+    }
+}

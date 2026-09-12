@@ -61,7 +61,8 @@ struct XBotApp: App {
                 let token = (try? EngineTokenStore.token()) ?? ""
                 return HTTPEngineClient(baseURL: endpoint.baseURL, token: token)
             },
-            appUpdates: appUpdates
+            appUpdates: appUpdates,
+            startsEngineOnLaunch: { OnboardingVersion.isComplete }
         )
     }
 
