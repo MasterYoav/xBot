@@ -347,8 +347,20 @@ public actor DockerDriver: ContainerDriver {
             let task = Task {
                 do {
                     try process.run()
+                    /*
+                     * The last few lines, kept for the failure.
+                     *
+                     * stderr shares this pipe, so docker's reason for failing — "no space left on
+                     * device", "dial tcp: i/o timeout" — arrives as just another progress line. It
+                     * was yielded and then the error was thrown with an empty message, so the one
+                     * piece of text that said what went wrong was gone before anything could read
+                     * it, and every failed pull became "The engine couldn't start".
+                     */
+                    var tail: [String] = []
                     for try await line in pipe.fileHandleForReading.bytes.lines {
                         continuation.yield(line)
+                        tail.append(line)
+                        if tail.count > 8 { tail.removeFirst() }
                     }
                     process.waitUntilExit()
                     if process.terminationStatus == 0 {
@@ -358,7 +370,7 @@ public actor DockerDriver: ContainerDriver {
                             throwing: RuntimeError.commandFailed(
                                 command: "docker \(arguments.joined(separator: " "))",
                                 exitCode: Int(process.terminationStatus),
-                                message: ""
+                                message: tail.joined(separator: "\n")
                             )
                         )
                     }

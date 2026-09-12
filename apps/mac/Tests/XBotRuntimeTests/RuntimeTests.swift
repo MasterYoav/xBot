@@ -226,6 +226,46 @@ struct RuntimeControllerTests {
         #expect(spec?.ports.keys.first == preferred)
     }
 
+    /**
+     A port Docker refuses is quietly swapped for another — docs/06: "nothing — we picked others".
+
+     It used to surface as a failed start, and Try again reused the saved port, which can look free
+     from the Mac while Docker holds it, so it clashed again on every attempt.
+     */
+    @Test func aRefusedPortIsRetriedOnAnotherWithoutFailing() async throws {
+        let ports = isolatedPortStore()
+        let driver = FakeDriver()
+        await driver.refuseNextRunPort()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: ports
+        )
+        await controller.start(environment: environment)
+
+        guard case .running(let endpoint) = await controller.state else {
+            Issue.record("expected running after a refused port, got \(await controller.state)")
+            return
+        }
+        let attempts = await driver.attemptedSpecs.compactMap { $0.ports.keys.first }
+        #expect(attempts.count == 2)
+        #expect(attempts.first != attempts.last)
+        #expect(endpoint.port == attempts.last)
+        // The port that stuck is the one remembered, not the one Docker refused.
+        #expect(ports.load() == attempts.last)
+    }
+
+    /// Once, not forever. A second refusal is a real problem and says so.
+    @Test func aPortRefusedEveryTimeStillFails() async {
+        let controller = controller(script: FakeDriver.Script(runFails: true))
+        await controller.start(environment: environment)
+        guard case .failed = await controller.state else {
+            Issue.record("expected failed, got \(await controller.state)")
+            return
+        }
+    }
+
     @Test func aMissingImageIsPulledFirst() async {
         let controller = controller(script: FakeDriver.Script(imagePresent: false))
         await controller.start(environment: environment)
@@ -319,9 +359,14 @@ struct RuntimeControllerTests {
         let error = RuntimeError.commandFailed(
             command: "run", exitCode: 125, message: "port is already allocated"
         )
-        #expect(error.sentence == String(localized: "The engine couldn't start"))
-        #expect(!error.sentence.contains("run"))
+        // Classified — the reason is used to pick the sentence — but never repeated.
+        #expect(!error.sentence.contains("docker"))
         #expect(!error.sentence.contains("allocated"))
+        #expect(!error.sentence.contains("125"))
+
+        let unrecognised = RuntimeError.commandFailed(command: "run", exitCode: 125, message: "boom")
+        #expect(unrecognised.sentence == String(localized: "The engine couldn't start"))
+        #expect(!unrecognised.sentence.contains("boom"))
     }
 
     @Test func healthLostBecomesDegradedAndRecovers() async {
@@ -807,5 +852,75 @@ struct PullProgressDetailTests {
     @Test func percentOnceTheTotalIsKnown() {
         let detail = PullProgress(layersComplete: 3, layersTotal: 11, fraction: 0.42).detail
         #expect(detail?.contains("42") == true)
+    }
+}
+
+/// Reading the reason out of a failed docker command, using docker's own wording.
+@Suite
+struct CommandFailureKindTests {
+    private func kind(_ command: String, _ message: String) -> RuntimeError.FailureKind {
+        RuntimeError.kind(command: command, message: message)
+    }
+    private let pull = "docker pull ghcr.io/masteryoav/xbot-engine@sha256:abc"
+
+    /**
+     The two failures a first run is most likely to hit, and both used to read "The engine couldn't
+     start" — for a download of four and a half gigabytes in which nothing had started at all.
+     */
+    @Test func aDownloadThatLostTheNetwork() {
+        for message in [
+            #"Error response from daemon: Get "https://ghcr.io/v2/": dial tcp: lookup ghcr.io: no such host"#,
+            "net/http: TLS handshake timeout",
+            "read tcp 192.168.5.15:52376->140.82.112.34:443: read: connection reset by peer",
+            "unexpected EOF",
+            "dial tcp 140.82.112.34:443: i/o timeout",
+        ] {
+            #expect(kind(pull, message) == .downloadInterrupted, "\(message)")
+        }
+    }
+
+    @Test func aDiskThatFilled() {
+        let message = "failed to register layer: write /var/lib/docker/overlay2/x/diff/usr/lib/libx.so: no space left on device"
+        #expect(kind(pull, message) == .diskFull)
+        // Not mistaken for a network problem because the same line names a layer being written.
+        #expect(kind("docker run -d --name xbot-engine", "mkdir /var/lib/docker/x: no space left on device") == .diskFull)
+    }
+
+    @Test func theRegistryRefusing() {
+        #expect(kind(pull, "toomanyrequests: retry-after: 723.23µs, allowed: 44000/minute") == .rateLimited)
+        #expect(kind(pull, "Error response from daemon: manifest unknown") == .imageUnavailable)
+        #expect(kind(pull, "Error response from daemon: denied: denied") == .imageUnavailable)
+    }
+
+    @Test func aPortSomebodyElseTook() {
+        let message = "Bind for 127.0.0.1:49152 failed: port is already allocated"
+        #expect(kind("docker run -d --name xbot-engine", message) == .portInUse)
+    }
+
+    /// Network words only mean a lost download on a pull. On anything else they would send somebody
+    /// to check a connection that was never the problem.
+    @Test func networkWordsOutsideAPullAreNotADownloadProblem() {
+        #expect(kind("docker volume create xbot-data", "dial tcp: i/o timeout") == .other)
+    }
+
+    @Test func somethingUnrecognisedStaysGeneric() {
+        #expect(kind(pull, "") == .other)
+        #expect(kind("docker volume create xbot-data", "error while creating volume") == .other)
+    }
+
+    /// Each kind reads differently, and none of them repeats docker's text back at the person.
+    @Test func everyKindHasItsOwnSentenceAndNoneLeaksTheCommand() {
+        let messages = [
+            "no space left on device", "dial tcp: i/o timeout", "toomanyrequests",
+            "manifest unknown", "port is already allocated", "something else",
+        ]
+        let command = "docker run -e XBOT_ENGINE_TOKEN=secret-value pull"
+        let sentences = messages.map {
+            RuntimeError.commandFailed(command: pull, exitCode: 1, message: $0).sentence
+        }
+        #expect(Set(sentences).count == messages.count)
+        let run = RuntimeError.commandFailed(command: command, exitCode: 1, message: "no space left on device")
+        #expect(!run.sentence.contains("secret-value"))
+        #expect(!run.sentence.contains("docker"))
     }
 }

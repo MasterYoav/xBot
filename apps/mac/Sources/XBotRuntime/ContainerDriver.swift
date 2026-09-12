@@ -185,15 +185,82 @@ public enum RuntimeError: Error, Sendable, Equatable {
     case healthTimedOut(seconds: Int)
     case noFreePort(range: ClosedRange<UInt16>)
 
+    /// What actually went wrong inside a failed command, as far as a person needs to know.
+    public enum FailureKind: Equatable, Sendable {
+        case diskFull
+        /// A download that lost the network — offline, a timeout, a dropped connection.
+        case downloadInterrupted
+        case rateLimited
+        /// The registry refused or does not have the image. Ours to fix, not theirs.
+        case imageUnavailable
+        case portInUse
+        case other
+    }
+
+    /**
+     Read the reason out of a failed command's own output.
+
+     Every command failure used to be one sentence — "The engine couldn't start" — including the two
+     that are most likely on a first run, because the first run downloads four and a half gigabytes:
+     the connection dropping, and the disk filling. Neither involves anything starting, and both have
+     a fix the person can make without reading a log, provided somebody tells them which it was.
+
+     Matched on docker's and the registry's own phrasing, lowercased. Disk comes first because it can
+     appear under any command, and a pull that ran out of space also mentions the layer it was
+     writing — which is not a network problem however the rest of the line reads.
+     */
+    public static func kind(command: String, message: String) -> FailureKind {
+        let text = message.lowercased()
+        let isPull = command.contains(" pull ")
+            || command.hasSuffix(" pull")
+            || command.hasPrefix("docker pull")
+
+        if text.contains("no space left on device") || text.contains("disk quota exceeded") {
+            return .diskFull
+        }
+        if text.contains("toomanyrequests") || text.contains("too many requests") {
+            return .rateLimited
+        }
+        if text.contains("port is already allocated") || text.contains("address already in use") {
+            return .portInUse
+        }
+        if isPull {
+            if text.contains("manifest unknown") || text.contains("denied")
+                || text.contains("unauthorized") || text.contains("not found") {
+                return .imageUnavailable
+            }
+            let network = [
+                "dial tcp", "no such host", "i/o timeout", "tls handshake timeout",
+                "connection reset", "connection refused", "unexpected eof",
+                "network is unreachable", "context deadline exceeded", "net/http",
+            ]
+            if network.contains(where: text.contains) { return .downloadInterrupted }
+        }
+        return .other
+    }
+
     /// A sentence for the composer. Never the command, never stderr — those belong in diagnostics.
     public var sentence: String {
         switch self {
         case .daemonUnavailable:
             String(localized: "Docker isn't running")
-        case .commandFailed:
-            // The image is not published yet (M3), a port clash, a volume error — all of them
-            // look like this from the driver's point of view. The details are in Copy diagnostics.
-            String(localized: "The engine couldn't start")
+        case .commandFailed(let command, _, let message):
+            switch Self.kind(command: command, message: message) {
+            case .diskFull:
+                String(localized: "There isn't enough disk space for the engine. Free up some space and try again.")
+            case .downloadInterrupted:
+                // "Kept" is true: docker holds on to every layer that finished, so a retry resumes.
+                String(localized: "The engine download was interrupted. Check your internet connection and try again — what already downloaded is kept.")
+            case .rateLimited:
+                String(localized: "The download server is busy right now. Wait a few minutes and try again.")
+            case .imageUnavailable:
+                String(localized: "The engine download isn't available right now. Try again later.")
+            case .portInUse:
+                String(localized: "Another app was using the engine's port. Try again and xBot will pick a different one.")
+            case .other:
+                // A volume error or anything unrecognised. The details are in Copy diagnostics.
+                String(localized: "The engine couldn't start")
+            }
         case .healthTimedOut:
             String(localized: "The engine took too long to become ready")
         case .noFreePort:

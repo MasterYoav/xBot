@@ -132,35 +132,61 @@ public actor RuntimeController {
                 return
             }
 
-            state = .starting(.ports)
-            // Persisted across launches: a port that moves breaks bookmarks, the CLI, and the
-            // admin webview, so the previous choice is preferred over a fresh scan.
-            let port = try PortAllocator.allocate(
-                preferred: allocatedPort ?? 3001,
-                range: 49_152...49_400
-            )
-            allocatedPort = port
-            ports.save(port)
-            let endpoint = EngineEndpoint(port: port)
-
-            state = .starting(.container)
-            let gateway = try await driver.hostGatewayAddress()
-            hostGateway = gateway
-            let spec = ContainerSpec(
-                name: Self.engineContainerName,
-                image: image,
-                ports: [port: port],
-                volumes: [
-                    Self.dataVolume: "/var/lib/postgresql/data",
-                    Self.workspaceVolume: "/workspace",
-                    Self.profilesVolume: "/profiles",
-                ],
-                environment: environment(port, gateway),
-                memoryLimitBytes: EngineEnvironment.memoryLimitBytes(
-                    forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
+            /*
+             * A port Docker refuses is retried on another, once, without telling anybody.
+             *
+             * docs/06 specifies a port collision as "nothing — we picked others". It was not: the
+             * clash surfaced as a failed start, and pressing Try again reused the saved port — which
+             * the Mac-side check can call free while Docker's own bookkeeping holds it — and clashed
+             * again, every time. `docker run` also leaves a created container behind when the bind
+             * fails, so the retry clears that before reusing the name.
+             */
+            var refused: Set<UInt16> = []
+            var endpoint = EngineEndpoint(port: 0)
+            while true {
+                state = .starting(.ports)
+                // Persisted across launches: a port that moves breaks bookmarks, the CLI, and the
+                // admin webview, so the previous choice is preferred over a fresh scan.
+                let port = try PortAllocator.allocate(
+                    preferred: allocatedPort ?? 3001,
+                    range: 49_152...49_400,
+                    excluding: refused
                 )
-            )
-            handle = try await driver.run(spec)
+                allocatedPort = port
+                ports.save(port)
+                endpoint = EngineEndpoint(port: port)
+
+                state = .starting(.container)
+                let gateway = try await driver.hostGatewayAddress()
+                hostGateway = gateway
+                let spec = ContainerSpec(
+                    name: Self.engineContainerName,
+                    image: image,
+                    ports: [port: port],
+                    volumes: [
+                        Self.dataVolume: "/var/lib/postgresql/data",
+                        Self.workspaceVolume: "/workspace",
+                        Self.profilesVolume: "/profiles",
+                    ],
+                    environment: environment(port, gateway),
+                    memoryLimitBytes: EngineEnvironment.memoryLimitBytes(
+                        forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
+                    )
+                )
+                do {
+                    handle = try await driver.run(spec)
+                    break
+                } catch let RuntimeError.commandFailed(command, _, message)
+                    where RuntimeError.kind(command: command, message: message) == .portInUse
+                    && refused.isEmpty
+                {
+                    refused.insert(port)
+                    allocatedPort = nil
+                    if let leftover = await driver.containerNamed(Self.engineContainerName) {
+                        try? await driver.remove(leftover)
+                    }
+                }
+            }
 
             // Migrations run inside the container on start, so the first health answer is also the
             // signal that they finished. That is why the first-run timeout is four times the rest.

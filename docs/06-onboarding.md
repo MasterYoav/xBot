@@ -153,9 +153,11 @@ Every failure gets a sentence, a cause, and a button. Never a stack trace on scr
 
 | Failure | What we say | Button |
 | --- | --- | --- |
-| Network drops | "The download was interrupted." | Resume |
-| Disk fills mid-pull | "Not enough space — needs 2.1 GB more." | Open Storage Settings |
-| Ports occupied | *(nothing — we picked others)* | — |
+| Network drops | "The engine download was interrupted. Check your internet connection and try again — what already downloaded is kept." | Try again (docker keeps finished layers, so this resumes) |
+| Disk fills mid-pull | "There isn't enough disk space for the engine. Free up some space and try again." | Try again. *No byte count and no Storage Settings button: the disk that filled may be the container runtime's own VM disk, which macOS Storage cannot see or free* |
+| Registry busy (429) | "The download server is busy right now. Wait a few minutes and try again." | Try again |
+| Image refused or missing | "The engine download isn't available right now. Try again later." | Try again — this one is ours to fix |
+| Ports occupied | *(nothing — we picked others)*. Built: a refused port is retried once on another, silently | — |
 | Runtime dies | "Docker stopped unexpectedly." | Restart Docker |
 | Migration fails | "Couldn't set up the database." | Retry · Reset and try again |
 | Anything unclassified | "Something went wrong setting up the engine." | Retry · Copy diagnostics |
@@ -257,8 +259,10 @@ data volume.
 The path with the least test coverage and the most consequence. It gets more, not less.
 
 - **Failure branches covered in unit tests** with `FakeDriver` / fake health clients: engine health
-  timeout, failed start (no command echo), runtime-not-detected paths. More branches (network drop
-  mid-pull, disk full, port collision) are specified here but **not all automated yet**.
+  timeout, failed start (no command echo), runtime-not-detected paths, a refused port retried on
+  another. Network drop, disk full, registry busy and image refused are classified from docker's own
+  wording (`RuntimeError.kind`) and tested against real error text; what is not automated is a pull
+  actually failing on a real network.
 - **The happy path is an XCUITest** on a clean machine image in CI — **not wired yet**.
 - **Manual, before every release, on a genuinely clean Mac** — no Homebrew, no Docker, no developer
   tools. A VM snapshot. See `scripts/README-packaging.md` for the M6 checklist.

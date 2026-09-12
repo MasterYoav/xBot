@@ -14,10 +14,12 @@ public enum PortAllocator {
     /// would pass a connect probe and then refuse the real bind seconds later.
     public static func allocate(
         preferred: UInt16,
-        range: ClosedRange<UInt16>
+        range: ClosedRange<UInt16>,
+        /// Ports Docker has already refused, which can look free from the Mac's side.
+        excluding: Set<UInt16> = []
     ) throws -> UInt16 {
-        if isFree(preferred) { return preferred }
-        for candidate in range where isFree(candidate) {
+        if !excluding.contains(preferred), isFree(preferred) { return preferred }
+        for candidate in range where !excluding.contains(candidate) && isFree(candidate) {
             return candidate
         }
         throw RuntimeError.noFreePort(range: range)

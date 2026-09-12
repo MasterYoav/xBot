@@ -137,7 +137,20 @@ public actor FakeDriver: ContainerDriver {
     /// What survived an uninstall, for the test that says nothing did.
     public var remainingVolumes: Set<String> { volumes }
 
+    /// Refuse the next `run` on a port clash, then behave — Docker holding a port the Mac thinks is free.
+    public func refuseNextRunPort() { refuseNextPort = true }
+    private var refuseNextPort = false
+    /// Every spec `run` was asked for, including refused ones, in order.
+    public private(set) var attemptedSpecs: [ContainerSpec] = []
+
     public func run(_ spec: ContainerSpec) async throws -> ContainerHandle {
+        attemptedSpecs.append(spec)
+        if refuseNextPort {
+            refuseNextPort = false
+            throw RuntimeError.commandFailed(
+                command: "run", exitCode: 125, message: "Bind for 127.0.0.1:\(spec.ports.keys.first ?? 0) failed: port is already allocated"
+            )
+        }
         if script.runFails {
             throw RuntimeError.commandFailed(
                 command: "run", exitCode: 125, message: "port is already allocated"

@@ -79,7 +79,12 @@ struct RuntimeConnectedTests {
             return false
         }
         guard case .engineFailed(let reason) = state.composerBlock else { return }
-        #expect(reason == String(localized: "The engine couldn't start"))
+        // The fake fails with a port clash, so the reason names that — and is the controller's own
+        // sentence rather than one invented here.
+        #expect(reason == RuntimeError.commandFailed(
+            command: "run", exitCode: 125, message: "port is already allocated"
+        ).sentence)
+        #expect(!reason.contains("allocated"))
     }
 
     @Test func startingTheEngineEventuallyUnblocksTheComposer() async throws {
