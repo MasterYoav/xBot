@@ -32,6 +32,42 @@ public final class AppState {
     /// to cancel the reply that was streaming — the agent was mid-answer and it was silently thrown
     /// away — and a single array is why: there was nowhere for a background turn to write.
     private var messagesByChannel: [Channel.ID: [Message]] = [:]
+    private var historyProblems: [Channel.ID: String] = [:]
+    public var historyProblem: String? { selectedChannelID.flatMap { historyProblems[$0] } }
+    public private(set) var creationProblem: String?
+    public private(set) var isCreatingAgent = false
+    private var pendingAgentDraft: AgentDraft?
+    public private(set) var isCreatingConversation = false
+    public private(set) var conversationCreationProblem: String?
+    public var needsConversation: Bool { selectedAgentID != nil && selectedChannelID == nil }
+    public var canSend: Bool {
+        composerBlock == nil && selectedChannelID != nil && !isTurnInFlight
+    }
+
+    /**
+     Why a send has to wait, for the composer to say beside itself. Nil when it does not, and nil when
+     a `composerBlock` is already saying something — one reason at a time.
+
+     One turn runs at a time across the whole app, because there is one running channel. That is a
+     fair limit, but on its own it greyed out every conversation's field while any agent answered,
+     with nothing on screen to say so: switch to a second agent mid-reply and its composer was simply
+     dead. docs/09 — "disabled with a reason, inline… never a silent no-op".
+     */
+    public var sendBlockedReason: String? {
+        guard composerBlock == nil else { return nil }
+        guard selectedChannelID != nil else {
+            return String(localized: "Open a conversation to send a message.")
+        }
+        guard let runningChannel else { return nil }
+        if runningChannel == selectedChannelID {
+            return String(localized: "Wait for this reply to finish before sending another.")
+        }
+        let name = agents.first { $0.id == runningAgent }?.name ?? String(localized: "Another agent")
+        return String(localized: "\(name) is still answering. You can send when it's done.")
+    }
+    // Keep failed local turns until they are retried, rather than replacing them with remote history.
+    private var retryPrompts: [Message.ID: (channel: Channel.ID, prompt: Message.ID)] = [:]
+    private var historyRequests: [Channel.ID: UUID] = [:]
 
     /// The selected conversation. Unchanged for every reader; only the storage moved.
     public var messages: [Message] {
@@ -672,23 +708,52 @@ public final class AppState {
     /// Create an agent and open it. Optimistic on the rail: the row exists before the channel
     /// round-trip finishes, so the fill never waits on a second request.
     public func createAgent(named name: String) {
+        guard !isCreatingAgent else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let agentName = trimmed.isEmpty ? String(localized: "New agent") : trimmed
         let draft = AgentDraft(
-            name: agentName,
+            name: trimmed.isEmpty ? String(localized: "New agent") : trimmed,
             roleDescription: AgentDefaultsStore.roleDescription(),
-            model: AgentDefaultsStore.defaultModel()
+            model: AgentDefaultsStore.defaultModel() ?? models.first
         )
+        pendingAgentDraft = draft
+        createAgent(draft)
+    }
+
+    public func retryAgentCreation() {
+        guard let draft = pendingAgentDraft, !isCreatingAgent else { return }
+        createAgent(draft)
+    }
+
+    private func createAgent(_ draft: AgentDraft) {
+        isCreatingAgent = true
+        creationProblem = nil
         Task { [engine] in
-            guard let agent = try? await engine.createAgent(draft) else { return }
-            agents.append(agent)
-            select(agent.id)
-            if let channel = try? await engine.createChannel(agentIds: [agent.id]) {
-                channels.append(channel)
-                if selectedAgentID == agent.id {
-                    await loadMessages()
-                    await loadPanel()
-                }
+            defer { isCreatingAgent = false }
+            do {
+                let agent = try await engine.createAgent(draft)
+                agents.append(agent)
+                pendingAgentDraft = nil
+                select(agent.id)
+                await createSelectedConversation()
+            } catch {
+                creationProblem = String(localized: "Couldn't create your agent. Try again when the engine is available.")
+            }
+        }
+    }
+
+    /// Also repairs agents left without a channel by an interrupted first-run setup.
+    public func createSelectedConversation() async {
+        guard let id = selectedAgentID, needsConversation, !isCreatingConversation else { return }
+        isCreatingConversation = true
+        conversationCreationProblem = nil
+        defer { isCreatingConversation = false }
+        do {
+            let channel = try await engine.createChannel(agentIds: [id])
+            channels.append(channel)
+            if selectedAgentID == id { await loadMessages() }
+        } catch {
+            if selectedAgentID == id {
+                conversationCreationProblem = String(localized: "Your agent is saved, but its conversation couldn't be opened. Try again.")
             }
         }
     }
@@ -696,6 +761,8 @@ public final class AppState {
     public func select(_ id: Agent.ID) {
         guard id != selectedAgentID else { return }
         selectedAgentID = id
+        agentUpdateProblem = nil
+        conversationCreationProblem = nil
         unreadAgents.remove(id)
         /*
          * The turn is deliberately left running.
@@ -862,22 +929,61 @@ public final class AppState {
         }
     }
 
+    /**
+     A change to the selected agent that failed, so the pane can stop showing it as though it took.
+
+     The model picker reads its label straight from the stored agent, so a failed change there simply
+     does not appear. The name and label fields do not: they are local editing state, committed on
+     blur, and a commit that failed used to leave the typed text sitting in the field while the rail
+     two inches away went on showing the old name. Nothing said which one was true, and the edit
+     vanished on the next agent switch.
+     */
+    public private(set) var agentUpdateProblem: String?
+
     public func updateSelectedAgent(_ patch: AgentPatch) {
         guard let id = selectedAgentID else { return }
+        agentUpdateProblem = nil
         Task { [engine] in
-            guard let updated = try? await engine.updateAgent(id, patch) else { return }
-            if let index = agents.firstIndex(where: { $0.id == id }) {
-                agents[index] = updated
+            do {
+                let updated = try await engine.updateAgent(id, patch)
+                if let index = agents.firstIndex(where: { $0.id == id }) {
+                    agents[index] = updated
+                }
+                if selectedAgentID == id { agentUpdateProblem = nil }
+            } catch {
+                guard selectedAgentID == id else { return }
+                agentUpdateProblem = String(
+                    localized: "That change couldn't be saved. Is the engine running?"
+                )
             }
         }
     }
 
+    /// Called by the pane once it has put the fields back to what is actually stored.
+    public func clearAgentUpdateProblem() {
+        agentUpdateProblem = nil
+    }
+
+    public func retryHistory() async { await loadMessages() }
+
     private func loadMessages() async {
-        guard let channel = selectedChannelID else { return }
         // Never over a conversation that is still being written to. A background turn's own
         // messages are newer than anything a reload would fetch.
-        guard runningChannel != channel else { return }
-        messagesByChannel[channel] = (try? await engine.messages(in: channel)) ?? []
+        guard let channel = selectedChannelID, runningChannel != channel else { return }
+        let requestID = UUID()
+        historyRequests[channel] = requestID
+        do {
+            let loaded = try await engine.messages(in: channel)
+            guard historyRequests[channel] == requestID, runningChannel != channel else { return }
+            // Failed prompts may not exist on the server. Keep the local transcript until recovery.
+            if !retryPrompts.values.contains(where: { $0.channel == channel }) {
+                messagesByChannel[channel] = loaded
+            }
+            historyProblems[channel] = nil
+        } catch {
+            guard historyRequests[channel] == requestID else { return }
+            historyProblems[channel] = String(localized: "Couldn't load conversation history. Your loaded messages are still here.")
+        }
     }
 
     /// Send, optimistically.
@@ -886,17 +992,35 @@ public final class AppState {
     /// holding the same text — the one thing that must never happen is losing what somebody typed.
     public func send(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, composerBlock == nil, let channel = selectedChannelID else { return }
-
-        // Answering is what clears the question. The agent asked and you replied; nothing is
-        // waiting on you in this conversation any more.
-        if let agent = selectedAgentID { questionsForYou[agent] = nil }
-
+        guard !trimmed.isEmpty, canSend, let channel = selectedChannelID else { return }
         let sent = Message(id: "local-\(UUID().uuidString)", author: .user, text: trimmed, state: .sending)
         messagesByChannel[channel, default: []].append(sent)
+        run(sent, in: channel)
+    }
 
+    public func canRetry(_ message: Message) -> Bool {
+        canSend && retryPrompts[message.id]?.channel == selectedChannelID
+    }
+
+    public func retry(_ messageID: Message.ID) {
+        guard canSend, let failed = retryPrompts[messageID], failed.channel == selectedChannelID,
+              let prompt = messagesByChannel[failed.channel]?.first(where: { $0.id == failed.prompt })
+        else { return }
+        // Reuse the prompt bubble; replace only this failed response, not subsequent messages.
+        if messageID != prompt.id {
+            messagesByChannel[failed.channel]?.removeAll { $0.id == messageID }
+        }
+        retryPrompts[messageID] = nil
+        mark(prompt.id, as: .sending, in: failed.channel)
+        run(prompt, in: failed.channel)
+    }
+
+    private func run(_ sent: Message, in channel: Channel.ID) {
         let agentID = selectedAgentID ?? ""
-        turn?.cancel()
+        // Answering is what clears the question. The agent asked and you replied; nothing is
+        // waiting on you in this conversation any more.
+        questionsForYou[agentID] = nil
+        historyRequests[channel] = nil // A load started before this send must not overwrite it.
         runningChannel = channel
         runningAgent = agentID
         retuneScreen()
@@ -915,32 +1039,54 @@ public final class AppState {
                 if selectedChannelID != channel { unreadAgents.insert(agentID) }
                 retuneScreen()
             }
-            var replyID: String?
+            var replyID: Message.ID?
+            var replyIDs: [Message.ID] = []
+            @MainActor func fail(_ reason: String) {
+                let id = replyID ?? sent.id
+                mark(id, as: .failed(reason: reason), in: channel)
+                retryPrompts[id] = (channel, sent.id)
+            }
+            @MainActor func ensureReply(_ id: String) {
+                guard !id.isEmpty else { return }
+                if !replyIDs.contains(id) {
+                    replyIDs.append(id)
+                    messagesByChannel[channel, default: []].append(
+                        Message(id: id, author: .agent(agentID), text: "", state: .streaming)
+                    )
+                }
+                replyID = id
+                mark(sent.id, as: .complete, in: channel)
+            }
             do {
-                for try await event in engine.send(trimmed, to: channel) {
+                for try await event in engine.send(sent.text, to: channel) {
                     switch event {
                     case .started(let id):
-                        replyID = id
-                        mark(sent.id, as: .complete, in: channel)
-                        messagesByChannel[channel, default: []].append(
-                            Message(id: id, author: .agent(agentID), text: "", state: .streaming)
-                        )
+                        ensureReply(id)
                     case .textDelta(let id, let text):
+                        ensureReply(id)
                         append(text, to: id, in: channel)
                     case .toolCall(let id, let callId, let name, let target):
-                        recordTool(callId: callId, name: name, target: target, on: id, in: channel)
+                        let targetID = id.isEmpty ? (replyID ?? "tool-\(callId)") : id
+                        ensureReply(targetID)
+                        recordTool(callId: callId, name: name, target: target, on: targetID, in: channel)
                     case .toolArguments(let callId, let json):
                         applyToolArguments(callId: callId, json: json)
                     case .finished(let id):
                         mark(id, as: .complete, in: channel)
-                    case .failed(let id, let reason):
-                        mark(id, as: .failed(reason: reason), in: channel)
+                    case .runFinished:
+                        mark(sent.id, as: .complete, in: channel)
+                        for id in replyIDs { mark(id, as: .complete, in: channel) }
+                        return
+                    case .failed(_, let reason):
+                        fail(reason)
+                        return
                     case .usage(let input, let output):
                         recordUsage(inputTokens: input, outputTokens: output, for: agentID)
                     }
                 }
+                fail(String(localized: "The reply was interrupted. Try again; any completed actions may run again."))
             } catch {
-                mark(replyID ?? sent.id, as: .failed(reason: error.localizedDescription), in: channel)
+                fail(String(localized: "Couldn't finish the reply. Check the connection and try again; any completed actions may run again."))
             }
         }
     }

@@ -22,6 +22,7 @@ public struct AgentSettingsSection: View {
 
                 field(String(localized: "Name"), text: $name, focus: .name)
                 field(String(localized: "Label"), text: $label, focus: .label)
+                updateProblem
                 modelRow(agent)
                 AgentReachSection()
                 AgentConnectionSection()
@@ -29,6 +30,17 @@ public struct AgentSettingsSection: View {
             }
         }
         .onChange(of: state.selectedAgentID, initial: true) { load() }
+        /*
+         * A save that failed puts the fields back, rather than leaving the typed text standing.
+         *
+         * Two inches away the rail still shows the old name, so leaving the edit in place is the
+         * app holding two answers and pointing at neither. Snapping back is the honest one, and the
+         * sentence below says why it moved — without it this reads as the app eating the keystrokes.
+         */
+        .onChange(of: state.agentUpdateProblem) { _, problem in
+            guard problem != nil else { return }
+            load()
+        }
         .onChange(of: focusedField) { previous, _ in
             // Saved on blur, which means the save is driven by focus leaving a field rather than
             // by every keystroke. A per-keystroke save would put a write on the engine for each
@@ -96,6 +108,17 @@ public struct AgentSettingsSection: View {
     private func load() {
         name = state.selectedAgent?.name ?? ""
         label = state.selectedAgent?.label ?? ""
+    }
+
+    /// Shown under the fields, where the change was made, rather than as a toast that is gone
+    /// before somebody looking at the field has looked up.
+    @ViewBuilder
+    private var updateProblem: some View {
+        if let problem = state.agentUpdateProblem {
+            Text(problem)
+                .captionText()
+                .foregroundStyle(Palette.stateFailed)
+        }
     }
 
     private func commit() {

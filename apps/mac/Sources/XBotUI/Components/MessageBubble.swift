@@ -6,9 +6,9 @@ import XBotEngine
 /// never spans the conversation.
 public struct MessageBubble: View {
     private let message: Message
-    private let onRetry: () -> Void
+    private let onRetry: (() -> Void)?
 
-    public init(message: Message, onRetry: @escaping () -> Void = {}) {
+    public init(message: Message, onRetry: (() -> Void)? = nil) {
         self.message = message
         self.onRetry = onRetry
     }
@@ -66,9 +66,11 @@ public struct MessageBubble: View {
                 // "something went wrong" — the text the user typed is still in the bubble above.
                 HStack(spacing: Space.s) {
                     Text(reason).captionText().foregroundStyle(Palette.stateFailed)
-                    Button(String(localized: "Retry"), action: onRetry)
-                        .buttonStyle(.link)
-                        .font(Typography.caption)
+                    if let onRetry {
+                        Button(String(localized: "Retry"), action: onRetry)
+                            .buttonStyle(.link)
+                            .font(Typography.caption)
+                    }
                 }
             }
         }

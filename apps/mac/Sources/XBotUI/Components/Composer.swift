@@ -8,6 +8,8 @@ import XBotEngine
 public struct Composer: View {
     private let agentName: String
     private let block: ComposerBlock?
+    /// Why sending has to wait, when it does. Typing never waits — see `send()`.
+    private let sendBlockedReason: String?
     private let onSend: (String) -> Void
     private let onBlockAction: () -> Void
 
@@ -17,11 +19,13 @@ public struct Composer: View {
     public init(
         agentName: String,
         block: ComposerBlock?,
+        sendBlockedReason: String? = nil,
         onSend: @escaping (String) -> Void,
         onBlockAction: @escaping () -> Void = {}
     ) {
         self.agentName = agentName
         self.block = block
+        self.sendBlockedReason = sendBlockedReason
         self.onSend = onSend
         self.onBlockAction = onBlockAction
     }
@@ -38,6 +42,12 @@ public struct Composer: View {
                             .buttonStyle(.link)
                             .font(Typography.caption)
                     }
+                    Spacer()
+                }
+            } else if let sendBlockedReason {
+                // Same place, same rule: a field that will not send says why, beside itself.
+                HStack(spacing: Space.s) {
+                    Text(sendBlockedReason).captionText().foregroundStyle(Palette.textSecondary)
                     Spacer()
                 }
             }
@@ -69,6 +79,13 @@ public struct Composer: View {
                 .bodyText()
                 .lineLimit(1...5)
                 .focused($focused)
+                /*
+                 * Disabled only for a block, never while a reply is running.
+                 *
+                 * Somebody reading a reply is usually composing the next message in their head, and
+                 * a field that greys out under them for the length of an answer throws that away. So
+                 * the field stays open and only the send waits, with the reason shown above it.
+                 */
                 .disabled(block != nil)
                 .onSubmit(send)
             }
@@ -85,9 +102,12 @@ public struct Composer: View {
             .opacity(block == nil ? 1 : 0.6)
         }
         .motion(Motion.quick, value: block)
+        .motion(Motion.quick, value: sendBlockedReason)
     }
 
     private func send() {
+        // Returns before the field is cleared, so a send that has to wait keeps what was typed.
+        guard block == nil, sendBlockedReason == nil else { return }
         let outgoing = text
         guard !outgoing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         // Cleared before the send, not after it resolves: the field must be ready for the next

@@ -316,7 +316,7 @@ struct HTTPEngineClientTests {
             if case .textDelta(_, let delta) = event { text += delta }
         }
         #expect(text == "hello")
-        #expect(events.contains { if case .finished = $0 { true } else { false } })
+        #expect(events.contains { if case .runFinished = $0 { true } else { false } })
     }
 
     @Test func aNonOkStreamResponseSurfacesAsRejected() async throws {

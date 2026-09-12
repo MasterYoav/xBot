@@ -176,6 +176,7 @@ public enum TurnEvent: Sendable {
     /// only the reader that has seen the start can say which call these belong to.
     case toolArguments(callId: String, json: String)
     case finished(messageId: String)
+    case runFinished
     case failed(messageId: String, reason: String)
     /// What the turn cost, reported once by the engine before the run closes.
     ///

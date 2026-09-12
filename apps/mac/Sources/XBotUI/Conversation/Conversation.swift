@@ -25,6 +25,7 @@ public struct Conversation: View {
             if state.status != nil {
                 Divider().overlay(Palette.separator.opacity(0.35))
             }
+            recovery
             messages
             composer
         }
@@ -72,7 +73,7 @@ public struct Conversation: View {
                         emptyState
                     }
                     ForEach(state.messages) { message in
-                        MessageBubble(message: message)
+                        MessageBubble(message: message, onRetry: state.canRetry(message) ? { state.retry(message.id) } : nil)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id(message.id)
                     }
@@ -179,10 +180,42 @@ public struct Conversation: View {
         return nil
     }
 
+    @ViewBuilder
+    private var recovery: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            if state.isCreatingAgent {
+                ProgressView(String(localized: "Creating your agent…"))
+            }
+            if let problem = state.creationProblem {
+                Text(problem).captionText()
+                Button(String(localized: "Retry creating agent")) { state.retryAgentCreation() }
+            }
+            if state.needsConversation {
+                Text(state.conversationCreationProblem ?? String(localized: "Open a conversation with this agent to start chatting."))
+                    .captionText()
+                Button(state.isCreatingConversation ? String(localized: "Opening…") : String(localized: "Open conversation")) {
+                    Task { await state.createSelectedConversation() }
+                }
+                .disabled(state.isCreatingConversation)
+            }
+            if let problem = state.historyProblem {
+                Text(problem).captionText()
+                Button(String(localized: "Retry loading history")) { Task { await state.retryHistory() } }
+            }
+            if state.isTurnInFlight {
+                Text(String(localized: "An agent is replying. You can send another message when it finishes."))
+                    .captionText()
+            }
+        }
+        .foregroundStyle(Palette.textSecondary)
+        .padding(.horizontal, Space.xl)
+    }
+
     private var composer: some View {
         Composer(
             agentName: state.selectedAgent?.name ?? String(localized: "your agent"),
             block: state.composerBlock,
+            sendBlockedReason: state.sendBlockedReason,
             onSend: { state.send($0) },
             onBlockAction: { state.handleComposerBlockAction() }
         )

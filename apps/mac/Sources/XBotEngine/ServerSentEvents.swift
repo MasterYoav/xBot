@@ -94,7 +94,7 @@ public enum AGUIDecoder {
             ?? ""
 
         switch type {
-        case "RUN_STARTED", "TEXT_MESSAGE_START":
+        case "TEXT_MESSAGE_START":
             return .started(messageId: messageId)
 
         case "TEXT_MESSAGE_CONTENT", "TEXT_MESSAGE_CHUNK":
@@ -118,7 +118,10 @@ public enum AGUIDecoder {
             else { return nil }
             return .toolArguments(callId: callId, json: delta)
 
-        case "TEXT_MESSAGE_END", "RUN_FINISHED":
+        case "RUN_FINISHED":
+            return .runFinished
+
+        case "TEXT_MESSAGE_END":
             return .finished(messageId: messageId)
 
         case "CUSTOM":

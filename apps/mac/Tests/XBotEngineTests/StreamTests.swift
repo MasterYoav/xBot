@@ -110,14 +110,12 @@ struct AGUIDecoderTests {
         #expect(decode(#"{"type":"TEXT_MESSAGE_CONTENT","messageId":"m1","delta":""}"#) == nil)
     }
 
-    @Test func runLevelEventsFallBackToTheRunId() {
-        // RUN_STARTED has no messageId. Without a key the conversation cannot place the event.
-        let event = decode(#"{"type":"RUN_STARTED","runId":"r1","threadId":"t1"}"#)
-        guard case .started(let id) = event else {
-            Issue.record("expected started, got \(String(describing: event))")
+    @Test func runEventsDoNotCreateMessageBubbles() {
+        #expect(decode(#"{"type":"RUN_STARTED","runId":"r1"}"#) == nil)
+        guard case .runFinished = decode(#"{"type":"RUN_FINISHED","runId":"r1"}"#) else {
+            Issue.record("Expected run completion")
             return
         }
-        #expect(id == "r1")
     }
 
     @Test func aWholeStreamDecodesInOrder() {
@@ -131,7 +129,7 @@ struct AGUIDecoderTests {
         ]
         let decoded = lines.compactMap { parser.consume($0) }.compactMap(AGUIDecoder.decode)
 
-        #expect(decoded.count == 4)
+        #expect(decoded.count == 3)
         var text = ""
         for event in decoded {
             if case .textDelta(_, let delta) = event { text += delta }

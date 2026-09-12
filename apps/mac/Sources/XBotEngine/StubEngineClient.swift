@@ -544,6 +544,7 @@ public actor StubEngineClient: EngineClient {
             Message(id: id, author: .agent("orchestrator"), text: reply, state: .complete)
         )
         continuation.yield(.finished(messageId: id))
+        continuation.yield(.runFinished)
         continuation.finish()
     }
 
