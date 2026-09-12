@@ -399,6 +399,10 @@ public final class AppState {
 
     private func apply(_ runtimeState: RuntimeState) async {
         self.runtimeState = runtimeState
+        if case .running = runtimeState {} else {
+            idleWatch?.cancel()
+            idleWatch = nil
+        }
         switch runtimeState {
         case .notDetected(let probe):
             engine = UnavailableEngineClient()
@@ -422,7 +426,9 @@ public final class AppState {
             grantedPlugins = nil
             pluginsPage = nil
             handoffGrants = nil
-            composerBlock = .engineNotRunning
+            // The app's own pause reads differently from a stop somebody chose or a crash: nothing
+            // is wrong, and a message is all it takes to carry on.
+            composerBlock = pausedWhenIdle ? .enginePausedWhenIdle : .engineNotRunning
             status = nil
         case .failed(let error):
             engine = UnavailableEngineClient()
@@ -433,6 +439,8 @@ public final class AppState {
             handoffGrants = nil
             composerBlock = .engineFailed(reason: error.sentence)
             status = nil
+            pausedWhenIdle = false
+            failMessageThatWokeTheEngine(error.sentence)
         case .pulling, .starting:
             status = .startingUp
         case .running(let endpoint):
@@ -461,6 +469,12 @@ public final class AppState {
                 case .unreadable: .conversationStoreUnreadable
                 }
             }
+            pausedWhenIdle = false
+            noteEngineActivity()
+            // Before the refresh, not after: `run` marks the channel as running, which is what stops
+            // a history reload from replacing the bubble that is waiting to be answered.
+            dispatchMessageThatWokeTheEngine()
+            startIdleWatch()
             await refreshFromEngine()
             await checkForEngineUpdateIfDue()
             appUpdates.scheduleAutomaticCheckIfDue()
@@ -534,6 +548,85 @@ public final class AppState {
                 state: .complete
             ),
         ]
+    }
+
+    // MARK: - Idle
+
+    /// When somebody last did something that needed the engine. See `EngineIdlePolicy`.
+    private var lastEngineActivity = Date()
+    /// Set when the app, not the person, stopped the engine — the stopped state reads differently.
+    private(set) var pausedWhenIdle = false
+    /// The message a paused engine was woken to answer.
+    private var messageThatWokeTheEngine: (message: Message, channel: Channel.ID)?
+    private var idleWatch: Task<Void, Never>?
+    /// Settable so a test is not waiting thirty minutes.
+    var idleTimeout: TimeInterval = EngineIdlePolicy.defaultTimeout
+    var idleCheckInterval: Duration = .seconds(60)
+
+    private func noteEngineActivity() {
+        lastEngineActivity = Date()
+    }
+
+    private func startIdleWatch() {
+        // Only an engine this app manages. `AppState(engine:)` has none to stop.
+        guard runtime != nil else { return }
+        idleWatch?.cancel()
+        idleWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: self?.idleCheckInterval ?? .seconds(60))
+                guard !Task.isCancelled, let self else { return }
+                await self.stopIfIdle(now: Date())
+            }
+        }
+    }
+
+    /**
+     Stop the engine if nothing needs it.
+
+     Routines are only asked about once everything else already says stop, so a quiet engine is not
+     polled every minute for them. A read that fails keeps it running — see `EngineIdlePolicy`.
+     */
+    func stopIfIdle(now: Date) async {
+        guard let runtime, case .running = runtimeState else { return }
+        let cheap = EngineIdlePolicy.verdict(
+            lastActivity: lastEngineActivity, now: now, timeout: idleTimeout,
+            turnRunning: isTurnRunning, humanHoldsControl: control == .human,
+            enabledRoutines: 0
+        )
+        guard cheap == .stop else { return }
+
+        let enabled = (try? await engine.routines())?.filter(\.enabled).count
+        // Asked again: a turn or a takeover may have started during that request.
+        let verdict = EngineIdlePolicy.verdict(
+            lastActivity: lastEngineActivity, now: now, timeout: idleTimeout,
+            turnRunning: isTurnRunning, humanHoldsControl: control == .human,
+            enabledRoutines: enabled
+        )
+        guard verdict == .stop else { return }
+        pausedWhenIdle = true
+        await runtime.stop()
+    }
+
+    private func dispatchMessageThatWokeTheEngine() {
+        guard let (message, channel) = messageThatWokeTheEngine else { return }
+        messageThatWokeTheEngine = nil
+        guard composerBlock == nil else {
+            // It woke into something that needs the person — no model, no CopilotKit key. The
+            // message is kept and made retryable, carrying the same sentence the composer shows.
+            let reason = composerBlock?.sentence ?? String(localized: "Couldn't send that message.")
+            mark(message.id, as: .failed(reason: reason), in: channel)
+            retryPrompts[message.id] = (channel, message.id)
+            return
+        }
+        run(message, in: channel)
+    }
+
+    /// A paused engine that failed to come back leaves its waiting message retryable, never lost.
+    private func failMessageThatWokeTheEngine(_ reason: String) {
+        guard let (message, channel) = messageThatWokeTheEngine else { return }
+        messageThatWokeTheEngine = nil
+        mark(message.id, as: .failed(reason: reason), in: channel)
+        retryPrompts[message.id] = (channel, message.id)
     }
 
     public func startEngine() {
@@ -688,7 +781,7 @@ public final class AppState {
     /// What the composer's inline action button does, keyed by the same reason that put it there.
     public func handleComposerBlockAction() {
         switch composerBlock {
-        case .engineNotRunning, .engineFailed:
+        case .engineNotRunning, .engineFailed, .enginePausedWhenIdle:
             startEngine()
         case .humanHoldsControl:
             setControl(.agent)
@@ -908,6 +1001,7 @@ public final class AppState {
     /// and reverts if the engine refuses. Waiting for a round trip to show that a click registered
     /// is exactly the latency the design system opens by forbidding.
     public func setControl(_ next: ScreenControl) {
+        noteEngineActivity()
         let previous = control
         let previousBlock = composerBlock
         control = next
@@ -992,6 +1086,16 @@ public final class AppState {
     /// holding the same text — the one thing that must never happen is losing what somebody typed.
     public func send(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if composerBlock == .enginePausedWhenIdle, !trimmed.isEmpty, !isTurnInFlight,
+           messageThatWokeTheEngine == nil, let channel = selectedChannelID {
+            // docs/07: "starts on demand when the user sends a message". The bubble goes up now,
+            // exactly as any optimistic send does, and is answered once the engine is back.
+            let sent = Message(id: "local-\(UUID().uuidString)", author: .user, text: trimmed, state: .sending)
+            messagesByChannel[channel, default: []].append(sent)
+            messageThatWokeTheEngine = (sent, channel)
+            startEngine()
+            return
+        }
         guard !trimmed.isEmpty, canSend, let channel = selectedChannelID else { return }
         let sent = Message(id: "local-\(UUID().uuidString)", author: .user, text: trimmed, state: .sending)
         messagesByChannel[channel, default: []].append(sent)
@@ -1017,6 +1121,7 @@ public final class AppState {
 
     private func run(_ sent: Message, in channel: Channel.ID) {
         let agentID = selectedAgentID ?? ""
+        noteEngineActivity()
         // Answering is what clears the question. The agent asked and you replied; nothing is
         // waiting on you in this conversation any more.
         questionsForYou[agentID] = nil
@@ -1028,6 +1133,8 @@ public final class AppState {
             defer {
                 runningChannel = nil
                 runningAgent = nil
+                // A long turn ends the quiet period rather than counting towards it.
+                noteEngineActivity()
                 /*
                  * An answer that finished where nobody was looking.
                  *

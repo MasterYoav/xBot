@@ -234,6 +234,23 @@ because the profile is on a volume.
 configurable idle period, default 30 minutes**, and starts it on demand when the user sends a
 message. Starting a stopped container is seconds, not the first-run minutes.
 
+*Built* — `EngineIdlePolicy` decides, `AppState` acts. Three things this section did not anticipate,
+decided in the code and written down here:
+
+- **An enabled routine keeps the engine up.** Routines run inside the engine and postdate this
+  document; an idle stop written straight from the paragraph above would have silently cancelled
+  "check the inbox every weekday at nine" on the first quiet afternoon. If the routine list cannot be
+  read, the engine also stays up — guessing wrong that way costs memory, the other way breaks a
+  routine with nothing on screen to say so.
+- **Never mid-turn, never while a person holds the agent's browser.**
+- **A pause reads differently from a stop.** The composer says the engine was paused while idle and
+  keeps its field open; sending is what wakes it, and the message is answered once it is back. A stop
+  the person chose, or a crash, still says "not running" with a Start button.
+
+**Not yet:** the longer timeout on battery described below.
+
+
+
 **On battery.** Longer idle timeout, slower screen polling, no background image pulls. Visible in
 Settings, on by default.
 

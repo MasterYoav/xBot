@@ -86,7 +86,7 @@ public struct Composer: View {
                  * a field that greys out under them for the length of an answer throws that away. So
                  * the field stays open and only the send waits, with the reason shown above it.
                  */
-                .disabled(block != nil)
+                .disabled(block.map { !$0.sendStartsEngine } ?? false)
                 .onSubmit(send)
             }
             .padding(.horizontal, Space.m)
@@ -107,7 +107,7 @@ public struct Composer: View {
 
     private func send() {
         // Returns before the field is cleared, so a send that has to wait keeps what was typed.
-        guard block == nil, sendBlockedReason == nil else { return }
+        guard block?.sendStartsEngine ?? true, sendBlockedReason == nil else { return }
         let outgoing = text
         guard !outgoing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         // Cleared before the send, not after it resolves: the field must be ready for the next

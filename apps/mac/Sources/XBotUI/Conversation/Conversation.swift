@@ -121,6 +121,8 @@ public struct Conversation: View {
         switch state.composerBlock {
         case .engineNotRunning:
             return String(localized: "The engine isn't running")
+        case .enginePausedWhenIdle:
+            return String(localized: "The engine is paused")
         case .runtimeUnavailable:
             return String(localized: "A container runtime isn't available")
         case .engineFailed:
@@ -145,6 +147,10 @@ public struct Conversation: View {
         switch state.composerBlock {
         case .engineNotRunning:
             return String(localized: "Start it to pick up where you left off.")
+        case .enginePausedWhenIdle:
+            // Why it happened and what brings it back, in that order — so it reads as the app
+            // looking after the Mac, not as something having broken.
+            return String(localized: "It stopped after a quiet spell to give your Mac its memory back. Send a message and it picks up where you left off.")
         case .runtimeUnavailable:
             return String(localized: "Install Docker Desktop, OrbStack, or Colima, then open xBot again.")
         case .engineFailed(let reason):
