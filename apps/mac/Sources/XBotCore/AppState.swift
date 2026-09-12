@@ -814,6 +814,16 @@ public final class AppState {
         }
         try? EngineTokenStore.remove()
         try? KeyEncryptionKeyStore.remove()
+        /*
+         * The CopilotKit key and its licence token, which this list used to miss.
+         *
+         * The comment above promises every key this app has written, and the one real third-party
+         * credential among them was not on it — so after Uninstall, the person's CopilotKit key sat
+         * on in the login Keychain for an app that was gone. Both are removed now; the token is
+         * generated per install and meaningless without the app, the key is theirs.
+         */
+        try? IntelligenceCredentialStore.removeAPIKey()
+        try? IntelligenceCredentialStore.removeLicenseToken()
 
         EngineUpdateCheckStore.reset()
         AppUpdateCheckStore.reset()
@@ -821,6 +831,8 @@ public final class AppState {
         providers.reset()
         RuntimeChoiceStore.reset()
         OnboardingVersion.reset()
+        EnginePortStore.shared.reset()
+        EngineImageResolver.resetCache()
         for provider in CustomProviderStore.shared.all {
             CustomProviderStore.shared.remove(id: provider.id)
         }

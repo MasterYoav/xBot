@@ -96,6 +96,11 @@ public actor EngineImageResolver {
         }
     }
 
+    /// For uninstall: the last manifest this app fetched, which would otherwise outlive it.
+    public static func resetCache(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: cachedManifestKey)
+    }
+
     private func cache(_ manifest: EngineManifest) {
         guard let data = try? JSONEncoder().encode(manifest) else { return }
         defaults.set(data, forKey: Self.cachedManifestKey)

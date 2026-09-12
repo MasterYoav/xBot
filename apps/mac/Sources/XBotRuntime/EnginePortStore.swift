@@ -28,4 +28,9 @@ public struct EnginePortStore: Sendable {
     public func save(_ port: UInt16) {
         defaults.set(Int(port), forKey: Self.key)
     }
+
+    /// For uninstall. A remembered port is harmless, but "uninstall, complete" means nothing left.
+    public func reset() {
+        defaults.removeObject(forKey: Self.key)
+    }
 }
