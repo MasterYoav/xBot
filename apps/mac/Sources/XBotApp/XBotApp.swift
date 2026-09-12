@@ -8,6 +8,7 @@ import XBotUI
 
 @main
 struct XBotApp: App {
+    @NSApplicationDelegateAdaptor(QuitHandler.self) private var quitHandler
     private let appUpdates = SparkleAppUpdateController()
     @State private var state: AppState
     @State private var onboardingCoordinator: OnboardingCoordinator
@@ -24,13 +25,13 @@ struct XBotApp: App {
         #endif
         let runtime = EngineBootstrap.runtimeController()
         let environment = EngineBootstrap.environmentFactory()
-        _state = State(
-            wrappedValue: Self.productionState(
-                runtime: runtime,
-                environment: environment,
-                appUpdates: appUpdates
-            )
+        let production = Self.productionState(
+            runtime: runtime,
+            environment: environment,
+            appUpdates: appUpdates
         )
+        QuitHandler.state = production
+        _state = State(wrappedValue: production)
         _onboardingCoordinator = State(
             wrappedValue: OnboardingCoordinator(runtime: runtime, environmentFactory: environment)
         )

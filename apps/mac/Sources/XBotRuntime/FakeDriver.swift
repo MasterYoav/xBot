@@ -148,6 +148,7 @@ public actor FakeDriver: ContainerDriver {
     }
 
     public func stop(_ handle: ContainerHandle, timeout: Duration) async throws { stopped = true }
+    public func requestStop(_ handle: ContainerHandle, timeout: Duration) async throws { stopped = true }
     public func remove(_ handle: ContainerHandle) async throws {
         removedHandles.append(handle)
         if handle.id == RuntimeController.engineContainerName {

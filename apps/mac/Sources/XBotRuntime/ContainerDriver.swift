@@ -225,6 +225,12 @@ public protocol ContainerDriver: Sendable {
 
     func run(_ spec: ContainerSpec) async throws -> ContainerHandle
     func stop(_ handle: ContainerHandle, timeout: Duration) async throws
+    /// Ask for a stop and return as soon as the request is on its way, without waiting for it.
+    ///
+    /// For quitting. The app cannot wait out a ten-second graceful shutdown with its window gone, and
+    /// it cannot cut the grace period either — that is Postgres being given time to stop cleanly
+    /// rather than recovering from a kill on the next start. So the request has to outlive the app.
+    func requestStop(_ handle: ContainerHandle, timeout: Duration) async throws
     func remove(_ handle: ContainerHandle) async throws
     func inspect(_ handle: ContainerHandle) async throws -> ContainerStatus
     func logs(_ handle: ContainerHandle, tail: Int) async throws -> [LogLine]

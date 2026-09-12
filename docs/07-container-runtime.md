@@ -247,6 +247,19 @@ decided in the code and written down here:
   keeps its field open; sending is what wakes it, and the message is answered once it is back. A stop
   the person chose, or a crash, still says "not running" with a Start button.
 
+**Launch and quit**, which this section never covered and which the idle rules only make sense
+alongside:
+
+- **Opening the app brings the engine up** once onboarding is done — adopting a running container,
+  starting a stopped one, or waking an asleep runtime. Before this, every launch read "The engine
+  isn't running" with a Start button, and when the container had been running all along that was
+  false.
+- **Quitting stops it**, by the idle rules minus the thirty minutes: an enabled routine or a turn
+  still being answered keeps it up, and so does not being able to find out. The stop is sent as a
+  detached `docker stop` with its usual ten-second grace, so Postgres still shuts down cleanly and
+  the app does not sit on screen waiting for it. This matters more than it looks: the container runs
+  `--restart unless-stopped`, so an engine left up at quit came back after a reboot too.
+
 **Not yet:** the longer timeout on battery described below.
 
 

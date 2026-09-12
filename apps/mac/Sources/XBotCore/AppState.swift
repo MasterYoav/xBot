@@ -633,6 +633,40 @@ public final class AppState {
         await runtime.stop()
     }
 
+    /**
+     What happens to the engine when the app quits.
+
+     It stops, by the same rules as an idle pause, with one change: there is no "quiet for thirty
+     minutes" — quitting is the person saying they are done. Left running, it was worse than an app
+     that forgot to pause: the container runs with `--restart unless-stopped`, so an engine left up at
+     quit came back after a reboot too, holding a couple of gigabytes for an app nobody had opened.
+
+     What keeps it up is what needs it without the app: an enabled routine, or a turn still being
+     answered — whose reply is kept by the conversation store and is there on the next open. Asking
+     about routines gets a short leash, because this runs while the app is quitting and an engine
+     that has stopped answering must not hold the quit hostage; no answer counts as unknown, and
+     unknown keeps it running, for the same reason it does when idle.
+     */
+    public func prepareToQuit() async {
+        guard let runtime, case .running = runtimeState else { return }
+        idleWatch?.cancel()
+        if isTurnRunning { return }
+
+        let engine = self.engine
+        let enabled: Int? = await withTaskGroup(of: Int?.self) { group in
+            group.addTask { (try? await engine.routines())?.filter(\.enabled).count }
+            group.addTask {
+                try? await Task.sleep(for: .milliseconds(1500))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+        guard enabled == 0 else { return }
+        await runtime.stopForQuit()
+    }
+
     private func dispatchMessageThatWokeTheEngine() {
         guard let (message, channel) = messageThatWokeTheEngine else { return }
         messageThatWokeTheEngine = nil

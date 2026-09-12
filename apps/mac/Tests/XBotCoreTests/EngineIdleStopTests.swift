@@ -167,3 +167,82 @@ struct EngineLaunchTests {
         #expect(state.composerBlock == .engineNotRunning)
     }
 }
+
+/// What quitting does to the engine.
+@MainActor
+@Suite(.serialized)
+struct EngineQuitTests {
+    private nonisolated func environment(_ port: UInt16, _ hostGateway: String) -> [String: String] {
+        EngineEnvironment.compose(
+            EngineEnvironment.Inputs(port: port, keyEncryptionKey: "k", hostGateway: hostGateway, appOrigin: "xbot://app")
+        )
+    }
+
+    private func running(_ engine: any EngineClient) async throws -> AppState {
+        let state = AppState(
+            runtime: RuntimeController(
+                driver: FakeDriver(script: FakeDriver.Script()),
+                image: ImageReference(repository: "xbot/engine", tag: "1"),
+                health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") }
+            ),
+            environment: environment,
+            engineFactory: { _ in engine },
+            providers: isolatedConnectionStore(),
+            conversationStore: { .ready }
+        )
+        await state.load()
+        state.startEngine()
+        for _ in 0..<300 {
+            if case .running = state.runtimeState { return state }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        Issue.record("Engine never reached running")
+        return state
+    }
+
+    private func isRunning(_ state: AppState) -> Bool {
+        if case .running = state.runtimeState { return true }
+        return false
+    }
+
+    /**
+     Quitting stops an engine nothing else needs.
+
+     Left running it outlived even a reboot — the container is `--restart unless-stopped` — holding a
+     couple of gigabytes for an app nobody had open.
+     */
+    @Test func quittingStopsAnEngineNothingNeeds() async throws {
+        let engine = StubEngineClient(tokenDelay: .zero)
+        for routine in try await engine.routines() {
+            try await engine.setRoutineEnabled(routine.id, enabled: false)
+        }
+        let state = try await running(engine)
+        await state.prepareToQuit()
+        // The controller has stopped; `AppState` hears about it through the runtime's event stream.
+        for _ in 0..<300 where isRunning(state) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!isRunning(state))
+    }
+
+    /// A routine is the one thing that needs the engine with the app closed.
+    @Test func aSwitchedOnRoutineKeepsItUpAfterQuit() async throws {
+        let state = try await running(StubEngineClient(tokenDelay: .zero))
+        await state.prepareToQuit()
+        // Long enough for a stop to have reached `AppState` if one had been sent — otherwise this
+        // would pass on a stop that simply had not been heard about yet.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(isRunning(state))
+    }
+
+    /// Could not ask is not "none". An engine that will not answer keeps running rather than risk a
+    /// routine the person set up — and the quit is not held hostage waiting for it.
+    @Test func anUnreadableRoutineListKeepsItUp() async throws {
+        let state = try await running(UnavailableEngineClient())
+        let started = ContinuousClock.now
+        await state.prepareToQuit()
+        #expect(ContinuousClock.now - started < .seconds(3))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(isRunning(state))
+    }
+}

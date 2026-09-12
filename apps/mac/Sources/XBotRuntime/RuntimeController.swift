@@ -267,6 +267,17 @@ public actor RuntimeController {
         state = .stopped
     }
 
+    /// Stop for a quit: the request is sent, the app does not wait for the container to finish.
+    ///
+    /// The same ten-second grace as `stop()`, because that is Postgres shutting down cleanly — only
+    /// the waiting is dropped, since nothing will be left to wait.
+    public func stopForQuit() async {
+        guard let handle else { return }
+        try? await driver.requestStop(handle, timeout: .seconds(10))
+        self.handle = nil
+        state = .stopped
+    }
+
     public func restart(environment: (UInt16, String) -> [String: String]) async {
         await stop()
         await start(environment: environment)

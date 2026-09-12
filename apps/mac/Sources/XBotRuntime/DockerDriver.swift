@@ -181,6 +181,26 @@ public actor DockerDriver: ContainerDriver {
         _ = try await run(["stop", "-t", "\(seconds)", handle.id])
     }
 
+    public func requestStop(_ handle: ContainerHandle, timeout: Duration) async throws {
+        let seconds = Int(timeout.components.seconds)
+        note(["stop", "-t", "\(seconds)", handle.id])
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = ["stop", "-t", "\(seconds)", handle.id]
+        /*
+         * Nowhere, not a pipe.
+         *
+         * The app exits right after this. A child writing to a pipe whose reader has gone is sent
+         * SIGPIPE and dies, and `docker stop` writes the container id when it is done — so with a pipe
+         * the stop would be killed at exactly the moment it finished, or before, depending on the
+         * daemon's timing. The null device has no reader to lose. A child outlives its parent on
+         * macOS; it is reparented to launchd and carries on.
+         */
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+    }
+
     public func exec(
         _ handle: ContainerHandle,
         command: [String],
