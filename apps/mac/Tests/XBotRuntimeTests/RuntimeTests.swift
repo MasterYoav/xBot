@@ -305,10 +305,67 @@ struct RuntimeControllerTests {
         }
     }
 
-    @Test func anExistingHealthyContainerIsAdopted() async {
-        let driver = FakeDriver(
-            script: FakeDriver.Script(runFails: true, existingContainerPort: 3_001)
+    /**
+     A container made with a different environment is replaced, keeping its data.
+
+     `docker start` reuses the environment a container was created with, so adoption kept every
+     existing engine on its old settings forever. A CopilotKit key connected during onboarding — after
+     the engine had already started — never reached it, and the first conversation failed.
+     */
+    @Test func aContainerWithAnOldEnvironmentIsReplacedNotAdopted() async {
+        var script = FakeDriver.Script(existingContainerPort: 3_001, existingContainerStopped: true)
+        script.existingContainerFingerprint = RuntimeController.environmentFingerprint { port, gateway in
+            EngineEnvironment.compose(.init(port: port, keyEncryptionKey: "k", hostGateway: gateway, appOrigin: "xbot://app"))
+        }
+        let driver = FakeDriver(script: script)
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
         )
+        let withIntelligence: @Sendable (UInt16, String) -> [String: String] = { port, gateway in
+            EngineEnvironment.compose(.init(
+                port: port, keyEncryptionKey: "k", hostGateway: gateway, appOrigin: "xbot://app",
+                intelligence: .init(apiURL: "https://api", gatewayWsURL: "wss://gw", apiKey: "ck", licenseToken: "lt")
+            ))
+        }
+
+        await controller.start(environment: withIntelligence)
+
+        guard case .running = await controller.state else {
+            Issue.record("expected running, got \(await controller.state)")
+            return
+        }
+        #expect(await driver.removedHandles.contains(ContainerHandle(id: RuntimeController.engineContainerName)))
+        let fresh = await driver.startedSpecs.last
+        #expect(fresh?.environment["INTELLIGENCE_API_KEY"] == "ck")
+        #expect(fresh?.labels[RuntimeController.environmentLabel] == RuntimeController.environmentFingerprint(withIntelligence))
+        // The data lives in volumes, which a replaced container keeps.
+        #expect(await driver.remainingVolumes.contains(RuntimeController.dataVolume))
+    }
+
+    /// Port and gateway are reconciled by adoption itself and change between starts, so they must
+    /// not make an otherwise identical container look out of date.
+    @Test func theFingerprintIgnoresPortAndGateway() {
+        let a = RuntimeController.environmentFingerprint { port, gateway in
+            EngineEnvironment.compose(.init(port: port, keyEncryptionKey: "k", hostGateway: gateway, appOrigin: "xbot://app"))
+        }
+        let b = RuntimeController.environmentFingerprint { _, _ in
+            EngineEnvironment.compose(.init(port: 0, keyEncryptionKey: "k", hostGateway: "", appOrigin: "xbot://app"))
+        }
+        #expect(a == b)
+        let other = RuntimeController.environmentFingerprint { port, gateway in
+            EngineEnvironment.compose(.init(port: port, keyEncryptionKey: "k2", hostGateway: gateway, appOrigin: "xbot://app"))
+        }
+        #expect(a != other)
+    }
+
+    @Test func anExistingHealthyContainerIsAdopted() async {
+        var script = FakeDriver.Script(runFails: true, existingContainerPort: 3_001)
+        script.existingContainerFingerprint = RuntimeController.environmentFingerprint(environment)
+        let driver = FakeDriver(script: script)
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),
@@ -328,13 +385,13 @@ struct RuntimeControllerTests {
     }
 
     @Test func aStoppedExistingContainerIsStartedThenAdopted() async {
-        let driver = FakeDriver(
-            script: FakeDriver.Script(
-                runFails: true,
-                existingContainerPort: 3_001,
-                existingContainerStopped: true
-            )
+        var script = FakeDriver.Script(
+            runFails: true,
+            existingContainerPort: 3_001,
+            existingContainerStopped: true
         )
+        script.existingContainerFingerprint = RuntimeController.environmentFingerprint(environment)
+        let driver = FakeDriver(script: script)
         let controller = RuntimeController(
             driver: driver,
             image: ImageReference(repository: "xbot/engine", tag: "1"),

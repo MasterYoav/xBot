@@ -163,6 +163,9 @@ public actor DockerDriver: ContainerDriver {
         for key in spec.environment.keys.sorted() {
             arguments += ["-e", "\(key)=\(spec.environment[key]!)"]
         }
+        for key in spec.labels.keys.sorted() {
+            arguments += ["--label", "\(key)=\(spec.labels[key]!)"]
+        }
         if let memory = spec.memoryLimitBytes {
             arguments += ["--memory", "\(memory)"]
         }
@@ -311,6 +314,13 @@ public actor DockerDriver: ContainerDriver {
             return port
         }
         return nil
+    }
+
+    public func label(_ key: String, on handle: ContainerHandle) async -> String? {
+        let output = try? await run(["inspect", "-f", "{{ index .Config.Labels \"\(key)\" }}", handle.id])
+        let value = output?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // `index` on a missing label prints "<no value>" rather than nothing.
+        return value.isEmpty || value == "<no value>" ? nil : value
     }
 
     public func startContainer(_ handle: ContainerHandle) async throws {

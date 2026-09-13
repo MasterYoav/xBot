@@ -102,8 +102,11 @@ public struct ModelsSettingsView: View {
                 Spacer()
                 switch conversationStore.state {
                 case .ready:
-                    Button(String(localized: "Disconnect")) { conversationStore.disconnect() }
-                        .buttonStyle(XBotButtonStyle())
+                    Button(String(localized: "Disconnect")) {
+                        conversationStore.disconnect()
+                        applyConversationStoreChange()
+                    }
+                    .buttonStyle(XBotButtonStyle())
                 case .notConnected, .unreadable:
                     Button(
                         editingCopilotKey
@@ -137,7 +140,7 @@ public struct ModelsSettingsView: View {
             Text(
                 String(
                     localized:
-                        "Your conversation history is stored by CopilotKit, the service xBot's engine is built on, so it leaves your Mac. Changing this key takes effect the next time the engine starts."
+                        "Your conversation history is stored by CopilotKit, the service xBot's engine is built on, so it leaves your Mac. Changing this key restarts the engine, which takes a few seconds."
                 )
             )
         }
@@ -158,7 +161,22 @@ public struct ModelsSettingsView: View {
         copilotKey = ""
         if conversationStore.state == .ready {
             withAnimation(Motion.quick) { editingCopilotKey = false }
+            applyConversationStoreChange()
         }
+    }
+
+    /*
+     * A changed CopilotKit key reaches the engine only through a restart.
+     *
+     * The footer used to say the change "takes effect the next time the engine starts" and leave it
+     * there — but the composer reads the Keychain and opened straight away, so the next message went
+     * to an engine still running on the old credentials and failed. Worse, the next start did not
+     * apply it either: `docker start` reuses the environment a container was created with. The
+     * controller now replaces a container whose environment changed, and this restarts it at once.
+     */
+    private func applyConversationStoreChange() {
+        guard case .running = state.runtimeState else { return }
+        state.restartEngine()
     }
 
     @ViewBuilder

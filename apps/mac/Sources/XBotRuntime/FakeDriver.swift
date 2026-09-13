@@ -24,6 +24,9 @@ public actor FakeDriver: ContainerDriver {
         public var existingContainerPort: UInt16?
         /// Whether the existing container starts stopped and needs `docker start`.
         public var existingContainerStopped: Bool
+        /// The environment label the existing container was created with. Nil is a container made
+        /// before the label existed.
+        public var existingContainerFingerprint: String? = nil
 
         public init(
             probe: ProbeResult = .ready(version: "27.0.0"),
@@ -211,6 +214,13 @@ public actor FakeDriver: ContainerDriver {
 
     public func startContainer(_ handle: ContainerHandle) async throws {
         existingRunning = true
+    }
+
+    public func label(_ key: String, on handle: ContainerHandle) async -> String? {
+        if handle.id == RuntimeController.engineContainerName {
+            return key == RuntimeController.environmentLabel ? script.existingContainerFingerprint : nil
+        }
+        return startedSpecs.last { "fake-\($0.name)" == handle.id }?.labels[key]
     }
 
     /// Drives the health poll the controller waits on.

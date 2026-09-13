@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import XBotEngine
 
@@ -128,7 +129,7 @@ public actor RuntimeController {
                 try await driver.createVolume(volume)
             }
 
-            if await adoptExistingEngineIfHealthy() {
+            if await adoptExistingEngineIfHealthy(environment: environment) {
                 return
             }
 
@@ -171,7 +172,8 @@ public actor RuntimeController {
                     environment: environment(port, gateway),
                     memoryLimitBytes: EngineEnvironment.memoryLimitBytes(
                         forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
-                    )
+                    ),
+                    labels: [Self.environmentLabel: Self.environmentFingerprint(environment)]
                 )
                 do {
                     handle = try await driver.run(spec)
@@ -231,8 +233,52 @@ public actor RuntimeController {
     ///
     /// Without this, `docker run --name xbot-engine` fails when the container already exists —
     /// which is the common case during onboarding retries and local development.
-    private func adoptExistingEngineIfHealthy() async -> Bool {
+    /// The label a container carries recording which environment it was created with.
+    public static let environmentLabel = "dev.xbot.environment"
+
+    /**
+     A fingerprint of everything a person can change about the engine's environment.
+
+     Computed with a placeholder port and gateway, because those are the two things adoption already
+     reconciles on its own — and because `docker port` answers nothing for a stopped container, so the
+     real port is not knowable at the moment this has to be checked. What is left is exactly what
+     settings change: the CopilotKit credentials, the browser limit, private hosts, the tokens.
+
+     SHA-256 over the sorted pairs. The values include secrets, and the hash of a high-entropy secret
+     gives nothing away; the environment itself is already readable by anything that can run
+     `docker inspect`, so the label adds no exposure that was not there.
+     */
+    public static func environmentFingerprint(
+        _ environment: (UInt16, String) -> [String: String]
+    ) -> String {
+        let pairs = environment(0, "").sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
+        let digest = SHA256.hash(data: Data(pairs.joined(separator: "\n").utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func adoptExistingEngineIfHealthy(
+        environment: (UInt16, String) -> [String: String]
+    ) async -> Bool {
         guard let existing = await driver.containerNamed(Self.engineContainerName) else {
+            return false
+        }
+
+        /*
+         * A container made with a different environment is replaced, not adopted.
+         *
+         * `docker start` reuses the environment a container was created with. So adoption — which is
+         * every launch, every Start and every restart — silently kept the old one, and no setting that
+         * lives in the environment ever reached an existing engine: a CopilotKit key connected in
+         * onboarding or Settings, the browser limit, private hosts. The first conversation after
+         * onboarding failed for exactly this reason. Replacing the container keeps every volume, so
+         * conversations, files and browser logins are untouched; only the process is recreated.
+         * A container from before this label existed has none, and is replaced once.
+         */
+        guard await driver.label(Self.environmentLabel, on: existing)
+            == Self.environmentFingerprint(environment)
+        else {
+            try? await driver.stop(existing, timeout: .seconds(10))
+            try? await driver.remove(existing)
             return false
         }
 
@@ -493,7 +539,8 @@ public actor RuntimeController {
                 environment: environment(port, gateway),
                 memoryLimitBytes: EngineEnvironment.memoryLimitBytes(
                     forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
-                )
+                ),
+                labels: [Self.environmentLabel: Self.environmentFingerprint(environment)]
             )
             handle = try await driver.run(spec)
 

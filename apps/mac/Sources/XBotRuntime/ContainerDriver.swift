@@ -145,6 +145,7 @@ public struct ContainerSpec: Sendable {
     public let volumes: [String: String]
     public let environment: [String: String]
     public let memoryLimitBytes: UInt64?
+    public let labels: [String: String]
 
     public init(
         name: String,
@@ -152,7 +153,8 @@ public struct ContainerSpec: Sendable {
         ports: [UInt16: UInt16],
         volumes: [String: String],
         environment: [String: String],
-        memoryLimitBytes: UInt64? = nil
+        memoryLimitBytes: UInt64? = nil,
+        labels: [String: String] = [:]
     ) {
         self.name = name
         self.image = image
@@ -160,6 +162,7 @@ public struct ContainerSpec: Sendable {
         self.volumes = volumes
         self.environment = environment
         self.memoryLimitBytes = memoryLimitBytes
+        self.labels = labels
     }
 }
 
@@ -304,6 +307,8 @@ public protocol ContainerDriver: Sendable {
     func requestStop(_ handle: ContainerHandle, timeout: Duration) async throws
     /// Memory now, and disk used under `paths` inside the container.
     func resourceUsage(_ handle: ContainerHandle, paths: [String]) async throws -> EngineResourceUsage
+    /// A label set when the container was created, or nil when it has none.
+    func label(_ key: String, on handle: ContainerHandle) async -> String?
     func remove(_ handle: ContainerHandle) async throws
     func inspect(_ handle: ContainerHandle) async throws -> ContainerStatus
     func logs(_ handle: ContainerHandle, tail: Int) async throws -> [LogLine]
