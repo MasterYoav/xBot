@@ -294,20 +294,31 @@ public final class OnboardingCoordinator {
         let token = try? EngineTokenStore.token()
         let client = HTTPEngineClient(baseURL: endpoint.baseURL, token: token)
         let name = String(localized: "Assistant")
-        guard var agent = try? await client.createAgent(AgentDraft(name: name, label: name)) else {
-            return nil
-        }
 
-        if !didSkipModel,
-           let providerID = ProviderConnectionStore.shared.connectedProviderIDs.first
-        {
+        /*
+         * Created with its model, in one request.
+         *
+         * It used to be created bare and given its model by a second call, `updateAgent`, behind a
+         * `try?`. That call failed against every real engine — it re-sent the managed Bot's loopback
+         * endpoint, which the engine refuses — and the `try?` kept quiet about it, so the first agent
+         * anybody met had no model. In per-run mode that is an agent that cannot answer at all.
+         * `AgentDraft` already carries a model; the engine stores it on create.
+         */
+        var model: ModelSelection?
+        if !didSkipModel {
             let gateway = await runtime.hostGateway
-            if let model = ModelProviderCatalog.selections(
-                forConnectedProviders: [providerID],
+            // Sorted so which provider the first agent uses does not depend on Set ordering.
+            model = ModelProviderCatalog.selections(
+                forConnectedProviders: ProviderConnectionStore.shared.connectedProviderIDs,
                 hostGateway: gateway
-            ).first {
-                agent = (try? await client.updateAgent(agent.id, AgentPatch(model: model))) ?? agent
-            }
+            )
+            .sorted { $0.providerID < $1.providerID }
+            .first
+        }
+        guard let agent = try? await client.createAgent(
+            AgentDraft(name: name, label: name, model: model)
+        ) else {
+            return nil
         }
 
         _ = try? await client.createChannel(agentIds: [agent.id])
