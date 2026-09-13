@@ -296,6 +296,10 @@ private actor RecoveryEngine: EngineClient {
     func deleteRoutine(_ id: String) async throws {
         throw EngineError.notRunning
     }
+
+    func liveModelKeys() async throws -> [StoredModelKey] { [] }
+    func storeModelKey(_ plaintext: String, providerId: String, baseURL: String?, fingerprint: String) async throws {}
+    func revokeModelKey(credentialId: String) async throws {}
 }
 
 private final class CredentialReads: @unchecked Sendable {

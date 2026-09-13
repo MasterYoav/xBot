@@ -89,6 +89,15 @@ public protocol EngineClient: Sendable {
 
     /// Delete a routine. The engine treats another person's id as one that does not exist.
     func deleteRoutine(_ id: String) async throws
+
+    /// The live model keys this app has put in the engine's vault. Values never come back.
+    func liveModelKeys() async throws -> [StoredModelKey]
+
+    /// Put a model key in the vault. One already stored under the same id is retired by the engine.
+    func storeModelKey(_ plaintext: String, providerId: String, baseURL: String?, fingerprint: String) async throws
+
+    /// Retire a model key the person disconnected.
+    func revokeModelKey(credentialId: String) async throws
 }
 
 /// What creating an agent needs. The rest of the row is generated — avatar seed, id, defaults.

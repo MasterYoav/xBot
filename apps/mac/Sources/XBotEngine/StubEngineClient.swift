@@ -459,6 +459,27 @@ public actor StubEngineClient: EngineClient {
         storedRoutines.removeAll { $0.id == id }
     }
 
+    /// The vault, in memory. Values are kept only so a test can see what arrived.
+    public private(set) var vault: [StoredModelKey] = []
+    public private(set) var vaultValues: [String: String] = [:]
+    public private(set) var vaultWrites = 0
+
+    public func liveModelKeys() async throws -> [StoredModelKey] { vault }
+
+    public func storeModelKey(_ plaintext: String, providerId: String, baseURL: String?, fingerprint: String) async throws {
+        let keyId = ModelKeyIdentity.keyId(providerId: providerId, baseURL: baseURL)
+        vault.removeAll { $0.keyId == keyId }
+        let stored = StoredModelKey(id: UUID().uuidString, provider: providerId, keyId: keyId, fingerprint: fingerprint)
+        vault.append(stored)
+        vaultValues[keyId] = plaintext
+        vaultWrites += 1
+    }
+
+    public func revokeModelKey(credentialId: String) async throws {
+        if let gone = vault.first(where: { $0.id == credentialId }) { vaultValues[gone.keyId] = nil }
+        vault.removeAll { $0.id == credentialId }
+    }
+
     public func channels() async throws -> [Channel] { fixedChannels }
 
     public func messages(in channel: Channel.ID) async throws -> [Message] {

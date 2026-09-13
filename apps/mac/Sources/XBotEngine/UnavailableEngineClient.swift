@@ -86,4 +86,12 @@ public struct UnavailableEngineClient: EngineClient {
     public func deleteRoutine(_ id: String) async throws {
         throw EngineError.notRunning
     }
+
+    public func liveModelKeys() async throws -> [StoredModelKey] { throw EngineError.notRunning }
+
+    public func storeModelKey(_ plaintext: String, providerId: String, baseURL: String?, fingerprint: String) async throws {
+        throw EngineError.notRunning
+    }
+
+    public func revokeModelKey(credentialId: String) async throws { throw EngineError.notRunning }
 }

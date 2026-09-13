@@ -7,6 +7,7 @@ import XBotCore
 /// the quota is the person's, with their vendor, and a percentage we cannot verify or enforce is
 /// worse than no number.
 public struct ModelsSettingsView: View {
+    @Environment(AppState.self) private var state
     @State private var settings = ModelSettingsState()
     @State private var editing: String?
     @State private var key = ""
@@ -196,6 +197,9 @@ public struct ModelsSettingsView: View {
             Button(row.isConnected ? String(localized: "Disconnect") : String(localized: "Connect")) {
                 if row.isConnected {
                     settings.disconnect(providerID: row.id)
+                    // Out of the engine's vault as well as the Keychain, or a disconnected key goes on
+                    // answering runs.
+                    Task { await state.syncModelKeys() }
                 } else {
                     withAnimation(Motion.quick) {
                         editing = editing == row.id ? nil : row.id
@@ -224,6 +228,8 @@ public struct ModelsSettingsView: View {
         Task {
             await settings.connect(providerID: row.id, key: pasted)
             if settings.rows.first(where: { $0.id == row.id })?.isConnected == true {
+                // Into the vault now, so the very next message can use it.
+                await state.syncModelKeys()
                 // Cleared on success only: a rejected key stays in the field so the person can fix
                 // a truncated paste rather than going back to the vendor for it again.
                 key = ""
@@ -268,6 +274,7 @@ public struct ModelsSettingsView: View {
             Spacer()
             Button(String(localized: "Remove")) {
                 settings.removeCustomProvider(id: provider.id)
+                Task { await state.syncModelKeys() }
             }
             .buttonStyle(XBotButtonStyle())
         }
@@ -317,7 +324,10 @@ public struct ModelsSettingsView: View {
             )
             savingCustom = false
             // Kept on failure so the person can correct one field rather than retype all four.
-            if added { withAnimation(Motion.quick) { resetCustomForm() } }
+            if added {
+                withAnimation(Motion.quick) { resetCustomForm() }
+                await state.syncModelKeys()
+            }
         }
     }
 

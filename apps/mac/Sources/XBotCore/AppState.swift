@@ -288,10 +288,18 @@ public final class AppState {
         conversationStore: @escaping @Sendable () -> ConversationStore = { EngineBootstrap.conversationStore },
         /// Whether opening the app should bring the engine up. False by default so a test's answer
         /// never depends on whether this Mac has finished onboarding; the app passes the real one.
-        startsEngineOnLaunch: @escaping @Sendable () -> Bool = { false }
+        startsEngineOnLaunch: @escaping @Sendable () -> Bool = { false },
+        /// The model keys the Mac holds. Empty by default so no test reads this machine's Keychain;
+        /// the app passes the real ones.
+        modelKeys: @escaping @Sendable () -> [DesiredModelKey] = { [] },
+        modelKeyFingerprint: @escaping @Sendable (String) -> String = {
+            ModelKeySync.fingerprint(of: $0, keyEncryptionKey: "test")
+        }
     ) {
         self.conversationStore = conversationStore
         self.startsEngineOnLaunch = startsEngineOnLaunch
+        self.modelKeys = modelKeys
+        self.modelKeyFingerprint = modelKeyFingerprint
         self.engine = UnavailableEngineClient()
         self.runtime = runtime
         self.environmentFactory = environment
@@ -321,6 +329,10 @@ public final class AppState {
     /// the machine's contents deciding the answer.
     private let conversationStore: @Sendable () -> ConversationStore
     private var startsEngineOnLaunch: @Sendable () -> Bool = { false }
+    private var modelKeys: @Sendable () -> [DesiredModelKey] = { [] }
+    private var modelKeyFingerprint: @Sendable (String) -> String = {
+        ModelKeySync.fingerprint(of: $0, keyEncryptionKey: "test")
+    }
 
     public var selectedAgent: Agent? {
         agents.first { $0.id == selectedAgentID }
@@ -504,6 +516,9 @@ public final class AppState {
             }
             pausedWhenIdle = false
             noteEngineActivity()
+            // Before anything can run: a message that woke the engine is about to be answered, and
+            // it needs its key in the vault to be answered at all.
+            await syncModelKeys()
             // Before the refresh, not after: `run` marks the channel as running, which is what stops
             // a history reload from replacing the bubble that is waiting to be answered.
             dispatchMessageThatWokeTheEngine()
@@ -528,6 +543,10 @@ public final class AppState {
             providers.markSkipped()
         }
         await load()
+        // Onboarding starts the engine before it asks for a model key, so the sync the running
+        // transition did found nothing to send. This is the first moment the key and the engine exist
+        // together.
+        await syncModelKeys()
         if let id = handoff.firstAgentID {
             selectedAgentID = id
             seedWelcomeMessage(for: id)
@@ -582,6 +601,42 @@ public final class AppState {
                 state: .complete
             ),
         ]
+    }
+
+    // MARK: - Model keys
+
+    /**
+     Put the Mac's model keys where a run can find them, and take back the ones disconnected.
+
+     Without this no run ever carried a key: the app kept them in the Keychain and read them back
+     only to show "Connected". See `ModelKeySync` for what is stored when, and why not every time.
+
+     A failure here is not reported on its own. A run that then lacks its key fails with the router's
+     sentence naming the provider whose key is missing, which is the sentence a person can act on.
+     */
+    /// The stub-backed initializer has no parameter for this, and a test needs to say what keys exist.
+    func overrideModelKeysForTesting(_ keys: @escaping @Sendable () -> [DesiredModelKey]) {
+        modelKeys = keys
+    }
+
+    public func syncModelKeys() async {
+        if runtime != nil {
+            guard case .running = runtimeState else { return }
+        }
+        let desired = modelKeys()
+        guard let live = try? await engine.liveModelKeys() else { return }
+        let plan = ModelKeySync.plan(desired: desired, live: live, fingerprint: modelKeyFingerprint)
+        for key in plan.store {
+            try? await engine.storeModelKey(
+                key.plaintext,
+                providerId: key.providerId,
+                baseURL: key.baseURL,
+                fingerprint: modelKeyFingerprint(key.plaintext)
+            )
+        }
+        for id in plan.revoke {
+            try? await engine.revokeModelKey(credentialId: id)
+        }
     }
 
     // MARK: - Idle

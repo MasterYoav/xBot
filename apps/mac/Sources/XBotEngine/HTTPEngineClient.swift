@@ -156,10 +156,17 @@ public actor HTTPEngineClient: EngineClient {
                 ?? current["title"] as? String ?? "",
             "visibility": current["visibility"] as? String ?? "private",
         ]
-        // Endpoint is re-sent because omitting it would drop the agent back to the built-in Bot.
-        if let endpoint = current["endpoint"] as? String, !endpoint.isEmpty {
-            body["endpoint"] = endpoint
-        }
+        /*
+         * The endpoint is NOT sent.
+         *
+         * It used to be, on the belief that omitting it would drop the agent back to the built-in Bot.
+         * The engine does the opposite — `profile-store.update` keeps the stored endpoint whenever an
+         * edit carries none — and re-sending it was actively harmful: every agent this app creates
+         * lives on the managed Bot at a loopback address, which the engine's own guard refuses as
+         * "inside this deployment's own network". So every rename, every relabel and every model
+         * change failed, for every agent, the moment it met a real engine. Found by the live tests;
+         * no stub could have shown it.
+         */
         // Only when this edit changed it. Absent means "leave the stored one alone" — the engine's
         // store follows the same rule the vault key does, for the same reason.
         if let model = patch.model { body["modelSelection"] = model.wireFormat }
@@ -227,6 +234,54 @@ public actor HTTPEngineClient: EngineClient {
         // caller wanted. Only a real failure is worth putting in front of somebody.
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 204 || status == 404 else { throw EngineError.notRunning }
+    }
+
+    // MARK: - Model keys
+
+    public func liveModelKeys() async throws -> [StoredModelKey] {
+        let (data, response) = try await send(request(.get, "/api/admin/credentials"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw EngineError.notRunning }
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let rows = object["credentials"] as? [[String: Any]]
+        else { return [] }
+        return rows.compactMap { row in
+            guard
+                row["kind"] as? String == "model",
+                row["revokedAt"] == nil || row["revokedAt"] is NSNull,
+                let id = row["id"] as? String,
+                let provider = row["provider"] as? String,
+                let keyId = row["keyId"] as? String,
+                // Only what this app wrote. Anything else in the vault is somebody's deliberate
+                // choice made elsewhere, and a sync must never revoke it.
+                keyId.hasPrefix(ModelKeyIdentity.prefix)
+            else { return nil }
+            let metadata = row["metadata"] as? [String: Any]
+            return StoredModelKey(
+                id: id, provider: provider, keyId: keyId,
+                fingerprint: metadata?["fingerprint"] as? String
+            )
+        }
+    }
+
+    public func storeModelKey(
+        _ plaintext: String, providerId: String, baseURL: String?, fingerprint: String
+    ) async throws {
+        let body: [String: Any] = [
+            "kind": "model",
+            "provider": providerId,
+            "keyId": ModelKeyIdentity.keyId(providerId: providerId, baseURL: baseURL),
+            "plaintext": plaintext,
+            "metadata": ["source": "xbot-app", "fingerprint": fingerprint],
+        ]
+        let (_, response) = try await send(request(.post, "/api/admin/credentials", body: body))
+        guard (response as? HTTPURLResponse)?.statusCode == 201 else { throw EngineError.notRunning }
+    }
+
+    public func revokeModelKey(credentialId: String) async throws {
+        let path = "/api/admin/credentials/\(credentialId)/revoke"
+        let (_, response) = try await send(request(.post, path, body: [:]))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw EngineError.notRunning }
     }
 
     private static func routine(from row: [String: Any]) -> Routine? {
