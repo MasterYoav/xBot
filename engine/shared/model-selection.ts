@@ -58,3 +58,23 @@ export function parseModelSelection(
     ...(apiKey ? { apiKey } : {}),
   };
 }
+
+/**
+ * The vault key a model credential is stored under, for one provider at one address.
+ *
+ * Part of the contract with the Mac app rather than a server detail, because the app writes these
+ * and the server reads them, and they meet only in this string. Built from what a run can see —
+ * provider and base URL — so two custom endpoints, both `openai-compatible`, never share a key, and a
+ * key for OpenRouter is not sent to a gateway at work. The base URL is trimmed and loses a trailing
+ * slash, since `…/v1` and `…/v1/` are the same endpoint and must not be two credentials.
+ *
+ * The Swift side is `ModelKeyIdentity.keyId(providerId:baseURL:)`; a test on each side pins the same
+ * examples, which is what keeps the two from drifting.
+ */
+export function modelKeyId(providerId: string, baseURL?: string): string {
+  const provider = providerId.trim().toLowerCase();
+  const address = baseURL?.trim().replace(/\/+$/, "");
+  return address
+    ? `xbot-model:${provider}@${address}`
+    : `xbot-model:${provider}`;
+}

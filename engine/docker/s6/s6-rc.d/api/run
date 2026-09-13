@@ -2,4 +2,9 @@
 # The API, and the app it serves. Started after the browser so a Bot's first action does not race a
 # computer that is still coming up.
 cd /app/server
+# The Bot beside it, unless somebody pointed this deployment at another one. Loopback: the Bot's port
+# is not published, and its only caller is this process.
+if [ "${EMBEDDED_AGENT:-on}" = "on" ] && [ -z "${MANAGED_AGENT_AG_UI_URL:-}" ]; then
+  export MANAGED_AGENT_AG_UI_URL="http://127.0.0.1:4201/ag-ui"
+fi
 exec s6-setuidgid pwuser /usr/local/bin/bun src/index.ts

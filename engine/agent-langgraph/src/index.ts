@@ -42,6 +42,18 @@ import { streamRun } from "./stream";
  */
 
 const PORT = Number.parseInt(process.env.PORT ?? "4201", 10);
+/**
+ * xBot's mode: no deployment model at all, only what each run carries.
+ *
+ * Upstream runs this process with one provider and one key in its environment and refuses to start
+ * without them. xBot runs it inside the engine container for every agent on the Mac, where ADR-0002
+ * puts the model on the agent and the key in the engine's vault, resolved per run — so there is no
+ * provider to name at boot, and exiting for the lack of one left the container with no Bot at all.
+ *
+ * Set by the image's own service definition, never inferred: an unset `BOT_PROVIDER` in an upstream
+ * deployment is a mistake that should still stop the process, and it does.
+ */
+const PER_RUN_MODELS = process.env.XBOT_PER_RUN_MODELS === "true";
 const MANAGED_AGENT_TOKEN = process.env.MANAGED_AGENT_TOKEN?.trim();
 if (!MANAGED_AGENT_TOKEN) {
   console.error(
@@ -158,14 +170,14 @@ const KEY_VARIABLE: Record<string, string> = {
 };
 
 const keyVariable = KEY_VARIABLE[PROVIDER];
-if (!keyVariable) {
+if (!PER_RUN_MODELS && !keyVariable) {
   console.error(
     `BOT_PROVIDER=${PROVIDER} is not one this Bot knows. Use openai, anthropic or google.`,
   );
   process.exit(1);
 }
-const API_KEY = process.env[keyVariable]?.trim();
-if (!API_KEY) {
+const API_KEY = keyVariable ? process.env[keyVariable]?.trim() : undefined;
+if (!PER_RUN_MODELS && !API_KEY) {
   console.error(
     `${keyVariable} is not set, and BOT_PROVIDER=${PROVIDER} needs it. This Bot cannot answer without a model.`,
   );
@@ -183,16 +195,20 @@ if (!API_KEY) {
  * a run that forwards nothing gets exactly what upstream would have given it, which is what keeps
  * an existing OpenBot deployment working unchanged.
  */
-const DEPLOYMENT_DEFAULT: ModelSelection = {
-  providerId: PROVIDER,
-  model: MODEL,
-  baseURL:
-    PROVIDER === "anthropic"
-      ? ANTHROPIC_BASE_URL
-      : PROVIDER === "google"
-        ? GOOGLE_BASE_URL
-        : OPENAI_BASE_URL,
-};
+const DEPLOYMENT_DEFAULT: ModelSelection | undefined = PER_RUN_MODELS
+  ? // No fallback: a run with no selection gets the registry's "no model selected" sentence rather
+    // than silently answering on a provider nobody chose.
+    undefined
+  : {
+      providerId: PROVIDER,
+      model: MODEL,
+      baseURL:
+        PROVIDER === "anthropic"
+          ? ANTHROPIC_BASE_URL
+          : PROVIDER === "google"
+            ? GOOGLE_BASE_URL
+            : OPENAI_BASE_URL,
+    };
 
 /**
  * Deployment-wide keys, by provider id.
@@ -201,11 +217,14 @@ const DEPLOYMENT_DEFAULT: ModelSelection = {
  * the engine's vault resolves a key per agent it arrives on the selection instead and wins, which
  * is how two agents on the same provider can be on different accounts.
  */
-const DEPLOYMENT_KEYS: Record<string, string | undefined> = {
-  openai: process.env.OPENAI_API_KEY?.trim(),
-  anthropic: process.env.ANTHROPIC_API_KEY?.trim(),
-  google: process.env.GOOGLE_API_KEY?.trim(),
-};
+const DEPLOYMENT_KEYS: Record<string, string | undefined> = PER_RUN_MODELS
+  ? // Keys arrive on the run, from the engine's vault. None is read from this environment.
+    {}
+  : {
+      openai: process.env.OPENAI_API_KEY?.trim(),
+      anthropic: process.env.ANTHROPIC_API_KEY?.trim(),
+      google: process.env.GOOGLE_API_KEY?.trim(),
+    };
 
 /**
  * The model this particular run should answer on, if the deployment said.
@@ -507,7 +526,8 @@ async function runAgent(input: RunAgentInput): Promise<Response> {
         (error) =>
           explainModelError(
             modelSelectionOf(input)?.providerId ??
-              DEPLOYMENT_DEFAULT.providerId,
+              DEPLOYMENT_DEFAULT?.providerId ??
+              "",
             error,
           )?.message,
       );
@@ -532,13 +552,19 @@ serve({
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
-      return Response.json({
-        status: "ok",
-        provider: PROVIDER,
-        model: MODEL,
-        framework: "langgraph",
-        responsesApi: USE_RESPONSES_API,
-      });
+      // In per-run mode there is no deployment model, so naming one here would be a claim about a
+      // provider this process will never use unless a run asks for it.
+      return Response.json(
+        PER_RUN_MODELS
+          ? { status: "ok", models: "per-run", framework: "langgraph" }
+          : {
+              status: "ok",
+              provider: PROVIDER,
+              model: MODEL,
+              framework: "langgraph",
+              responsesApi: USE_RESPONSES_API,
+            },
+      );
     }
 
     if (url.pathname === "/ag-ui" && request.method === "POST") {

@@ -1,0 +1,24 @@
+#!/command/with-contenv sh
+# The Bot in the box: the process every coworker without its own endpoint runs on.
+#
+# It was missing. The image ran the database, the API and the browser, and no Bot, so
+# MANAGED_AGENT_AG_UI_URL was never set and the API refused to create any coworker at all — "This
+# deployment has no managed Bot". Every agent in the Mac app is one of these.
+#
+# Per-run models (XBOT_PER_RUN_MODELS): no provider or key is named here. Each run carries its model,
+# and the API puts the key on it from the encrypted vault, so this environment never holds a vendor
+# key. See docs/decisions/0002-per-bot-model-router.md.
+#
+# `EMBEDDED_AGENT=on` is the default for the same reason `EMBEDDED_COMPUTER` is: one container that
+# works. Off, this exits and the API uses whatever MANAGED_AGENT_AG_UI_URL points at instead.
+set -eu
+if [ "${EMBEDDED_AGENT:-on}" != "on" ]; then
+  exec /bin/true
+fi
+# Tools run through the API beside it. Computed before PORT is repointed at this process: PORT is the
+# API's until the line after.
+export OPENBOT_TOOL_URL="http://127.0.0.1:${PORT:-3001}/api/agent-tools/call"
+export PORT=4201
+export XBOT_PER_RUN_MODELS=true
+cd /app
+exec s6-setuidgid pwuser /usr/local/bin/bun agent-langgraph/src/index.ts

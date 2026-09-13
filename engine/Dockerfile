@@ -53,6 +53,12 @@ COPY agent-computer/package.json agent-computer/package.json
 COPY agent-computer/bun.lock agent-computer/bun.lock
 RUN cd agent-computer && bun install --frozen-lockfile
 
+# The Bot, with its own locked tree like the browser above. It was absent from this image entirely,
+# which left the API with no managed Bot and unable to create a single coworker.
+COPY agent-langgraph/package.json agent-langgraph/package.json
+COPY agent-langgraph/bun.lock agent-langgraph/bun.lock
+RUN cd agent-langgraph && bun install --frozen-lockfile --production
+
 # A second tree with the build-time dependencies left out, for the runtime stage to take. Vite,
 # biome and the test tooling are a gigabyte that nothing in a running container imports.
 RUN mkdir -p /prod && cp package.json bun.lock /prod/ \
@@ -105,12 +111,16 @@ COPY --from=deps /src/package.json package.json
 COPY --from=deps /src/bun.lock bun.lock
 COPY --from=deps /src/server/node_modules server/node_modules
 COPY --from=deps /src/agent-computer/node_modules agent-computer/node_modules
+COPY --from=deps /src/agent-langgraph/node_modules agent-langgraph/node_modules
 
 COPY server server
 COPY shared shared
 COPY examples examples
 COPY agent-computer/src agent-computer/src
 COPY agent-computer/package.json agent-computer/package.json
+# Beside `shared`, at the repository's own depth, so `../../shared/…` resolves as it does on a laptop.
+COPY agent-langgraph/src agent-langgraph/src
+COPY agent-langgraph/package.json agent-langgraph/package.json
 
 # The built app, served by the API on the same origin. There is no CORS in this server, so this is
 # not a convenience: two origins would simply fail.

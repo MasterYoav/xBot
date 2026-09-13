@@ -1,6 +1,11 @@
 import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { type RegisteredAgent, registeredAgentFromRow } from "../copilot";
-import type { CredentialSecretReader } from "../credentials";
+import { modelKeyId } from "../../../shared/model-selection";
+import {
+  type CredentialSecretReader,
+  type CredentialStore,
+  decryptSecret,
+} from "../credentials";
 import type { Database } from "../db/client";
 import {
   agentProfiles,
@@ -21,7 +26,12 @@ import type { AgentActor } from "./profile-types";
 export function createRuntimeAgentLoader(
   database: Database,
   /** Resolves a customer agent's key at load time. Absent means no agent can carry one. */
-  vault?: { reader: CredentialSecretReader; encryptionKey: string },
+  vault?: {
+    reader: CredentialSecretReader;
+    encryptionKey: string;
+    /** Finds a model key by provider and address. Absent means no agent carries one. */
+    store?: Pick<CredentialStore, "findLiveByKey">;
+  },
   /** Secret for the deployment-managed Bot. Never sent to customer-owned endpoints. */
   managedAgent?: { endpoint: URL; token: string },
 ) {
@@ -56,6 +66,22 @@ export function createRuntimeAgentLoader(
           ...agent.headers,
           "x-openbot-agent-token": managedAgent.token,
         };
+      }
+      // The model key, beside the endpoint key and for the same reason: resolved per load, so a key
+      // replaced or removed in the app is what the very next run uses.
+      if (agent.type === "remote_ag_ui" && vault?.store) {
+        const { store, reader, encryptionKey } = vault;
+        await attachModelKey(agent, async (providerId, baseURL) => {
+          const live = await store.findLiveByKey({
+            kind: "model",
+            provider: providerId,
+            keyId: modelKeyId(providerId, baseURL),
+          });
+          if (!live) return undefined;
+          const secret = await reader.readSecret(live.id);
+          if (!secret || secret.revokedAt) return undefined;
+          return decryptSecret(encryptionKey, secret.encryptedValue);
+        });
       }
       registered.set(agent.id, agent);
     }
@@ -119,4 +145,31 @@ function selectTombstoneAgents(database: Database, actor: AgentActor) {
       ),
     )
     .where(isNotNull(agentProfiles.deletedAt));
+}
+
+/**
+ * Put the vault's key for this agent's model onto its selection, when the selection has none.
+ *
+ * ADR-0002: the model is the agent's, the key is the vault's, and the two meet per run. `copilot.ts`
+ * forwards `modelSelection` to the Bot as it is, so a selection that leaves here carrying its key is
+ * all it takes for the Bot to answer on it — and `publishableSelection` strips the key before any
+ * surface can read it back. Without this nothing put a key there at all: the app held the key in the
+ * Keychain, the vault could hold it too, and the run reached the vendor with neither.
+ *
+ * A key already on the selection wins — that is a key somebody set for this agent specifically. A
+ * lookup that finds nothing leaves the selection alone, so the Bot answers with the registry's own
+ * sentence about the missing key rather than a failure from here.
+ */
+export async function attachModelKey(
+  agent: RegisteredAgent,
+  resolve: (
+    providerId: string,
+    baseURL?: string,
+  ) => Promise<string | undefined>,
+): Promise<void> {
+  if (agent.type !== "remote_ag_ui") return;
+  const selection = agent.modelSelection;
+  if (!selection?.providerId || selection.apiKey) return;
+  const key = await resolve(selection.providerId, selection.baseURL);
+  if (key) agent.modelSelection = { ...selection, apiKey: key };
 }
