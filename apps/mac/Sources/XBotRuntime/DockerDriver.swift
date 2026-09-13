@@ -181,6 +181,28 @@ public actor DockerDriver: ContainerDriver {
         _ = try await run(["stop", "-t", "\(seconds)", handle.id])
     }
 
+    public func resourceUsage(_ handle: ContainerHandle, paths: [String]) async throws -> EngineResourceUsage {
+        let stats = try await run(["stats", "--no-stream", "--format", "{{.MemUsage}}", handle.id])
+        let line = stats.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let memory = DockerSize.memoryUsage(line) else {
+            throw RuntimeError.commandFailed(command: "docker stats", exitCode: 0, message: line)
+        }
+        /*
+         * `du` inside the container, over just the engine's own directories.
+         *
+         * Not `docker system df -v`, which is what reports volume sizes: it sizes every image and
+         * volume on the machine, and on a Mac with a few other projects it took minutes — far too long
+         * for a settings pane. A failure here leaves disk unknown rather than failing the memory
+         * figure beside it.
+         */
+        let du = try? await run(["exec", handle.id, "du", "-sk"] + paths)
+        return EngineResourceUsage(
+            memoryBytes: memory.used,
+            memoryLimitBytes: memory.limit,
+            diskBytes: du.flatMap(DockerSize.duKilobytesTotal)
+        )
+    }
+
     public func requestStop(_ handle: ContainerHandle, timeout: Duration) async throws {
         let seconds = Int(timeout.components.seconds)
         note(["stop", "-t", "\(seconds)", handle.id])

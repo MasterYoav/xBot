@@ -270,6 +270,12 @@ Settings, on by default.
 **Surfaced honestly.** Settings → Advanced shows current memory and disk use with a link to per-agent
 resets. A user who thinks the app is heavy should be able to see whether it is.
 
+*Built*, without the per-agent resets. Memory comes from `docker stats`; disk from `du` run inside the
+container over its three data directories — not `docker system df -v`, which sizes every image and
+volume on the machine and took minutes on a Mac with other projects. Docker prints memory in binary
+units and sizes in decimal ones, about 7% apart per gigabyte, so the parser keeps them apart. When the
+engine is not running the pane says so rather than showing zeros.
+
 ## Diagnostics
 
 The user never reads a log. **Copy diagnostics** exists so they can send one.

@@ -302,6 +302,8 @@ public protocol ContainerDriver: Sendable {
     /// it cannot cut the grace period either — that is Postgres being given time to stop cleanly
     /// rather than recovering from a kill on the next start. So the request has to outlive the app.
     func requestStop(_ handle: ContainerHandle, timeout: Duration) async throws
+    /// Memory now, and disk used under `paths` inside the container.
+    func resourceUsage(_ handle: ContainerHandle, paths: [String]) async throws -> EngineResourceUsage
     func remove(_ handle: ContainerHandle) async throws
     func inspect(_ handle: ContainerHandle) async throws -> ContainerStatus
     func logs(_ handle: ContainerHandle, tail: Int) async throws -> [LogLine]

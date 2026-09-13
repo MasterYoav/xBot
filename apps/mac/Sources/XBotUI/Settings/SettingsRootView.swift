@@ -1,5 +1,6 @@
 import SwiftUI
 import XBotCore
+import XBotRuntime
 
 /// Settings → Advanced. Admin surfaces live here per ADR-0004, and so does uninstall.
 public struct AdvancedSettingsView: View {
@@ -11,6 +12,38 @@ public struct AdvancedSettingsView: View {
 
     public var body: some View {
         Form {
+            /*
+             * What the engine costs this Mac.
+             *
+             * docs/07: "A user who thinks the app is heavy should be able to see whether it is." The
+             * container is the heaviest thing xBot adds to a machine, and nothing said how heavy. Real
+             * figures from Docker, or a sentence saying there are none — never a zero standing in for
+             * "could not ask".
+             */
+            Section {
+                if let usage = state.engineResources {
+                    LabeledContent(String(localized: "Memory")) {
+                        Text(Self.memoryText(usage))
+                    }
+                    LabeledContent(String(localized: "Disk")) {
+                        Text(usage.diskBytes.map(Self.bytes) ?? String(localized: "Couldn't be measured"))
+                    }
+                } else {
+                    Text(String(localized: "Shown while the engine is running."))
+                        .foregroundStyle(Palette.textSecondary)
+                }
+            } header: {
+                Text(String(localized: "Resources"))
+            } footer: {
+                Text(
+                    String(
+                        localized:
+                            "Disk is your conversations, your agents' files, and the websites they are signed in to. The engine pauses itself after 30 quiet minutes and stops when you quit xBot."
+                    )
+                )
+            }
+            .task { await state.refreshEngineResources() }
+
             Section {
                 Button(String(localized: "Plugins…")) {
                     state.preparePluginsAdmin()
@@ -81,6 +114,18 @@ public struct AdvancedSettingsView: View {
                 )
             )
         }
+    }
+
+    /// "1.2 GB of 6 GB", or just the amount when Docker gives no cap.
+    static func memoryText(_ usage: EngineResourceUsage) -> String {
+        guard let limit = usage.memoryLimitBytes else { return bytes(usage.memoryBytes) }
+        return String(localized: "\(bytes(usage.memoryBytes)) of \(bytes(limit))")
+    }
+
+    /// The system's own formatting, in the units Finder uses, so the figure matches what the person
+    /// sees everywhere else on their Mac.
+    static func bytes(_ count: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(clamping: count), countStyle: .file)
     }
 }
 

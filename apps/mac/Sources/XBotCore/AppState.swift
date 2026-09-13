@@ -603,6 +603,15 @@ public final class AppState {
         ]
     }
 
+    // MARK: - Resources
+
+    /// What the engine is costing the Mac, for Settings. Nil until asked, and when it cannot be read.
+    public private(set) var engineResources: EngineResourceUsage?
+
+    public func refreshEngineResources() async {
+        engineResources = await runtime?.resourceUsage()
+    }
+
     // MARK: - Model keys
 
     /**

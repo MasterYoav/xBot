@@ -544,6 +544,15 @@ public actor RuntimeController {
         state = .stopped
     }
 
+    /// What the running engine is using. Nil when it is not running or Docker would not say.
+    public func resourceUsage() async -> EngineResourceUsage? {
+        guard let handle, case .running = state else { return nil }
+        return try? await driver.resourceUsage(
+            handle,
+            paths: ["/var/lib/postgresql/data", "/workspace", "/profiles"]
+        )
+    }
+
     /// Consecutive health checks that went unanswered while the engine should have been up.
     private var missedHealthChecks = 0
 

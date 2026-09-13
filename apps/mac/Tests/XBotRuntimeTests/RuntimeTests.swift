@@ -1013,3 +1013,50 @@ struct EngineHealthWatchTests {
         #expect(await controller.state == .stopped)
     }
 }
+
+/// Docker's human sizes, read back. Every example is a string real Docker printed.
+@Suite
+struct DockerSizeTests {
+    /// `docker stats` reports memory in binary units.
+    @Test func memoryFromDockerStats() {
+        let usage = DockerSize.memoryUsage("65.09MiB / 15.66GiB")
+        #expect(usage?.used == UInt64(65.09 * 1_048_576))
+        #expect(usage?.limit == UInt64(15.66 * 1_073_741_824))
+    }
+
+    /// `docker system df` reports sizes in decimal units — about 7% apart from binary per gigabyte,
+    /// so treating them alike would be wrong on every figure.
+    @Test func decimalAndBinaryUnitsAreNotTheSame() {
+        #expect(DockerSize.bytes("49.82MB") == 49_820_000)
+        #expect(DockerSize.bytes("3.589MB") == 3_589_000)
+        #expect(DockerSize.bytes("0B") == 0)
+        #expect(DockerSize.bytes("1GB")! < DockerSize.bytes("1GiB")!)
+    }
+
+    @Test func somethingUnreadableIsNil() {
+        #expect(DockerSize.bytes("lots") == nil)
+        #expect(DockerSize.bytes("12parsecs") == nil)
+        #expect(DockerSize.memoryUsage("--") == nil)
+    }
+
+    /// `du -sk` over the engine's three directories, one line each.
+    @Test func diskFromDu() {
+        let output = "48652\t/var/lib/postgresql/data\n0\t/workspace\n3504\t/profiles\n"
+        #expect(DockerSize.duKilobytesTotal(output) == (48_652 + 0 + 3_504) * 1_024)
+        #expect(DockerSize.duKilobytesTotal("") == nil)
+    }
+
+    @Test func aRunningEngineReportsItsUsage() async {
+        let controller = RuntimeController(
+            driver: FakeDriver(),
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore()
+        )
+        #expect(await controller.resourceUsage() == nil)
+        await controller.start(environment: { port, gateway in
+            EngineEnvironment.compose(.init(port: port, keyEncryptionKey: "k", hostGateway: gateway, appOrigin: "xbot://app"))
+        })
+        #expect(await controller.resourceUsage()?.memoryBytes ?? 0 > 0)
+    }
+}

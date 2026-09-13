@@ -170,6 +170,10 @@ public actor FakeDriver: ContainerDriver {
 
     public func stop(_ handle: ContainerHandle, timeout: Duration) async throws { stopped = true }
     public func requestStop(_ handle: ContainerHandle, timeout: Duration) async throws { stopped = true }
+    /// About what a real engine uses at rest: 1.2 GB of a 6 GB cap, 51 MB on disk.
+    public func resourceUsage(_ handle: ContainerHandle, paths: [String]) async throws -> EngineResourceUsage {
+        EngineResourceUsage(memoryBytes: 1_288_490_188, memoryLimitBytes: 6_442_450_944, diskBytes: 53_409_792)
+    }
     public func remove(_ handle: ContainerHandle) async throws {
         removedHandles.append(handle)
         if handle.id == RuntimeController.engineContainerName {
