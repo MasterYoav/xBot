@@ -116,6 +116,13 @@ history.
 That last part is the actual test. The transcript living on their infrastructure is precisely what
 this key buys, so a reply that does not survive a restart means it is not working.
 
+**There is an automated version of the engine half.** `apps/mac/Tests/XBotEngineTests/LiveEngineTests.swift`
+drives the real client against a running engine — point it at a throwaway one, since it creates
+agents. With Intelligence configured, set `XBOT_LIVE_ENGINE_HAS_INTELLIGENCE=1` as well and it proves
+the whole key path by sending with a deliberately invalid Anthropic key: the answer should be
+"Anthropic rejected the key". Everything short of the conversation store was verified that way on
+13 September; this is the hop that needs your key.
+
 **Also close the last M2 item here:** point one agent at a second real vendor — Anthropic is already
 proven, so use OpenAI or Google — and confirm the reply comes from the vendor you picked. A model
 name the vendor does not have should come back as a named error, not a silent fall back to somebody
