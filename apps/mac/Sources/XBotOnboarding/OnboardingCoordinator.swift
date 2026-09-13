@@ -290,6 +290,23 @@ public final class OnboardingCoordinator {
     }
 
     public func createFirstAgent() async -> Agent.ID? {
+        /*
+         * Restart the engine once the CopilotKit key exists — which, on a first run, is always after
+         * the engine started.
+         *
+         * The engine starts in step three and the key is asked for in step four, and the engine reads
+         * its CopilotKit credentials from its environment at start. So the engine onboarding handed
+         * over was running without them while the composer, which checks the Keychain, opened as if
+         * all was well, and the first conversation anybody had failed. The restart recreates the
+         * container with the key (see `RuntimeController.environmentFingerprint`), keeping every
+         * volume. It happens here, behind "Creating your first agent…", rather than mid-typing.
+         *
+         * Here and not in a `finish()`: it was first put there, and nothing called `finish()` — the
+         * Meet-your-agent screen calls this directly — so it would never have run.
+         */
+        if IntelligenceCredentialStore.settings() != nil {
+            await runtime.restart(environment: environmentFactory)
+        }
         guard case .running(let endpoint) = await runtime.state else { return nil }
         let token = try? EngineTokenStore.token()
         let client = HTTPEngineClient(baseURL: endpoint.baseURL, token: token)
@@ -323,24 +340,5 @@ public final class OnboardingCoordinator {
 
         _ = try? await client.createChannel(agentIds: [agent.id])
         return agent.id
-    }
-
-    public func finish() async -> OnboardingHandoff {
-        /*
-         * Restart the engine once the CopilotKit key exists — which, on a first run, is always after
-         * the engine started.
-         *
-         * The engine starts in step three and the key is asked for in step four, and the engine reads
-         * its CopilotKit credentials from its environment at start. So the engine onboarding handed
-         * over was running without them while the composer, which checks the Keychain, opened as if
-         * all was well, and the first conversation anybody had failed. The restart recreates the
-         * container with the key (see `RuntimeController.environmentFingerprint`), keeping every
-         * volume, and is a no-op recreate-wise when nothing changed. It happens here, behind
-         * "Creating your first agent…", rather than in the middle of typing the key.
-         */
-        if IntelligenceCredentialStore.settings() != nil {
-            await runtime.restart(environment: environmentFactory)
-        }
-        return OnboardingHandoff(firstAgentID: await createFirstAgent(), modelSkipped: didSkipModel)
     }
 }
