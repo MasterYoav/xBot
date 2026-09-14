@@ -115,7 +115,12 @@ struct SendTests {
 
         state.send("hello")
         state.select(second)
-        try await settle(state)
+        // Not `settle`: that watches the selected conversation, which is already still, so it could
+        // return before the first agent's reply landed. Wait for the thing being tested.
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !state.unreadAgents.contains(first), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
 
         #expect(state.unreadAgents.contains(first))
 
