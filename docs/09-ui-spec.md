@@ -149,27 +149,22 @@ Content types:
 | Text | Markdown. Code blocks with syntax highlighting and a copy button |
 | Image | Inline, tappable to a full-size window. Both directions — the reference shows the user attaching an image and the agent returning one |
 | Tool call | A compact inline row: what it did, its target, its result. Expandable |
-| Handover request | Not in the transcript. **Take control** lives on the Screen panel, next to the browser it hands over — which is where a person is looking when they decide to take it |
-| Secret request | **There is none, deliberately.** See below |
+| Handover request | Upstream's `computer_request_help` client tool: the Bot asks, the person takes control and hands back. **Not built in the Mac app** — see below |
+| Secret request | Upstream's `computer_request_secret` client tool: a masked box whose value is typed straight into the page and never reaches the model. **Not built in the Mac app** — see below |
 | Generated UI | Sandboxed `WKWebView`, no same-origin access. Fixed height, expandable |
 | Error | Inline, with a retry action |
 
-**Why there is no secret card.** This document originally specified "a card with a secure field,
-never a normal message", and the instinct behind it is right: a secret typed into the composer goes
-into the transcript, and for v1 the transcript rests on CopilotKit Intelligence (ADR-0007). But the
-engine has no tool with which a Bot asks for one, and adding one would be re-engineering upstream
-rather than surfacing it — CLAUDE.md's first rule about the engine.
+**Correction: the secret and handover requests exist, and the Mac app does not implement them.**
+An earlier version of this section said "the engine has no tool with which a Bot asks for" a secret,
+and argued the takeover made one unnecessary. That was wrong, from reading only the server. Upstream
+defines the whole computer — `computer_navigate`, `computer_snapshot`, `computer_click`,
+`computer_type`, the file tools, `computer_run_command`, and also `computer_request_secret` and
+`computer_request_help` — as **client-side tools** registered by its web app
+(`app/src/lib/copilot/computer-tools.tsx`). The client offers them on every run, executes each call
+against `/api/computers/:botId/…`, and continues the run with the result.
 
-It does not need one, because upstream already answers this better than a card would. The mechanism
-is the **browser takeover**: the person takes control and types the password into the real login
-form themselves. `server/src/computer/routes.ts` is explicit that this is the point — the takeover is
-the audited event, and what the person typed during it is deliberately unrecorded, "because the
-reason a takeover exists is to let them enter the thing nothing else should keep."
-
-A card would have been strictly worse: it puts the secret through our process, our transcript and our
-memory on the way to the same field. The takeover never lets it leave the browser. So the secure
-field stays where it already is — in the page — and the app's job is to make handing over easy,
-which is the button on the Screen panel.
+The Mac app is the client in xBot, and it sends `tools: []`. So an xBot agent is offered no computer at
+all, and neither request can happen. See `docs/plans/computer-client-tools.md` for the plan.
 
 **Streaming.** Tokens append without re-laying-out the message. The scroll pins to the bottom while
 the user is at the bottom, and **releases the moment they scroll up** — with a "jump to latest"
