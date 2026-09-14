@@ -1,7 +1,7 @@
 {
   "channel": "stable",
-  "version": "4010d48",
-  "image": "ghcr.io/masteryoav/xbot-engine@sha256:532e3ec1a028e99a3f96531507fb9db27a6885b43f85ea701a050356f45ab50a",
+  "version": "100b510",
+  "image": "ghcr.io/masteryoav/xbot-engine@sha256:76367a75b89ee63090bbd945be51d100d07642e361bd5488641b8fb39dc4a196",
   "size": 4670241762,
   "minimumAppVersion": "1.0.0",
   "migration": {
