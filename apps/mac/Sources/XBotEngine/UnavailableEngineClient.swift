@@ -36,6 +36,14 @@ public struct UnavailableEngineClient: EngineClient {
         throw EngineError.notRunning
     }
 
+    public func controlState(for agent: Agent.ID) async throws -> ComputerControlState {
+        throw EngineError.notRunning
+    }
+
+    public func supplySecret(_ text: String, for agent: Agent.ID) async -> String? {
+        String(localized: "The engine isn't running.")
+    }
+
     public func send(
         _ text: String,
         to channel: Channel.ID

@@ -243,6 +243,12 @@ private actor RecoveryEngine: EngineClient {
         throw EngineError.notRunning
     }
 
+    func controlState(for agent: Agent.ID) async throws -> ComputerControlState {
+        throw EngineError.notRunning
+    }
+
+    func supplySecret(_ text: String, for agent: Agent.ID) async -> String? { nil }
+
     nonisolated func send(_ text: String, to channel: Channel.ID) -> AsyncThrowingStream<TurnEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {

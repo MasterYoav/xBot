@@ -37,4 +37,8 @@ been offered a browser, files, or a shell — the product's headline feature doe
   agents having no memory of earlier messages. `HTTPEngineClient.stream` runs pending calls at
   `RUN_FINISHED` and follows up, capped at 25 rounds. **Needs one real conversation with a CopilotKit
   key** before v1: that the history route's rows round-trip, and that follow-ups do not duplicate.
-- C4 next.
+- **C4 done, verified against a stubbed engine.** While a turn runs, `AppState` polls `/control`
+  every two seconds, as upstream's client does. A help request shows "needs you" with Take control,
+  which opens the screen; handing back ends the wait. A secret request shows a masked field that posts
+  to `/human/secret` and clears itself; the value is kept nowhere. An unanswered help request the
+  engine expires is reported to the Bot as nobody coming, not as the person finishing.

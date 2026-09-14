@@ -372,6 +372,27 @@ struct HTTPEngineClientTests {
         #expect(StubURLProtocol.requestedPaths(forHost: host).contains("/api/computers/orchestrator/navigate"))
     }
 
+    /// A help request the engine expired unanswered is nobody coming — not a person who finished.
+    @Test(arguments: [
+        (["human"], "handed control back"),
+        ([], "Nobody took control"),
+    ])
+    func aHelpRequestEndsTheWayThePersonAnswered(drove: [String], expected: String) async throws {
+        let host = "stub-\(UUID().uuidString).test"
+        let computer = "/api/computers/orchestrator"
+        StubURLProtocol.register(.init(body: Self.json(["holder": "bot", "requested": true])), forHost: host, path: computer + "/control/request")
+        StubURLProtocol.enqueue(
+            drove.map { .init(body: Self.json(["holder": $0, "requested": false])) }
+                + [.init(body: Self.json(["holder": "bot", "requested": false]))],
+            forHost: host, path: computer + "/control"
+        )
+
+        let content = await client(host: host).executeComputerTool(
+            agentId: "orchestrator", name: "computer_request_help", argumentsJSON: #"{"reason":"sign in"}"#
+        )
+        #expect(content.contains(expected))
+    }
+
     @Test func aNonOkStreamResponseSurfacesAsRejected() async throws {
         let host = "stub-\(UUID().uuidString).test"
         StubURLProtocol.register(

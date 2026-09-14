@@ -184,6 +184,13 @@ public final class AppState {
 
     public private(set) var screenFrame: ScreenFrame?
     public private(set) var control: ScreenControl = .agent
+
+    /// Something the answering agent's computer is waiting on a person for — upstream's
+    /// `computer_request_help` and `computer_request_secret`. The turn is blocked until it is answered.
+    public private(set) var personAsk: (agent: Agent.ID, ask: PersonAsk)?
+    /// Why the last secret did not reach the page. Never contains the value.
+    public private(set) var secretProblem: String?
+    private var askTask: Task<Void, Never>?
     public private(set) var models: [ModelSelection] = []
 
     /// Loopback origin when the engine is running. Used for admin webviews.
@@ -1174,6 +1181,51 @@ public final class AppState {
         }
     }
 
+    /**
+     Poll the answering agent's computer for a request aimed at a person, for as long as the turn runs.
+
+     The client-tool loop is blocked inside `executeComputerTool` while it waits, so nothing on the
+     stream says "the agent is asking you". Upstream's own client polls `/control` the same way.
+     */
+    private func watchForAsks(from agent: Agent.ID) {
+        askTask?.cancel()
+        askTask = Task { [engine] in
+            while !Task.isCancelled {
+                if let state = try? await engine.controlState(for: agent), !Task.isCancelled {
+                    let ask: PersonAsk? = state.secretWanted.map { .secret(label: $0) }
+                        ?? state.helpReason.map { .help(reason: $0) }
+                    if let ask, personAsk?.ask != ask, selectedAgentID != agent {
+                        // Asking a person nobody is looking at is how an agent looks broken.
+                        unreadAgents.insert(agent)
+                    }
+                    personAsk = ask.map { (agent, $0) }
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    /// Answer a help request: open the screen and take the wheel. Handing back ends the wait.
+    public func takeControlForAsk() {
+        guard let asked = personAsk, asked.agent == selectedAgentID else { return }
+        isPanelVisible = true
+        panelSection = .screen
+        setControl(.human)
+    }
+
+    /// Type the value the agent asked for into the page. It goes to the engine and nowhere else.
+    public func supplySecret(_ text: String) {
+        guard let asked = personAsk, case .secret = asked.ask, !text.isEmpty else { return }
+        secretProblem = nil
+        Task { [engine] in
+            if let problem = await engine.supplySecret(text, for: asked.agent) {
+                secretProblem = problem
+            } else {
+                personAsk = nil
+            }
+        }
+    }
+
     /// Take the browser, or hand it back.
     ///
     /// Optimistic, like sending: the overlay flips immediately because the user pressed the button,
@@ -1308,10 +1360,15 @@ public final class AppState {
         runningChannel = channel
         runningAgent = agentID
         retuneScreen()
+        watchForAsks(from: agentID)
         turn = Task { [engine] in
             defer {
                 runningChannel = nil
                 runningAgent = nil
+                askTask?.cancel()
+                askTask = nil
+                personAsk = nil
+                secretProblem = nil
                 // A long turn ends the quiet period rather than counting towards it.
                 noteEngineActivity()
                 /*

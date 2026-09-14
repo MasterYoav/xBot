@@ -81,3 +81,26 @@ public enum ScreenControl: Hashable, Sendable {
     case agent
     case human
 }
+
+/// What an agent is asking a person to do.
+public enum PersonAsk: Hashable, Sendable {
+    /// Take control of the browser and hand it back — a sign-in, a CAPTCHA, a judgement call.
+    case help(reason: String)
+    /// Supply a value the agent must not be told, named but never shown.
+    case secret(label: String)
+}
+
+/// What an agent's computer is waiting on a person for, as the engine's `/control` reports it.
+public struct ComputerControlState: Hashable, Sendable {
+    public var holder: ScreenControl
+    /// Why the agent asked for help, while it is asking. Nil once answered or expired.
+    public var helpReason: String?
+    /// The name of the value the agent is waiting for — never the value.
+    public var secretWanted: String?
+
+    public init(holder: ScreenControl, helpReason: String? = nil, secretWanted: String? = nil) {
+        self.holder = holder
+        self.helpReason = helpReason
+        self.secretWanted = secretWanted
+    }
+}

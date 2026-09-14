@@ -42,6 +42,13 @@ public protocol EngineClient: Sendable {
     /// Take the browser, or give it back. Audited by the engine as a first-class event.
     func setControl(_ control: ScreenControl, for agent: Agent.ID) async throws
 
+    /// Who holds the browser, and whether the agent is asking a person for help or a secret.
+    func controlState(for agent: Agent.ID) async throws -> ComputerControlState
+
+    /// Type a value the agent asked for straight into the page. Nil on success, otherwise a sentence
+    /// saying why not — a person is waiting on the answer. The value is never echoed or kept.
+    func supplySecret(_ text: String, for agent: Agent.ID) async -> String?
+
     /// Change one agent. Saved on blur; there is no Save button anywhere in this product.
     func updateAgent(_ id: Agent.ID, _ patch: AgentPatch) async throws -> Agent
 

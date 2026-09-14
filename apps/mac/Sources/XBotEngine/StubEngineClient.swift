@@ -225,6 +225,25 @@ public actor StubEngineClient: EngineClient {
         self.control = control
     }
 
+    /// What the agent is asking a person for, as a test sets it.
+    public private(set) var pendingAsk = ComputerControlState(holder: .agent)
+    /// Only the lengths of supplied secrets, as upstream records them.
+    public private(set) var suppliedSecretLengths: [Int] = []
+
+    public func ask(_ state: ComputerControlState) { pendingAsk = state }
+
+    public func controlState(for agent: Agent.ID) async throws -> ComputerControlState {
+        var state = pendingAsk
+        state.holder = control
+        return state
+    }
+
+    public func supplySecret(_ text: String, for agent: Agent.ID) async -> String? {
+        suppliedSecretLengths.append(text.count)
+        pendingAsk.secretWanted = nil
+        return nil
+    }
+
     public func updateAgent(_ id: Agent.ID, _ patch: AgentPatch) async throws -> Agent {
         guard let index = fixedAgents.firstIndex(where: { $0.id == id }) else {
             throw EngineError.unknownChannel(id)

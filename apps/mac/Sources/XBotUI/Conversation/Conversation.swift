@@ -27,6 +27,12 @@ public struct Conversation: View {
             }
             recovery
             messages
+            if let asked = state.personAsk, asked.agent == state.selectedAgentID {
+                PersonAskView(ask: asked.ask)
+                    .padding(.horizontal, Space.xl)
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
+            }
             composer
         }
         .background(.clear)

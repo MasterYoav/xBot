@@ -407,6 +407,28 @@ public actor HTTPEngineClient: EngineClient {
         _ = try await send(request(.post, "/api/computers/\(agent)/control/\(path)", body: [:]))
     }
 
+    public func controlState(for agent: Agent.ID) async throws -> ComputerControlState {
+        let (data, response) = try await send(request(.get, "/api/computers/\(agent)/control"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let row = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { throw EngineError.notRunning }
+        return ComputerControlState(
+            holder: row["holder"] as? String == "human" ? .human : .agent,
+            helpReason: row["requested"] as? Bool == true ? row["reason"] as? String ?? "" : nil,
+            secretWanted: row["secretWanted"] as? String
+        )
+    }
+
+    public func supplySecret(_ text: String, for agent: Agent.ID) async -> String? {
+        let fallback = String(localized: "That didn't reach the page. Try again.")
+        guard let (data, response) = try? await send(request(.post, "/api/computers/\(agent)/human/secret", body: ["text": text])) else {
+            return fallback
+        }
+        if (response as? HTTPURLResponse)?.statusCode == 200 { return nil }
+        // The engine's own sentence, which never contains the value: it names what went wrong.
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String ?? fallback
+    }
+
     public nonisolated func screen(
         for agent: Agent.ID,
         cadence: ScreenCadence
@@ -749,6 +771,9 @@ public actor HTTPEngineClient: EngineClient {
 
     private func waitForPerson(control: String, until: ComputerTools.PersonWait) async -> PersonAnswer {
         let deadline = ContinuousClock.now + Self.personWait
+        // The engine drops an unanswered help request after ten minutes; that is nobody coming, not
+        // somebody finishing, so handing back only counts once a person actually held the wheel.
+        var personDrove = false
         while ContinuousClock.now < deadline {
             if Task.isCancelled { return .cancelled }
             let state = await computerCall(control, body: nil)
@@ -757,8 +782,11 @@ public actor HTTPEngineClient: EngineClient {
                 case .secretEntered:
                     if state["secretWanted"] == nil || state["secretWanted"] is NSNull { return .answered }
                 case .controlReturned:
-                    let requested = state["requested"] as? Bool ?? (state["requested"].map { !($0 is NSNull) } ?? false)
-                    if state["holder"] as? String == "bot", !requested { return .answered }
+                    let holder = state["holder"] as? String
+                    if holder == "human" { personDrove = true }
+                    if holder == "bot", state["requested"] as? Bool != true {
+                        return personDrove ? .answered : .gaveUp
+                    }
                 }
             }
             try? await Task.sleep(for: .seconds(1))

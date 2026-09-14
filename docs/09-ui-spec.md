@@ -149,8 +149,8 @@ Content types:
 | Text | Markdown. Code blocks with syntax highlighting and a copy button |
 | Image | Inline, tappable to a full-size window. Both directions — the reference shows the user attaching an image and the agent returning one |
 | Tool call | A compact inline row: what it did, its target, its result. Expandable |
-| Handover request | Upstream's `computer_request_help` client tool: the Bot asks, the person takes control and hands back. **Not built in the Mac app** — see below |
-| Secret request | Upstream's `computer_request_secret` client tool: a masked box whose value is typed straight into the page and never reaches the model. **Not built in the Mac app** — see below |
+| Handover request | Upstream's `computer_request_help` client tool: the Bot asks, the person takes control and hands back. Shown above the composer (`PersonAskView`) |
+| Secret request | Upstream's `computer_request_secret` client tool: a masked box whose value is typed straight into the page and never reaches the model. Shown above the composer (`PersonAskView`) |
 | Generated UI | Sandboxed `WKWebView`, no same-origin access. Fixed height, expandable |
 | Error | Inline, with a retry action |
 
@@ -164,8 +164,8 @@ defines the whole computer — `computer_navigate`, `computer_snapshot`, `comput
 against `/api/computers/:botId/…`, and continues the run with the result.
 
 The Mac app is the client in xBot. It used to send `tools: []`, so no xBot agent was offered a computer.
-It now offers all fourteen and runs them (`XBotEngine/ComputerTools.swift`); the two requests wait on the
-person, but the prompts that let the person answer are still to build. See
+It now offers all fourteen and runs them (`XBotEngine/ComputerTools.swift`), and the two requests appear
+above the composer while the turn waits on them. See
 `docs/plans/computer-client-tools.md`.
 
 **Streaming.** Tokens append without re-laying-out the message. The scroll pins to the bottom while
