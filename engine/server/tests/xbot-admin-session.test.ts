@@ -111,3 +111,70 @@ describe("the admin webview's session", () => {
     }
   });
 });
+
+/*
+ * Routes that prove their caller with a credential of their own.
+ *
+ * The engine-token gate is mounted on every path, and two callers never hold that token: the Bot
+ * inside the container calling back to run a tool (its own agent token plus a run assertion the
+ * engine signed) and a routine run handed back (the worker's shared secret). Both were refused at the
+ * gate, and the Bot's tool call failed in the quietest way available — the refusal has no `text`, so
+ * the Bot told its model "The tool returned nothing." Every browser action by every agent did nothing.
+ */
+describe("routes with a credential of their own", () => {
+  function gated() {
+    const hono = new Hono();
+    hono.use("*", xbotBearerAuth(token));
+    hono.post("/api/agent-tools/call", (context) =>
+      context.json({ error: "the route's own check" }, 401),
+    );
+    hono.post("/internal/routines/run", (context) =>
+      context.json({ error: "the route's own check" }, 401),
+    );
+    hono.post("/api/agents", (context) => context.json({ ok: true }));
+    return hono;
+  }
+
+  test("the Bot's tool callback reaches its own check without the engine token", async () => {
+    const response = await gated().request(
+      "http://127.0.0.1/api/agent-tools/call",
+      {
+        method: "POST",
+        headers: { "x-openbot-agent-token": "the-agent-token" },
+      },
+    );
+    await expect(response.json()).resolves.toEqual({
+      error: "the route's own check",
+    });
+  });
+
+  test("a routine run handed back reaches its own check", async () => {
+    const response = await gated().request(
+      "http://127.0.0.1/internal/routines/run",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer worker-secret" },
+      },
+    );
+    await expect(response.json()).resolves.toEqual({
+      error: "the route's own check",
+    });
+  });
+
+  /// Exact paths only: nothing nearby, and nothing that merely starts the same way, slips past.
+  test("every other route is still behind the engine token", async () => {
+    for (const path of [
+      "/api/agents",
+      "/api/agent-tools/call/extra",
+      "/internal/routines/run2",
+    ]) {
+      const response = await gated().request(`http://127.0.0.1${path}`, {
+        method: "POST",
+      });
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({
+        error: "Unauthorized.",
+      });
+    }
+  });
+});

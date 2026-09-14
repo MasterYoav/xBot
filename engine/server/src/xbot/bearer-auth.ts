@@ -29,6 +29,7 @@ export function xbotBearerAuth(token: string): MiddlewareHandler {
 
   return async (context, next) => {
     if (context.req.path === "/health") return next();
+    if (OWN_CREDENTIAL_PATHS.has(context.req.path)) return next();
 
     const hasBearer = matches(context.req.header("Authorization"), expected);
 
@@ -53,6 +54,23 @@ export function xbotBearerAuth(token: string): MiddlewareHandler {
     return next();
   };
 }
+
+/**
+ * Routes that prove their caller with a credential of their own, and so are not behind this gate.
+ *
+ * Neither caller holds the engine token, by design. The Bot inside the container calls
+ * `/api/agent-tools/call` with its own agent token and a run assertion this engine signed, both
+ * verified there in constant time and every refusal audited. A worker hands a routine run back to
+ * `/internal/routines/run` with its shared secret, refused there when none is configured. Behind this
+ * gate both were refused before their own checks ran — and the Bot's refusal carried no `text`, so it
+ * told its model "The tool returned nothing." and every browser action by every agent did nothing.
+ *
+ * Exact paths, not prefixes: nothing that merely starts the same way gets past.
+ */
+const OWN_CREDENTIAL_PATHS = new Set([
+  "/api/agent-tools/call",
+  "/internal/routines/run",
+]);
 
 /** The admin cookie's value from a Cookie header, if present. */
 function cookieValue(header: string | undefined): string | undefined {

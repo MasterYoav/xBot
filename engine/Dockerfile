@@ -121,6 +121,10 @@ COPY agent-computer/package.json agent-computer/package.json
 # Beside `shared`, at the repository's own depth, so `../../shared/…` resolves as it does on a laptop.
 COPY agent-langgraph/src agent-langgraph/src
 COPY agent-langgraph/package.json agent-langgraph/package.json
+# The routine worker. It imports the server's routine store and sweep, and needs nothing the server
+# does not already have installed.
+COPY worker/src worker/src
+COPY worker/package.json worker/package.json
 
 # The built app, served by the API on the same origin. There is no CORS in this server, so this is
 # not a convenience: two origins would simply fail.

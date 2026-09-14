@@ -1,0 +1,17 @@
+#!/command/with-contenv sh
+# The routine worker: finds routines that are due and hands each firing to the API beside it.
+#
+# Missing from this image until now, so no routine ever fired. It needs the database (written into the
+# container environment by postgres-init), the API's address, and the shared secret worker-secret
+# generates. Routines also need CopilotKit Intelligence to run a turn — without it the API leaves the
+# run route unmounted, and a firing is refused rather than half-run.
+#
+# `EMBEDDED_WORKER=on` is the default for the same reason as the Bot and the browser: one container
+# that works. Off, routines are swept by a worker elsewhere.
+set -eu
+if [ "${EMBEDDED_WORKER:-on}" != "on" ]; then
+  exec /bin/true
+fi
+export SERVER_INTERNAL_URL="http://127.0.0.1:${PORT:-3001}"
+cd /app/worker
+exec s6-setuidgid pwuser /usr/local/bin/bun src/index.ts
