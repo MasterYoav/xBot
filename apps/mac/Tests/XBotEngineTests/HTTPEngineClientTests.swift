@@ -319,6 +319,59 @@ struct HTTPEngineClientTests {
         #expect(events.contains { if case .runFinished = $0 { true } else { false } })
     }
 
+    /// A run that ends on a computer tool is not the end of the turn: the client runs the tool and
+    /// continues, carrying the call and its result — ids intact, so the runtime does not re-persist.
+    @Test func aRunEndingOnAComputerToolContinuesWithItsResult() async throws {
+        let host = "stub-\(UUID().uuidString).test"
+        StubURLProtocol.register(
+            .init(body: Self.json(["channel": ["threadId": "thread-1", "agentIds": ["orchestrator"]]])),
+            forHost: host,
+            path: "/api/channels/channel-1"
+        )
+        StubURLProtocol.register(
+            .init(body: Self.json(["messages": [["id": "old-1", "role": "user", "content": "earlier"]]])),
+            forHost: host,
+            path: "/api/copilotkit/threads"
+        )
+        StubURLProtocol.register(
+            .init(body: Self.json(["title": "Example Domain", "url": "https://example.com", "text": "hi"])),
+            forHost: host,
+            path: "/api/computers/orchestrator/navigate"
+        )
+        StubURLProtocol.enqueue([
+            .init(body: Self.sse([
+                #"{"type":"RUN_STARTED","runId":"r1"}"#,
+                #"{"type":"TOOL_CALL_START","toolCallId":"call-1","toolCallName":"computer_navigate"}"#,
+                #"{"type":"TOOL_CALL_ARGS","toolCallId":"call-1","delta":"{\"url\":\"https://example.com\"}"}"#,
+                #"{"type":"TOOL_CALL_END","toolCallId":"call-1"}"#,
+                #"{"type":"RUN_FINISHED","runId":"r1"}"#,
+            ])),
+            .init(body: Self.sse([
+                #"{"type":"RUN_STARTED","runId":"r2"}"#,
+                #"{"type":"TEXT_MESSAGE_CONTENT","messageId":"m2","delta":"done"}"#,
+                #"{"type":"RUN_FINISHED","runId":"r2"}"#,
+            ])),
+        ], forHost: host, path: "/api/copilotkit/agent/orchestrator/run")
+
+        var finishes = 0
+        var text = ""
+        for try await event in client(host: host).send("go look", to: "channel-1") {
+            if case .runFinished = event { finishes += 1 }
+            if case .textDelta(_, let delta) = event { text += delta }
+        }
+        #expect(text == "done")
+        #expect(finishes == 1)
+
+        let runs = StubURLProtocol.sentRequests(forHost: host).filter { $0.path.hasSuffix("/run") }
+        #expect(runs.count == 2)
+        let first = runs.first?.body["messages"] ?? ""
+        #expect(first.contains("old-1") && first.contains("go look"))
+        let second = runs.last?.body["messages"] ?? ""
+        #expect(second.contains("call-1") && second.contains("computer_navigate"))
+        #expect(second.contains("toolCallId") && second.contains("Example Domain"))
+        #expect(StubURLProtocol.requestedPaths(forHost: host).contains("/api/computers/orchestrator/navigate"))
+    }
+
     @Test func aNonOkStreamResponseSurfacesAsRejected() async throws {
         let host = "stub-\(UUID().uuidString).test"
         StubURLProtocol.register(
@@ -415,6 +468,7 @@ final class StubURLProtocol: URLProtocol {
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var stubs: [String: Stub] = [:]
+    nonisolated(unsafe) private static var queued: [String: [Stub]] = [:]
     nonisolated(unsafe) private static var seenPaths: [String: [String]] = [:]
     nonisolated(unsafe) private static var sent: [String: [Sent]] = [:]
 
@@ -459,6 +513,13 @@ final class StubURLProtocol: URLProtocol {
         lock.unlock()
     }
 
+    /// Answers, in order, for successive requests to one path — ahead of any `register`ed stub.
+    static func enqueue(_ answers: [Stub], forHost host: String, path: String) {
+        lock.lock()
+        queued["\(host)\(path)", default: []].append(contentsOf: answers)
+        lock.unlock()
+    }
+
     static func requestedPaths(forHost host: String) -> [String] {
         lock.lock()
         defer { lock.unlock() }
@@ -470,7 +531,12 @@ final class StubURLProtocol: URLProtocol {
         lock.lock()
         defer { lock.unlock() }
         seenPaths[host, default: []].append(url.path)
-        return stubs["\(host)\(url.path)"]
+        let key = "\(host)\(url.path)"
+        if let next = queued[key]?.first {
+            queued[key]?.removeFirst()
+            return next
+        }
+        return stubs[key]
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }

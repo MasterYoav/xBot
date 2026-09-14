@@ -94,4 +94,8 @@ public struct UnavailableEngineClient: EngineClient {
     }
 
     public func revokeModelKey(credentialId: String) async throws { throw EngineError.notRunning }
+
+    public func executeComputerTool(agentId: Agent.ID, name: String, argumentsJSON: String) async -> String {
+        ComputerTools.content(["ok": false, "reason": "The assistant's computer could not be reached."])
+    }
 }

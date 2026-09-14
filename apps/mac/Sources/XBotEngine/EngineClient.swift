@@ -98,6 +98,10 @@ public protocol EngineClient: Sendable {
 
     /// Retire a model key the person disconnected.
     func revokeModelKey(credentialId: String) async throws
+
+    /// Run one of the agent's client tools — its browser, files or shell — and return the result's
+    /// content for the run to continue with. See `ComputerTools`.
+    func executeComputerTool(agentId: Agent.ID, name: String, argumentsJSON: String) async -> String
 }
 
 /// What creating an agent needs. The rest of the row is generated — avatar seed, id, defaults.

@@ -159,3 +159,63 @@ struct LiveEngineTests {
         #expect(outcome != "HUNG")
     }
 }
+
+/**
+ The agent's computer, driven through the client tools against a real engine and a real browser.
+
+ Skipped unless `XBOT_LIVE_ENGINE_URL` is set. These are the calls an agent's model makes through
+ `ComputerTools`; before them no xBot agent had ever been offered its computer. The model is not
+ needed to prove the computer half — only the executor and the engine's own `/api/computers` routes.
+ */
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["XBOT_LIVE_ENGINE_URL"] != nil))
+struct LiveComputerToolsTests {
+    private var client: HTTPEngineClient {
+        let env = ProcessInfo.processInfo.environment
+        let url = URL(string: env["XBOT_LIVE_ENGINE_URL"] ?? "http://127.0.0.1:3001")!
+        let token = env["XBOT_LIVE_ENGINE_TOKEN_FILE"].flatMap {
+            try? String(contentsOfFile: $0, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return HTTPEngineClient(baseURL: url, token: token)
+    }
+
+    private func outcome(_ content: String) -> [String: Any] {
+        (try? JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any]) ?? [:]
+    }
+
+    @Test func anAgentCanUseItsBrowserFilesAndShell() async throws {
+        let client = client
+        let agent = try await client.createAgent(AgentDraft(name: "Computer check"))
+
+        let navigated = outcome(await client.executeComputerTool(
+            agentId: agent.id, name: "computer_navigate", argumentsJSON: #"{"url":"https://example.com"}"#
+        ))
+        print("navigate:", navigated["ok"] ?? "-", navigated["title"] ?? navigated["reason"] ?? "-")
+        #expect(navigated["ok"] as? Bool == true)
+        #expect((navigated["title"] as? String)?.contains("Example") == true)
+
+        let snapshot = outcome(await client.executeComputerTool(
+            agentId: agent.id, name: "computer_snapshot", argumentsJSON: "{}"
+        ))
+        print("snapshot:", snapshot["ok"] ?? "-", (snapshot["elements"] as? [Any])?.count ?? -1, snapshot["reason"] ?? "")
+        #expect(snapshot["ok"] as? Bool == true)
+        #expect(snapshot["snapshotId"] != nil)
+
+        let written = outcome(await client.executeComputerTool(
+            agentId: agent.id, name: "computer_write_file", argumentsJSON: #"{"path":"notes/check.md","contents":"hello from the client tools"}"#
+        ))
+        print("write:", written["ok"] ?? "-", written["bytes"] ?? written["reason"] ?? "-")
+        #expect(written["ok"] as? Bool == true)
+
+        let read = outcome(await client.executeComputerTool(
+            agentId: agent.id, name: "computer_read_file", argumentsJSON: #"{"path":"notes/check.md"}"#
+        ))
+        #expect(read["text"] as? String == "hello from the client tools")
+
+        let command = outcome(await client.executeComputerTool(
+            agentId: agent.id, name: "computer_run_command", argumentsJSON: #"{"command":"cat notes/check.md | wc -w"}"#
+        ))
+        print("exec:", command["ok"] ?? "-", command["stdout"] ?? command["reason"] ?? "-")
+        #expect(command["ok"] as? Bool == true)
+        #expect((command["stdout"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) == "5")
+    }
+}

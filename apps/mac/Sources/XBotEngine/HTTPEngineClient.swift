@@ -460,6 +460,11 @@ public actor HTTPEngineClient: EngineClient {
         }
     }
 
+    /// How many times one message may go round the loop of client tools before it is stopped.
+    /// CopilotKit's own client caps its follow-ups the same way, so a model that keeps calling the same
+    /// tool cannot spin forever.
+    static let maxToolRounds = 25
+
     private func stream(
         _ text: String,
         to channel: Channel.ID,
@@ -476,41 +481,99 @@ public actor HTTPEngineClient: EngineClient {
             return
         }
 
-        var request = request(
-            .post,
-            "/api/copilotkit/agent/\(agentId)/run",
-            body: [
-                "threadId": threadId,
-                "runId": UUID().uuidString,
-                "messages": [["id": UUID().uuidString, "role": "user", "content": text]],
-                "state": [:],
-                "tools": [],
-                "context": [],
-                "forwardedProps": [:],
-            ]
-        )
-        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        // No timeout on the stream itself. A turn can legitimately take minutes while an agent
-        // browses, and a URLSession default would cut it off mid-answer.
-        request.timeoutInterval = .infinity
+        /*
+         * The whole conversation, not just this message.
+         *
+         * The runtime gives the agent exactly the messages a run carries and never adds the thread's
+         * history — it only uses history to skip persisting what it already has. Sending the newest
+         * message alone meant no agent remembered anything said before it. See `WireTranscript`.
+         */
+        var transcript = WireTranscript(messages: try await threadMessages(threadId))
+        transcript.append(WireMessage(id: UUID().uuidString, role: "user", content: text))
 
-        let (bytes, response) = try await session.bytes(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-            continuation.finish(
-                throwing: EngineError.streamRejected(status: code)
-            )
-            return
-        }
-
-        var parser = ServerSentEventParser()
-        for try await line in Self.rawLines(of: bytes) {
+        for _ in 0..<Self.maxToolRounds {
             if Task.isCancelled { break }
-            guard let event = parser.consume(line) else { continue }
-            guard let turn = AGUIDecoder.decode(event) else { continue }
-            continuation.yield(turn)
+            var finished = false
+            var failed = false
+
+            var request = request(
+                .post,
+                "/api/copilotkit/agent/\(agentId)/run",
+                body: [
+                    "threadId": threadId,
+                    "runId": UUID().uuidString,
+                    "messages": transcript.messages.map(\.dictionary),
+                    "state": [:],
+                    // The agent's computer, offered on every run as upstream's client offers it.
+                    "tools": ComputerTools.wireTools,
+                    "context": [],
+                    "forwardedProps": [:],
+                ]
+            )
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            // No timeout on the stream itself. A turn can legitimately take minutes while an agent
+            // browses, and a URLSession default would cut it off mid-answer.
+            request.timeoutInterval = .infinity
+
+            let (bytes, response) = try await session.bytes(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                continuation.finish(throwing: EngineError.streamRejected(status: code))
+                return
+            }
+
+            var parser = ServerSentEventParser()
+            for try await line in Self.rawLines(of: bytes) {
+                if Task.isCancelled { break }
+                guard let event = parser.consume(line) else { continue }
+                if let json = try? JSONSerialization.jsonObject(with: Data(event.data.utf8)) as? [String: Any] {
+                    transcript.apply(json)
+                }
+                guard let turn = AGUIDecoder.decode(event) else { continue }
+                switch turn {
+                case .runFinished:
+                    // Held back: a run that ended on client tool calls is not the end of the turn.
+                    finished = true
+                case .failed:
+                    failed = true
+                    continuation.yield(turn)
+                default:
+                    continuation.yield(turn)
+                }
+            }
+
+            let pending = transcript.pendingClientCalls
+            guard finished, !failed, !pending.isEmpty else {
+                // Done, failed, or cut off. Only a run that genuinely finished is reported as one; a
+                // stream that simply stopped lets the caller say the reply was interrupted.
+                if finished, !failed { continuation.yield(.runFinished) }
+                continuation.finish()
+                return
+            }
+
+            // The agent's computer: run each call, then continue the same turn with the results.
+            for call in pending {
+                if Task.isCancelled { break }
+                let content = await executeComputerTool(agentId: agentId, name: call.name, argumentsJSON: call.arguments)
+                transcript.appendToolResult(callId: call.id, content: content)
+            }
         }
+
+        continuation.yield(.failed(
+            messageId: "",
+            reason: String(localized: "The agent kept using its computer without finishing, so it was stopped. Try asking again, more specifically.")
+        ))
         continuation.finish()
+    }
+
+    /// The thread's messages as AG-UI messages, or none for a thread that does not exist yet.
+    private func threadMessages(_ threadId: String) async throws -> [WireMessage] {
+        let (data, response) = try await send(request(.get, "/api/copilotkit/threads?threadId=\(threadId)"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let thread = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = thread["messages"] as? [[String: Any]]
+        else { return [] }
+        return rows.compactMap(WireMessage.init(row:))
     }
 
     /// `AsyncBytes.lines` looked like the obvious way to drive the parser, and is wrong: it omits
@@ -622,6 +685,101 @@ public actor HTTPEngineClient: EngineClient {
 
     private func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         try await session.data(for: request)
+    }
+
+    // MARK: - The computer, as client tools
+
+    /// How long a secret or help request waits for the person. Upstream's figure: long enough to
+    /// come back to the Mac, finite so the run can end.
+    static let personWait: Duration = .seconds(600)
+
+    /**
+     Run one client tool call against the engine and return the tool result's content.
+
+     Mirrors upstream's handlers in `computer-tools.tsx`, so the Bot sees exactly what it would see in
+     OpenBot's own client. A request that cannot reach the engine is a result the Bot can read, not a
+     thrown error: the run continues and says what it could not do.
+     */
+    public func executeComputerTool(
+        agentId: Agent.ID, name: String, argumentsJSON: String
+    ) async -> String {
+        guard let route = ComputerTools.route(name: name, argumentsJSON: argumentsJSON) else {
+            return ComputerTools.content(["ok": false, "reason": "This client has no tool called \(name)."])
+        }
+        let computer = "/api/computers/\(agentId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? agentId)"
+
+        switch route {
+        case .computer(let path, let body):
+            let outcome = await computerCall(computer + path, body: body)
+            return ComputerTools.content(name == "computer_navigate" ? ComputerTools.navigateOutcome(outcome) : outcome)
+
+        case .waitForPerson(let path, let body, let until):
+            let asked = await computerCall(computer + path, body: body)
+            guard asked["ok"] as? Bool == true else { return ComputerTools.content(asked) }
+            let answer = await waitForPerson(control: computer + "/control", until: until)
+            return ComputerTools.content(["ok": true, "result": Self.sentence(for: answer, until: until)])
+
+        case .declined(let body):
+            let path = "/api/agents/\(agentId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? agentId)/declined"
+            let outcome = await computerCall(path, body: body)
+            // A plain sentence, as upstream returns: audit bookkeeping must not stop the Bot answering.
+            return outcome["ok"] as? Bool == true
+                ? "Recorded. Now tell the person what you decided and why."
+                : "That could not be recorded. Tell the person what you decided anyway."
+        }
+    }
+
+    private func computerCall(_ path: String, body: String?) async -> [String: Any] {
+        var request = URLRequest(url: URL(string: path, relativeTo: baseURL)!)
+        request.httpMethod = body == nil ? "GET" : "POST"
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = Data(body.utf8)
+        }
+        // Long enough for a slow page load; the engine bounds its own browser actions.
+        request.timeoutInterval = 120
+        guard let (data, response) = try? await send(request) else {
+            return ["ok": false, "reason": "The assistant's computer could not be reached."]
+        }
+        return ComputerTools.outcome(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
+    }
+
+    private enum PersonAnswer { case answered, gaveUp, cancelled }
+
+    private func waitForPerson(control: String, until: ComputerTools.PersonWait) async -> PersonAnswer {
+        let deadline = ContinuousClock.now + Self.personWait
+        while ContinuousClock.now < deadline {
+            if Task.isCancelled { return .cancelled }
+            let state = await computerCall(control, body: nil)
+            if state["ok"] as? Bool == true {
+                switch until {
+                case .secretEntered:
+                    if state["secretWanted"] == nil || state["secretWanted"] is NSNull { return .answered }
+                case .controlReturned:
+                    let requested = state["requested"] as? Bool ?? (state["requested"].map { !($0 is NSNull) } ?? false)
+                    if state["holder"] as? String == "bot", !requested { return .answered }
+                }
+            }
+            try? await Task.sleep(for: .seconds(1))
+        }
+        return .gaveUp
+    }
+
+    /// Upstream's sentences for how a wait on the person ended.
+    private static func sentence(for answer: PersonAnswer, until: ComputerTools.PersonWait) -> String {
+        switch (answer, until) {
+        case (.answered, .secretEntered(let label)):
+            "The person has entered \(label) into the field. It was typed straight into the page and you were not told what it is."
+        case (.gaveUp, .secretEntered(let label)):
+            "Nobody entered \(label). Do not ask for it another way."
+        case (.answered, .controlReturned):
+            "The person has finished and handed control back. Take a fresh snapshot: the page may have changed while they were driving."
+        case (.gaveUp, .controlReturned):
+            "Nobody took control. Say what you still need rather than trying to do it yourself."
+        case (.cancelled, _):
+            "The request was cancelled."
+        }
     }
 
     private static func agent(from row: [String: Any]) -> Agent? {

@@ -29,4 +29,12 @@ been offered a browser, files, or a shell — the product's headline feature doe
 
 ## Status
 
-- C1 in progress.
+- **C1 done**, verified against a real engine: navigate, snapshot, write/read a file, run a command
+  (`LiveComputerToolsTests`).
+- **C2 done.** Every run carries `ComputerTools.wireTools`.
+- **C3 done, verified only against a stubbed engine.** `WireTranscript` rebuilds the conversation with
+  `@ag-ui/client`'s reducer, id for id, starting from the thread's stored history — which also fixes
+  agents having no memory of earlier messages. `HTTPEngineClient.stream` runs pending calls at
+  `RUN_FINISHED` and follows up, capped at 25 rounds. **Needs one real conversation with a CopilotKit
+  key** before v1: that the history route's rows round-trip, and that follow-ups do not duplicate.
+- C4 next.

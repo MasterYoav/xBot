@@ -475,6 +475,14 @@ public actor StubEngineClient: EngineClient {
         vaultWrites += 1
     }
 
+    /// Every client tool call the stub was asked to run, in order.
+    public private(set) var computerCalls: [(name: String, argumentsJSON: String)] = []
+
+    public func executeComputerTool(agentId: Agent.ID, name: String, argumentsJSON: String) async -> String {
+        computerCalls.append((name, argumentsJSON))
+        return ComputerTools.content(["ok": true, "title": "Example Domain", "url": "https://example.com/"])
+    }
+
     public func revokeModelKey(credentialId: String) async throws {
         if let gone = vault.first(where: { $0.id == credentialId }) { vaultValues[gone.keyId] = nil }
         vault.removeAll { $0.id == credentialId }

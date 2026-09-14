@@ -300,6 +300,7 @@ private actor RecoveryEngine: EngineClient {
     func liveModelKeys() async throws -> [StoredModelKey] { [] }
     func storeModelKey(_ plaintext: String, providerId: String, baseURL: String?, fingerprint: String) async throws {}
     func revokeModelKey(credentialId: String) async throws {}
+    func executeComputerTool(agentId: Agent.ID, name: String, argumentsJSON: String) async -> String { "{}" }
 }
 
 private final class CredentialReads: @unchecked Sendable {

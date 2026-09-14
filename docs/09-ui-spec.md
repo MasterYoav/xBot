@@ -163,8 +163,10 @@ defines the whole computer — `computer_navigate`, `computer_snapshot`, `comput
 (`app/src/lib/copilot/computer-tools.tsx`). The client offers them on every run, executes each call
 against `/api/computers/:botId/…`, and continues the run with the result.
 
-The Mac app is the client in xBot, and it sends `tools: []`. So an xBot agent is offered no computer at
-all, and neither request can happen. See `docs/plans/computer-client-tools.md` for the plan.
+The Mac app is the client in xBot. It used to send `tools: []`, so no xBot agent was offered a computer.
+It now offers all fourteen and runs them (`XBotEngine/ComputerTools.swift`); the two requests wait on the
+person, but the prompts that let the person answer are still to build. See
+`docs/plans/computer-client-tools.md`.
 
 **Streaming.** Tokens append without re-laying-out the message. The scroll pins to the bottom while
 the user is at the bottom, and **releases the moment they scroll up** — with a "jump to latest"
