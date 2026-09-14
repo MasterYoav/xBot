@@ -116,6 +116,18 @@ history.
 That last part is the actual test. The transcript living on their infrastructure is precisely what
 this key buys, so a reply that does not survive a restart means it is not working.
 
+Three more things only this conversation can prove, all built on 14 September against a stubbed
+engine (`docs/plans/computer-client-tools.md`):
+
+- **Memory.** Tell the agent something, then ask about it two messages later. Each run now carries the
+  whole conversation; before, every agent forgot everything between messages.
+- **Its computer.** Ask it to open a page and say what is on it. The Activity panel should show
+  `computer_navigate` and the screen should show the page. Then check the conversation after an app
+  restart has no duplicated messages — the tool-call loop resends messages the thread already holds,
+  and relies on their ids matching.
+- **The asks.** Ask it to sign in somewhere. "Needs you" or a masked field should appear above the
+  composer, and the agent should carry on once you answer.
+
 **There is an automated version of the engine half.** `apps/mac/Tests/XBotEngineTests/LiveEngineTests.swift`
 drives the real client against a running engine — point it at a throwaway one, since it creates
 agents. With Intelligence configured, set `XBOT_LIVE_ENGINE_HAS_INTELLIGENCE=1` as well and it proves
