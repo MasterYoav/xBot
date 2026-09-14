@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="assets/logo-animated.gif" alt="xBot" width="220">
-
 <img src="assets/banner.png" alt="xBot" width="100%">
 
 
