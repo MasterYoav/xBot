@@ -94,6 +94,7 @@ struct HTTPEngineClientTests {
                     "messages": [
                         ["id": "m1", "role": "user", "content": "Check the flight"],
                         ["id": "m2", "role": "assistant", "agentId": "orchestrator", "content": "It's refundable"],
+                        ["id": "m3", "role": "tool", "toolCallId": "c1", "content": #"{"ok":true}"#],
                     ]
                 ])
             ),

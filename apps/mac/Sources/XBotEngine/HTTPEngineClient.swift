@@ -843,6 +843,9 @@ public actor HTTPEngineClient: EngineClient {
 
     private static func message(from row: [String: Any]) -> Message? {
         guard let id = row["id"] as? String, let role = row["role"] as? String else { return nil }
+        // A person's words and an agent's, nothing else. A `tool` row is a computer result — JSON the
+        // model reads — and the client-tool loop persists one per call; shown, it was a bubble of JSON.
+        guard role == "user" || role == "assistant" else { return nil }
         // Content is a string on a plain message and absent on a tool-call-only assistant row,
         // which is a real shape the engine sends rather than a defensive guess.
         let text = row["content"] as? String ?? ""
