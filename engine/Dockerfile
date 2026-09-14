@@ -227,7 +227,9 @@ EXPOSE 3001
 
 # One port out. The browser's 4100 is deliberately not exposed: it holds real logins and its only
 # caller is the process next to it.
+# The port the server actually listens on. The Mac app moves off 3001 whenever something else holds it,
+# and a check pinned to 3001 then reported every such engine as unhealthy while it served normally.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
-  CMD bun -e "const r=await fetch('http://127.0.0.1:3001/health');const j=await r.json();process.exit(r.ok&&j.product==='xBot'?0:1)"
+  CMD bun -e "const r=await fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/health');const j=await r.json();process.exit(r.ok&&j.product==='xBot'?0:1)"
 
 ENTRYPOINT ["/init"]

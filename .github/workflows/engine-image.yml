@@ -21,8 +21,45 @@ permissions:
   packages: write
 
 jobs:
+  # Both architectures, each built natively.
+  #
+  # This used to build on ubuntu-latest alone, so the published engine was amd64 only. Every Apple
+  # Silicon Mac — most of the Macs xBot will ever run on — then ran Postgres, Bun and Chromium under
+  # emulation: health checks timing out, and Bun warning "CPU lacks AVX support, strange crashes may
+  # occur". Native arm runners rather than QEMU, which would take this build from minutes to hours.
   build:
-    name: build xbot/engine and manifest
+    name: build xbot/engine (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # build-engine-image.sh versions the image with `git describe --tags`.
+          fetch-depth: 0
+
+      - name: Build engine image
+        run: scripts/build-engine-image.sh
+
+      # ghcr rejects an uppercase path, and the owner here is MasterYoav.
+      - name: Push to ghcr
+        run: |
+          set -euo pipefail
+          repo="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/xbot-engine"
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag xbot/engine:1 "${repo}:${GITHUB_SHA}-${{ matrix.arch }}"
+          docker push "${repo}:${GITHUB_SHA}-${{ matrix.arch }}"
+
+  publish:
+    name: publish multi-arch image and manifest
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,23 +68,21 @@ jobs:
           # generate-engine-manifest.sh versions the image with `git describe --tags`.
           fetch-depth: 0
 
-      - name: Build engine image
-        run: scripts/build-engine-image.sh
-
-      # ghcr rejects an uppercase path, and the owner here is MasterYoav.
-      - name: Push to ghcr
+      - name: Merge architectures
         id: push
         run: |
           set -euo pipefail
           repo="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/xbot-engine"
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker tag xbot/engine:1 "${repo}:latest"
-          docker push "${repo}:latest"
-          # The digest only exists once the registry has the image, and the pinned digest is
-          # the whole point of the manifest — a tag can be moved, a digest cannot.
-          digest="$(docker image inspect "${repo}:latest" --format '{{index .RepoDigests 0}}')"
-          echo "ref=${digest}" >> "$GITHUB_OUTPUT"
+          docker buildx imagetools create -t "${repo}:latest" \
+            "${repo}:${GITHUB_SHA}-amd64" "${repo}:${GITHUB_SHA}-arm64"
+          # The digest of the list itself, so the pin serves each Mac its own architecture. A tag
+          # can be moved, a digest cannot, and the digest is the whole point of the manifest.
+          digest="sha256:$(docker buildx imagetools inspect --raw "${repo}:latest" | sha256sum | cut -d' ' -f1)"
+          # generate-engine-manifest.sh reads the size from a local image.
+          docker pull "${repo}@${digest}"
+          echo "ref=${repo}@${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Generate manifest
         run: scripts/generate-engine-manifest.sh '${{ steps.push.outputs.ref }}' > engine-manifest.json
