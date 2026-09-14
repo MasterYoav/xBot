@@ -182,6 +182,10 @@ From a shell holding no credentials:
 - The manifest bundled into the app is byte-identical to the published one, so a first run with the
   network blocked still starts from a real pin.
 - Every outbound URL the app can show a person answers 200.
+- The pinned engine is one multi-arch image (linux/amd64 and linux/arm64). On 14 September an Apple
+  Silicon Mac pulled it anonymously, got arm64, was healthy in about ten seconds on a port other than
+  3001, and passed the live suite: browser, files, shell, and a help request handed back. Before that
+  the image was amd64 only, and every Apple Silicon Mac ran the engine under emulation.
 
 Plus: the Swift suite and the engine suite are green in CI, the latter against a real database.
 
