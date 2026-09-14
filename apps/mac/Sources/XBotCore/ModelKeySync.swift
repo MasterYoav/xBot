@@ -73,17 +73,17 @@ public enum ModelKeySync {
     public static func desired(
         connectedProviderIDs: Set<String>,
         custom: [CustomProvider],
-        key: (String) -> String?
-    ) -> [DesiredModelKey] {
+        key: (String) throws -> String?
+    ) rethrows -> [DesiredModelKey] {
         var keys: [DesiredModelKey] = []
         for id in connectedProviderIDs.sorted() where id != "ollama" {
             guard let routing = ModelProviderCatalog.engineRouting(for: id),
-                  let plaintext = key(id), !plaintext.isEmpty
+                  let plaintext = try key(id), !plaintext.isEmpty
             else { continue }
             keys.append(DesiredModelKey(providerId: routing.id, baseURL: routing.baseURL, plaintext: plaintext))
         }
         for provider in custom {
-            guard let plaintext = key(provider.id), !plaintext.isEmpty else { continue }
+            guard let plaintext = try key(provider.id), !plaintext.isEmpty else { continue }
             keys.append(DesiredModelKey(providerId: "openai-compatible", baseURL: provider.baseURL, plaintext: plaintext))
         }
         return keys

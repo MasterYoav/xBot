@@ -67,9 +67,15 @@ export function createRuntimeAgentLoader(
           "x-openbot-agent-token": managedAgent.token,
         };
       }
-      // The model key, beside the endpoint key and for the same reason: resolved per load, so a key
-      // replaced or removed in the app is what the very next run uses.
-      if (agent.type === "remote_ag_ui" && vault?.store) {
+      // Deployment model keys belong only to the configured managed Bot. A customer endpoint
+      // choosing the same provider is not permission to forward our key to that endpoint.
+      // Resolve per load so replacement and revocation affect the next run.
+      if (
+        agent.type === "remote_ag_ui" &&
+        managedAgent &&
+        agent.endpoint === managedAgent.endpoint.toString() &&
+        vault?.store
+      ) {
         const { store, reader, encryptionKey } = vault;
         await attachModelKey(agent, async (providerId, baseURL) => {
           const live = await store.findLiveByKey({

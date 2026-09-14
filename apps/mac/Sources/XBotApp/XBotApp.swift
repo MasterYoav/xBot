@@ -65,14 +65,14 @@ struct XBotApp: App {
             appUpdates: appUpdates,
             startsEngineOnLaunch: { OnboardingVersion.isComplete },
             modelKeys: {
-                ModelKeySync.desired(
+                try ModelKeySync.desired(
                     connectedProviderIDs: ProviderConnectionStore.shared.connectedProviderIDs,
                     custom: CustomProviderStore.shared.all,
-                    key: { (try? ProviderKeyStore.key(for: $0)) ?? nil }
+                    key: { try ProviderKeyStore.key(for: $0) }
                 )
             },
             modelKeyFingerprint: {
-                ModelKeySync.fingerprint(of: $0, keyEncryptionKey: (try? KeyEncryptionKeyStore.key()) ?? "")
+                ModelKeySync.fingerprint(of: $0, keyEncryptionKey: try KeyEncryptionKeyStore.key())
             }
         )
     }

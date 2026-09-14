@@ -42,6 +42,7 @@ public final class AppState {
     public var needsConversation: Bool { selectedAgentID != nil && selectedChannelID == nil }
     public var canSend: Bool {
         composerBlock == nil && selectedChannelID != nil && !isTurnInFlight
+            && modelKeySyncProblem == nil && !isSyncingModelKeys
     }
 
     /**
@@ -55,6 +56,8 @@ public final class AppState {
      */
     public var sendBlockedReason: String? {
         guard composerBlock == nil else { return nil }
+        if let modelKeySyncProblem { return modelKeySyncProblem }
+        if isSyncingModelKeys { return String(localized: "Connecting your model keys to the engine…") }
         guard selectedChannelID != nil else {
             return String(localized: "Open a conversation to send a message.")
         }
@@ -291,8 +294,8 @@ public final class AppState {
         startsEngineOnLaunch: @escaping @Sendable () -> Bool = { false },
         /// The model keys the Mac holds. Empty by default so no test reads this machine's Keychain;
         /// the app passes the real ones.
-        modelKeys: @escaping @Sendable () -> [DesiredModelKey] = { [] },
-        modelKeyFingerprint: @escaping @Sendable (String) -> String = {
+        modelKeys: @escaping @Sendable () throws -> [DesiredModelKey] = { [] },
+        modelKeyFingerprint: @escaping @Sendable (String) throws -> String = {
             ModelKeySync.fingerprint(of: $0, keyEncryptionKey: "test")
         }
     ) {
@@ -329,8 +332,8 @@ public final class AppState {
     /// the machine's contents deciding the answer.
     private let conversationStore: @Sendable () -> ConversationStore
     private var startsEngineOnLaunch: @Sendable () -> Bool = { false }
-    private var modelKeys: @Sendable () -> [DesiredModelKey] = { [] }
-    private var modelKeyFingerprint: @Sendable (String) -> String = {
+    private var modelKeys: @Sendable () throws -> [DesiredModelKey] = { [] }
+    private var modelKeyFingerprint: @Sendable (String) throws -> String = {
         ModelKeySync.fingerprint(of: $0, keyEncryptionKey: "test")
     }
 
@@ -620,32 +623,47 @@ public final class AppState {
      Without this no run ever carried a key: the app kept them in the Keychain and read them back
      only to show "Connected". See `ModelKeySync` for what is stored when, and why not every time.
 
-     A failure here is not reported on its own. A run that then lacks its key fails with the router's
-     sentence naming the provider whose key is missing, which is the sentence a person can act on.
+     A failed read must not look like a disconnected provider: that would revoke a working vault
+     key. Keep the vault unchanged and block new sends until synchronization succeeds.
      */
     /// The stub-backed initializer has no parameter for this, and a test needs to say what keys exist.
-    func overrideModelKeysForTesting(_ keys: @escaping @Sendable () -> [DesiredModelKey]) {
+    func overrideModelKeysForTesting(_ keys: @escaping @Sendable () throws -> [DesiredModelKey]) {
         modelKeys = keys
     }
+
+    public private(set) var modelKeySyncProblem: String?
+    public private(set) var isSyncingModelKeys = false
+    private var modelKeysNeedSync = false
 
     public func syncModelKeys() async {
         if runtime != nil {
             guard case .running = runtimeState else { return }
         }
-        let desired = modelKeys()
-        guard let live = try? await engine.liveModelKeys() else { return }
-        let plan = ModelKeySync.plan(desired: desired, live: live, fingerprint: modelKeyFingerprint)
-        for key in plan.store {
-            try? await engine.storeModelKey(
-                key.plaintext,
-                providerId: key.providerId,
-                baseURL: key.baseURL,
-                fingerprint: modelKeyFingerprint(key.plaintext)
-            )
-        }
-        for id in plan.revoke {
-            try? await engine.revokeModelKey(credentialId: id)
-        }
+        modelKeysNeedSync = true
+        guard !isSyncingModelKeys else { return }
+        isSyncingModelKeys = true
+        defer { isSyncingModelKeys = false }
+        repeat {
+            modelKeysNeedSync = false
+            do {
+                // Resolve every secret before writing or revoking anything.
+                let desired = try modelKeys()
+                var fingerprints: [String: String] = [:]
+                for key in desired { fingerprints[key.plaintext] = try modelKeyFingerprint(key.plaintext) }
+                let live = try await engine.liveModelKeys()
+                let plan = ModelKeySync.plan(desired: desired, live: live) { fingerprints[$0] ?? "" }
+                for key in plan.store {
+                    try await engine.storeModelKey(
+                        key.plaintext, providerId: key.providerId, baseURL: key.baseURL,
+                        fingerprint: fingerprints[key.plaintext] ?? ""
+                    )
+                }
+                for id in plan.revoke { try await engine.revokeModelKey(credentialId: id) }
+                modelKeySyncProblem = nil
+            } catch {
+                modelKeySyncProblem = String(localized: "Couldn't connect your model keys to the engine. Check Keychain access and try again.")
+            }
+        } while modelKeysNeedSync
     }
 
     // MARK: - Idle
@@ -759,10 +777,10 @@ public final class AppState {
     private func dispatchMessageThatWokeTheEngine() {
         guard let (message, channel) = messageThatWokeTheEngine else { return }
         messageThatWokeTheEngine = nil
-        guard composerBlock == nil else {
+        guard composerBlock == nil, modelKeySyncProblem == nil, !isSyncingModelKeys else {
             // It woke into something that needs the person — no model, no CopilotKit key. The
             // message is kept and made retryable, carrying the same sentence the composer shows.
-            let reason = composerBlock?.sentence ?? String(localized: "Couldn't send that message.")
+            let reason = composerBlock?.sentence ?? modelKeySyncProblem ?? String(localized: "Couldn't send that message.")
             mark(message.id, as: .failed(reason: reason), in: channel)
             retryPrompts[message.id] = (channel, message.id)
             return
@@ -1281,7 +1299,7 @@ public final class AppState {
     }
 
     private func run(_ sent: Message, in channel: Channel.ID) {
-        let agentID = selectedAgentID ?? ""
+        let agentID = agentID(forChannel: channel) ?? ""
         noteEngineActivity()
         // Answering is what clears the question. The agent asked and you replied; nothing is
         // waiting on you in this conversation any more.

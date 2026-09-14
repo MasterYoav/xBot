@@ -547,6 +547,7 @@ async function runAgent(input: RunAgentInput): Promise<Response> {
 
 serve({
   port: PORT,
+  ...(PER_RUN_MODELS ? { hostname: "127.0.0.1" } : {}),
   idleTimeout: 120,
   async fetch(request) {
     const url = new URL(request.url);

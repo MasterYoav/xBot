@@ -204,6 +204,12 @@ public struct Conversation: View {
                 }
                 .disabled(state.isCreatingConversation)
             }
+            if state.modelKeySyncProblem != nil {
+                Button(String(localized: "Retry connecting model keys")) {
+                    Task { await state.syncModelKeys() }
+                }
+                .disabled(state.isSyncingModelKeys)
+            }
             if let problem = state.historyProblem {
                 Text(problem).captionText()
                 Button(String(localized: "Retry loading history")) { Task { await state.retryHistory() } }

@@ -73,8 +73,9 @@ async function owner(): Promise<AgentActor> {
   return { id, role: "user" };
 }
 
-async function agentOn(actor: AgentActor, baseURL?: string) {
+async function agentOn(actor: AgentActor, baseURL?: string, endpoint?: string) {
   const profile = await profileStore.create(actor, {
+    ...(endpoint ? { endpoint } : {}),
     name: "Keyed",
     title: "Keyed",
     roleDescription: "Keyed",
@@ -108,6 +109,17 @@ function modelKey(actor: AgentActor, plaintext: string, baseURL?: string) {
 }
 
 describe("model keys from the vault, on a real database", () => {
+  test("a customer endpoint never receives the deployment's model key", async () => {
+    const actor = await owner();
+    const agent = await agentOn(
+      actor,
+      undefined,
+      "https://agent.example/ag-ui",
+    );
+    await createCredential(service, modelKey(actor, "private-deployment-key"));
+    expect(keyOf(await loadAgents(actor), agent.id)).toBeUndefined();
+  });
+
   test("a stored key arrives on the agent's selection, decrypted", async () => {
     const actor = await owner();
     const agent = await agentOn(actor);

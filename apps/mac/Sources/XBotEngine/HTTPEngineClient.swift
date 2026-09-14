@@ -395,9 +395,10 @@ public actor HTTPEngineClient: EngineClient {
     }
 
     public func availableModels() async throws -> [ModelSelection] {
-        // Comes from the router once ADR-0002 lands. Until then the engine has one provider from
-        // its environment, and offering a picker over models it cannot actually reach would be a
-        // settings screen that lies.
+        // Empty on purpose, and the app's own catalog fills the picker instead (`AppState` falls back
+        // to connected vendors plus custom endpoints). The engine has no model list to give: its Bot
+        // runs in per-run mode with no provider of its own, and which vendors are usable is decided by
+        // which keys the Mac holds — knowledge that lives on this side, not in the container.
         []
     }
 

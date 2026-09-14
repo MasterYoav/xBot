@@ -107,6 +107,22 @@ struct AppModelKeySyncTests {
         var current: [DesiredModelKey] = []
     }
 
+    @Test func unreadableKeychainDoesNotRevokeAVaultKey() async throws {
+        let engine = StubEngineClient(tokenDelay: .zero)
+        try await engine.storeModelKey("existing", providerId: "anthropic", baseURL: nil, fingerprint: "old")
+        let state = AppState(engine: engine)
+        await state.load()
+        state.overrideModelKeysForTesting { throw EngineError.notRunning }
+        await state.syncModelKeys()
+        #expect(await engine.vaultValues["xbot-model:anthropic"] == "existing")
+        #expect(state.modelKeySyncProblem != nil)
+        #expect(!state.canSend)
+        state.overrideModelKeysForTesting { [] }
+        await state.syncModelKeys()
+        #expect(state.modelKeySyncProblem == nil)
+        #expect(state.canSend)
+    }
+
     @Test func keysReachTheVaultOnceAndFollowChanges() async throws {
         let engine = StubEngineClient(tokenDelay: .zero)
         let keys = Keys()
