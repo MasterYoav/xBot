@@ -738,7 +738,7 @@ public actor HTTPEngineClient: EngineClient {
         case .waitForPerson(let path, let body, let until):
             let asked = await computerCall(computer + path, body: body)
             guard asked["ok"] as? Bool == true else { return ComputerTools.content(asked) }
-            let answer = await waitForPerson(control: computer + "/control", until: until)
+            let answer = await waitForPerson(control: computer + "/control", until: until, askedSince: asked["since"] as? String)
             return ComputerTools.content(["ok": true, "result": Self.sentence(for: answer, until: until)])
 
         case .declined(let body):
@@ -769,10 +769,11 @@ public actor HTTPEngineClient: EngineClient {
 
     private enum PersonAnswer { case answered, gaveUp, cancelled }
 
-    private func waitForPerson(control: String, until: ComputerTools.PersonWait) async -> PersonAnswer {
+    private func waitForPerson(control: String, until: ComputerTools.PersonWait, askedSince: String?) async -> PersonAnswer {
         let deadline = ContinuousClock.now + Self.personWait
         // The engine drops an unanswered help request after ten minutes; that is nobody coming, not
-        // somebody finishing, so handing back only counts once a person actually held the wheel.
+        // somebody finishing, so handing back only counts once a person actually held the wheel. A take
+        // and hand-back can both fall between two polls; `since` moves on each, and expiry leaves it.
         var personDrove = false
         while ContinuousClock.now < deadline {
             if Task.isCancelled { return .cancelled }
@@ -783,7 +784,9 @@ public actor HTTPEngineClient: EngineClient {
                     if state["secretWanted"] == nil || state["secretWanted"] is NSNull { return .answered }
                 case .controlReturned:
                     let holder = state["holder"] as? String
-                    if holder == "human" { personDrove = true }
+                    if holder == "human" || (askedSince != nil && state["since"] as? String != askedSince) {
+                        personDrove = true
+                    }
                     if holder == "bot", state["requested"] as? Bool != true {
                         return personDrove ? .answered : .gaveUp
                     }

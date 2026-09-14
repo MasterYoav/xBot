@@ -374,16 +374,17 @@ struct HTTPEngineClientTests {
 
     /// A help request the engine expired unanswered is nobody coming — not a person who finished.
     @Test(arguments: [
-        (["human"], "handed control back"),
-        ([], "Nobody took control"),
+        (["human"], "t0", "handed control back"),
+        ([], "t1", "handed control back"), // taken and handed back between two polls
+        ([], "t0", "Nobody took control"),
     ])
-    func aHelpRequestEndsTheWayThePersonAnswered(drove: [String], expected: String) async throws {
+    func aHelpRequestEndsTheWayThePersonAnswered(drove: [String], finalSince: String, expected: String) async throws {
         let host = "stub-\(UUID().uuidString).test"
         let computer = "/api/computers/orchestrator"
-        StubURLProtocol.register(.init(body: Self.json(["holder": "bot", "requested": true])), forHost: host, path: computer + "/control/request")
+        StubURLProtocol.register(.init(body: Self.json(["holder": "bot", "requested": true, "since": "t0"])), forHost: host, path: computer + "/control/request")
         StubURLProtocol.enqueue(
-            drove.map { .init(body: Self.json(["holder": $0, "requested": false])) }
-                + [.init(body: Self.json(["holder": "bot", "requested": false]))],
+            drove.map { .init(body: Self.json(["holder": $0, "requested": false, "since": "t0"])) }
+                + [.init(body: Self.json(["holder": "bot", "requested": false, "since": finalSince]))],
             forHost: host, path: computer + "/control"
         )
 

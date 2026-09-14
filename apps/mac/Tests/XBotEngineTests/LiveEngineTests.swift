@@ -218,4 +218,33 @@ struct LiveComputerToolsTests {
         #expect(command["ok"] as? Bool == true)
         #expect((command["stdout"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) == "5")
     }
+
+    /// The asks, as the conversation reads them: a help request, a takeover, a hand-back, and a secret
+    /// nothing asked for being refused with the engine's own sentence.
+    @Test func theAsksReadBackAsTheConversationShowsThem() async throws {
+        let client = client
+        let agent = try await client.createAgent(AgentDraft(name: "Ask check"))
+        _ = await client.executeComputerTool(agentId: agent.id, name: "computer_navigate", argumentsJSON: #"{"url":"https://example.com"}"#)
+
+        let asking = Task {
+            await client.executeComputerTool(agentId: agent.id, name: "computer_request_help", argumentsJSON: #"{"reason":"Sign in, please"}"#)
+        }
+        var state = try await client.controlState(for: agent.id)
+        for _ in 0..<20 where state.helpReason == nil {
+            try await Task.sleep(for: .milliseconds(250))
+            state = try await client.controlState(for: agent.id)
+        }
+        #expect(state.helpReason == "Sign in, please")
+
+        try await client.setControl(.human, for: agent.id)
+        #expect(try await client.controlState(for: agent.id).holder == .human)
+        try await client.setControl(.agent, for: agent.id)
+        let answer = await asking.value
+        print("help:", answer)
+        #expect(answer.contains("handed control back"))
+
+        let refused = await client.supplySecret("not asked for", for: agent.id)
+        print("unasked secret:", refused ?? "accepted")
+        #expect(refused != nil)
+    }
 }
