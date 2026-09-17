@@ -586,6 +586,12 @@ public actor RuntimeController {
         for volume in [Self.dataVolume, Self.workspaceVolume, Self.profilesVolume] {
             try? await driver.removeVolume(volume)
         }
+        // The pre-upgrade dump is a plain-SQL copy of the database, kept outside the volume so a
+        // rollback can use it — which is exactly why removing the volumes never removed it.
+        try? FileManager.default.removeItem(at: dumpURL)
+        try? FileManager.default.removeItem(
+            at: dumpURL.deletingLastPathComponent().appendingPathComponent("restore.log")
+        )
         // Back to stopped, not notDetected: the runtime is still installed and still working — it
         // is only xBot's own data that is gone.
         state = .stopped
