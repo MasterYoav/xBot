@@ -41,7 +41,7 @@ scripts/generate-app-icon.sh
 (
   cd apps/mac
   swift build -c release --arch arm64
-  ! lipo -verify_arch arm64 x86_64 .build/release/XBot
+  ! lipo .build/release/XBot -verify_arch x86_64
 )
 ```
 
@@ -57,7 +57,8 @@ Replace the release build step in `.github/workflows/mac-release.yml` with:
         working-directory: apps/mac
         run: |
           swift build -c release --arch arm64 --arch x86_64
-          lipo -verify_arch arm64 x86_64 .build/release/XBot
+          lipo .build/release/XBot -verify_arch arm64
+          lipo .build/release/XBot -verify_arch x86_64
 ```
 
 Replace packaging step 2 in `scripts/README-packaging.md` with:
@@ -74,10 +75,12 @@ Run:
 ```bash
 scripts/generate-app-icon.sh
 swift build -c release --arch arm64 --arch x86_64 --package-path apps/mac
-lipo -verify_arch arm64 x86_64 apps/mac/.build/release/XBot
+lipo apps/mac/.build/release/XBot -verify_arch arm64
+lipo apps/mac/.build/release/XBot -verify_arch x86_64
 scripts/bundle-mac-app.sh
 scripts/create-dmg.sh
-lipo -verify_arch arm64 x86_64 apps/mac/XBot.app/Contents/MacOS/XBot
+lipo apps/mac/XBot.app/Contents/MacOS/XBot -verify_arch arm64
+lipo apps/mac/XBot.app/Contents/MacOS/XBot -verify_arch x86_64
 hdiutil verify dist/xBot.dmg
 ```
 
@@ -91,7 +94,7 @@ Run:
 swift test --package-path apps/mac
 ```
 
-Expected: 235 tests pass with no failures.
+Expected: every Swift test executable passes with no failures.
 
 - [ ] **Step 5: Commit the universal build**
 
@@ -161,7 +164,8 @@ test -n "${phase1_dmg}"
 hdiutil verify "${phase1_dmg}"
 phase1_mount="$(mktemp -d)"
 hdiutil attach -nobrowse -readonly -mountpoint "${phase1_mount}" "${phase1_dmg}"
-lipo -verify_arch arm64 x86_64 "${phase1_mount}/XBot.app/Contents/MacOS/XBot"
+lipo "${phase1_mount}/XBot.app/Contents/MacOS/XBot" -verify_arch arm64
+lipo "${phase1_mount}/XBot.app/Contents/MacOS/XBot" -verify_arch x86_64
 hdiutil detach "${phase1_mount}"
 ```
 
@@ -315,7 +319,8 @@ codesign --verify --deep --strict --verbose=2 "${phase1_signed_app}"
 spctl -a -vvv -t execute "${phase1_signed_app}"
 xcrun stapler validate "${phase1_signed_app}"
 xcrun stapler validate "${phase1_signed_dmg}"
-lipo -verify_arch arm64 x86_64 "${phase1_signed_app}/Contents/MacOS/XBot"
+lipo "${phase1_signed_app}/Contents/MacOS/XBot" -verify_arch arm64
+lipo "${phase1_signed_app}/Contents/MacOS/XBot" -verify_arch x86_64
 phase1_feed_url="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "${phase1_signed_app}/Contents/Info.plist")"
 phase1_public_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "${phase1_signed_app}/Contents/Info.plist")"
 [[ "${phase1_feed_url}" == https://* ]]
@@ -487,7 +492,7 @@ git diff --check
 git status --short
 ```
 
-Expected: 235 tests pass, the diff is clean, and only the intended roadmap/checklist edits remain.
+Expected: every Swift test executable passes, the diff is clean, and only the intended roadmap/checklist edits remain.
 
 - [ ] **Step 4: Commit Phase 1 closure**
 
