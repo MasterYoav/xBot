@@ -41,11 +41,8 @@ jobs:
       - name: Release build
         working-directory: apps/mac
         run: |
+          swift build -c release --arch arm64 --arch x86_64
           BIN_PATH="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
-          echo "BIN_PATH=${BIN_PATH}"
-          ls -la "${BIN_PATH}" || true
-          find .build -type f -name XBot -perm -111 -print -exec file {} \;
-          find .build/apple/Products/Release -name 'XBot*' -print -exec file {} \; 2>/dev/null || true
           lipo "${BIN_PATH}/XBot" -verify_arch arm64
           lipo "${BIN_PATH}/XBot" -verify_arch x86_64
 

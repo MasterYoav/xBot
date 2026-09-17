@@ -3,13 +3,13 @@
 #
 # Usage:
 #   scripts/generate-app-icon.sh
-#   cd apps/mac && swift build -c release
+#   cd apps/mac && swift build -c release --arch arm64 --arch x86_64
 #   scripts/bundle-mac-app.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAC="${ROOT}/apps/mac"
-BUILD="$(cd "${MAC}" && swift build -c release --show-bin-path)/XBot"
+BUILD="$(cd "${MAC}" && swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/XBot"
 RES="${MAC}/Sources/XBotApp/Resources"
 APP="${MAC}/XBot.app"
 

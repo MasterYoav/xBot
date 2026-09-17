@@ -16,7 +16,7 @@ scripts/bundle-mac-app.sh
 scripts/create-dmg.sh
 
 # 5. Run against real engine
-cd apps/mac && XBOT_USE_RUNTIME=1 .build/release/XBot
+cd apps/mac && XBOT_USE_RUNTIME=1 "$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/XBot"
 ```
 
 Engine image (pulled during onboarding, not bundled in the DMG):
