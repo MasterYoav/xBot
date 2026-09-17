@@ -6,8 +6,8 @@ Local release flow until CI signing credentials exist. See `docs/11-packaging-an
 # 1. Official icon (Icon Composer → Assets.car + xBot.icns)
 scripts/generate-app-icon.sh
 
-# 2. Release binary
-cd apps/mac && swift build -c release && cd ../..
+# 2. Universal release binary
+cd apps/mac && swift build -c release --arch arm64 --arch x86_64 && cd ../..
 
 # 3. .app bundle
 scripts/bundle-mac-app.sh
@@ -88,4 +88,3 @@ apps/mac/.build/artifacts/sparkle/Sparkle/bin/generate_keys
 
 Commit the public key to CI as `XBOT_SPARKLE_PUBLIC_KEY`; keep the private key in
 `SPARKLE_EDDSA_PRIVATE_KEY` only.
-
