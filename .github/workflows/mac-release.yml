@@ -41,9 +41,9 @@ jobs:
       - name: Release build
         working-directory: apps/mac
         run: |
-          swift build -c release --arch arm64 --arch x86_64
-          lipo .build/release/XBot -verify_arch arm64
-          lipo .build/release/XBot -verify_arch x86_64
+          BIN_PATH="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
+          lipo "${BIN_PATH}/XBot" -verify_arch arm64
+          lipo "${BIN_PATH}/XBot" -verify_arch x86_64
 
       - name: Bundle .app
         env:

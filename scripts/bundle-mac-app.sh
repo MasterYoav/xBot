@@ -9,12 +9,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAC="${ROOT}/apps/mac"
-BUILD="${MAC}/.build/release/XBot"
+BUILD="$(cd "${MAC}" && swift build -c release --show-bin-path)/XBot"
 RES="${MAC}/Sources/XBotApp/Resources"
 APP="${MAC}/XBot.app"
 
 if [[ ! -x "${BUILD}" ]]; then
-  echo "Build the release binary first: cd apps/mac && swift build -c release" >&2
+  echo "Build the release binary first: cd apps/mac && swift build -c release --arch arm64 --arch x86_64" >&2
   exit 1
 fi
 
