@@ -125,14 +125,20 @@ Expected: the worktree is clean before the push, and `origin/master` advances to
 Run:
 
 ```bash
-gh workflow run mac-release.yml -R MasterYoav/xBot --ref master
 phase1_sha="$(git rev-parse HEAD)"
+phase1_previous_run_id="$(gh run list -R MasterYoav/xBot --workflow mac-release.yml \
+  --event workflow_dispatch --commit "${phase1_sha}" --limit 1 \
+  --json databaseId --jq '.[0].databaseId // empty')"
+gh workflow run mac-release.yml -R MasterYoav/xBot --ref master
 phase1_run_id=""
 for phase1_attempt in 1 2 3 4 5 6; do
-  phase1_run_id="$(gh run list -R MasterYoav/xBot --workflow mac-release.yml \
+  phase1_candidate_run_id="$(gh run list -R MasterYoav/xBot --workflow mac-release.yml \
     --event workflow_dispatch --commit "${phase1_sha}" --limit 1 \
     --json databaseId --jq '.[0].databaseId // empty')"
-  [[ -n "${phase1_run_id}" ]] && break
+  if [[ -n "${phase1_candidate_run_id}" && "${phase1_candidate_run_id}" != "${phase1_previous_run_id}" ]]; then
+    phase1_run_id="${phase1_candidate_run_id}"
+    break
+  fi
   sleep 5
 done
 test -n "${phase1_run_id}"
@@ -263,14 +269,20 @@ rmdir "${phase1_secrets_dir}"
 Run:
 
 ```bash
-gh workflow run mac-release.yml -R MasterYoav/xBot --ref master
 phase1_signed_sha="$(git rev-parse HEAD)"
+phase1_previous_signed_run_id="$(gh run list -R MasterYoav/xBot --workflow mac-release.yml \
+  --event workflow_dispatch --commit "${phase1_signed_sha}" --limit 1 \
+  --json databaseId --jq '.[0].databaseId // empty')"
+gh workflow run mac-release.yml -R MasterYoav/xBot --ref master
 phase1_signed_run_id=""
 for phase1_signed_attempt in 1 2 3 4 5 6; do
-  phase1_signed_run_id="$(gh run list -R MasterYoav/xBot --workflow mac-release.yml \
+  phase1_candidate_signed_run_id="$(gh run list -R MasterYoav/xBot --workflow mac-release.yml \
     --event workflow_dispatch --commit "${phase1_signed_sha}" --limit 1 \
     --json databaseId --jq '.[0].databaseId // empty')"
-  [[ -n "${phase1_signed_run_id}" ]] && break
+  if [[ -n "${phase1_candidate_signed_run_id}" && "${phase1_candidate_signed_run_id}" != "${phase1_previous_signed_run_id}" ]]; then
+    phase1_signed_run_id="${phase1_candidate_signed_run_id}"
+    break
+  fi
   sleep 5
 done
 test -n "${phase1_signed_run_id}"
