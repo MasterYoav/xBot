@@ -258,7 +258,9 @@ it.**
   still open.**
 - Engine update flow including rollback, and the migration-rollback decision. **Done** — the dump,
   per docs/11's recommendation: taken before the new image can migrate, restored on rollback.
-- Uninstall, complete.
+- Uninstall, complete. **Done** — Settings → Advanced removes the container, volumes, Keychain items,
+  preferences and the pre-upgrade dump (which it used to leave behind); `Uninstall xBot.command` ships
+  in the DMG for somebody who already trashed the app.
 - Admin surfaces embedded (webview). **Plugins admin ships; the audit trail is native rather than
   embedded, per ADR-0004's exception; credentials, playground, etc. still open.**
 - Settings: General, Models, Agents, Computer, Advanced, Updates. **Built** — all seven panes, in the

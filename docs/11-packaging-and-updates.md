@@ -300,13 +300,17 @@ is a bad citizen with a reputation problem.
    logins"
 4. Remove Keychain items
 5. Remove `UserDefaults`
-6. Offer to move the app to the Trash
+6. Remove the pre-upgrade database dump in Application Support — a plain-SQL copy of the database,
+   kept outside the volume so rollback can use it, and therefore untouched by step 3
+7. Tell the person they can now drag the app to the Trash. **Not done for them**: moving a running
+   app's own bundle is not something an app should try, so the screen says it instead
 
 **Does not remove the container runtime**, because the user may have installed it for something else.
 It says so.
 
 **Also ship a standalone uninstaller script** in the DMG for the user who already dragged the app to
-the Trash and then found the volumes. ⚠️ Yes, this is a terminal — it is the one place the no-terminal
+the Trash and then found the volumes. It is `Uninstall xBot.command`, copied from
+`scripts/uninstall-xbot.command`, and it mirrors `AppState.uninstall()` step for step. ⚠️ Yes, this is a terminal — it is the one place the no-terminal
 promise yields, because the alternative is orphaned data with no way to remove it. It is documented
 on the website, not in the app.
 

@@ -27,6 +27,8 @@ mkdir -p "${STAGE}"
 
 cp -R "${APP}" "${STAGE}/"
 ln -s /Applications "${STAGE}/Applications"
+cp "${ROOT}/scripts/uninstall-xbot.command" "${STAGE}/Uninstall xBot.command"
+chmod +x "${STAGE}/Uninstall xBot.command"
 
 hdiutil create -volname "${VOLUME}" -srcfolder "${STAGE}" -ov -format UDZO "${DMG}"
 rm -rf "${STAGE}"
