@@ -994,6 +994,21 @@ struct CommandFailureKindTests {
         }
     }
 
+    /**
+     OrbStack words an unreachable registry differently from Docker Desktop.
+
+     Its daemon reaches out through a proxy, so a lookup that fails comes back as the proxy's
+     "Bad Gateway" rather than Docker Desktop's `no such host`. Measured, not guessed: this is the
+     exact line OrbStack 29.4 printed for a registry that does not resolve. Unmatched, it fell through
+     to "The engine couldn't start" — on a first run with the network down, and on the runtime a
+     developer-leaning Mac is most likely to already have.
+     */
+    @Test func aDownloadThatLostTheNetworkThroughOrbStacksProxy() {
+        let message = #"Error response from daemon: Get "https://ghcr.io/v2/": Bad Gateway"#
+        #expect(kind(pull, message) == .downloadInterrupted)
+        #expect(kind(pull, "Error response from daemon: Get \"https://ghcr.io/v2/\": Gateway Timeout") == .downloadInterrupted)
+    }
+
     @Test func aDiskThatFilled() {
         let message = "failed to register layer: write /var/lib/docker/overlay2/x/diff/usr/lib/libx.so: no space left on device"
         #expect(kind(pull, message) == .diskFull)

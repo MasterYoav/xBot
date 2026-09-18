@@ -238,6 +238,9 @@ public enum RuntimeError: Error, Sendable, Equatable {
                 "dial tcp", "no such host", "i/o timeout", "tls handshake timeout",
                 "connection reset", "connection refused", "unexpected eof",
                 "network is unreachable", "context deadline exceeded", "net/http",
+                // OrbStack's daemon goes through a proxy, so an unreachable registry reaches us as
+                // the proxy's answer rather than Docker Desktop's `no such host`.
+                "bad gateway", "gateway timeout",
             ]
             if network.contains(where: text.contains) { return .downloadInterrupted }
         }
