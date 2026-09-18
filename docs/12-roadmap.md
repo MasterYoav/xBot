@@ -151,8 +151,8 @@ An end-to-end conversation through the server needs Intelligence credentials:
 `runtimeCapabilities()` takes all four `INTELLIGENCE_*` variables or none, and none selects
 `LocalIntelligence`, which is a spike that throws (ADR-0007).
 
-**Still open:** native OpenAI/Google adapters (compatible mode covers them for now) and a second
-live vendor. Usage accounting is done — the agent sums `usage_metadata` across a turn and emits
+**Still open:** a second live vendor. The three native adapters are built and each is covered by a
+test asserting which client a selection gets (`agent-langgraph/tests/models-build.test.ts`). Usage accounting is done — the agent sums `usage_metadata` across a turn and emits
 `CUSTOM`/`xbot.usage` before `RUN_FINISHED`, and Settings → Usage shows it per agent.
 
 ---

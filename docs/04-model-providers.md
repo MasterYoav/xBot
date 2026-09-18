@@ -50,8 +50,12 @@ user already has. No key. If it is not installed, the row offers a link, not an 
 | Agent settings model picker | Dropdown in panel, backed by `ModelProviderCatalog` |
 | Settings → Models | **Built.** Provider rows with live connect/disconnect, Ollama detection, and **Add a custom provider** |
 
-**Not built yet:** native Anthropic/OpenAI/Google adapters (compatible mode reaches all three),
-usage accounting, and the live two-vendor smoke that closes M2.
+**Built since:** the three native adapters — `buildChatModel` in `agent-langgraph/src/models/build.ts`
+hands Anthropic to `ChatAnthropic`, Google to `ChatGoogleGenerativeAI`, and OpenAI plus every
+compatible endpoint to `ChatOpenAI` at its own base URL. `tests/models-build.test.ts` asserts which
+client each selection gets, because a wrong one still answers. Usage accounting is built too.
+
+**Not built yet:** the live two-vendor smoke that closes M2, which needs a second vendor key.
 
 **Ollama container routing:** the app probes Ollama on the host (`localhost:11434`) and routes
 engine calls through `hostGatewayAddress()` from the runtime driver
