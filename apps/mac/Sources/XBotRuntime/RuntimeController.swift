@@ -590,7 +590,13 @@ public actor RuntimeController {
     /// Every step tolerates work already done. An uninstall that fails halfway and cannot be run
     /// again leaves exactly the orphaned state it exists to prevent, so a missing container or an
     /// already-deleted volume is not an error.
-    public func uninstall() async {
+    /// Whether the engine's data is gone. False when the runtime could not be reached, in which case
+    /// nothing was removed and the caller must not report otherwise.
+    @discardableResult
+    public func uninstall() async -> Bool {
+        // Wake the runtime first. With no daemon every removal below fails inside a `try?`, and the
+        // volumes — the conversations, agents and browser logins — stay exactly where they were.
+        guard await ensureRuntimeReady() else { return false }
         await stop()
         if let handle = await driver.containerNamed(Self.engineContainerName) {
             try? await driver.remove(handle)
@@ -604,6 +610,11 @@ public actor RuntimeController {
         // Back to stopped, not notDetected: the runtime is still installed and still working — it
         // is only xBot's own data that is gone.
         state = .stopped
+        // Measured rather than assumed: a volume that is still there is data that is still there.
+        for volume in [Self.dataVolume, Self.workspaceVolume, Self.profilesVolume] {
+            if await driver.volumeExists(volume) { return false }
+        }
+        return true
     }
 
     /// What the running engine is using. Nil when it is not running or Docker would not say.

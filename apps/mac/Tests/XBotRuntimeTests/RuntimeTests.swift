@@ -823,6 +823,52 @@ extension RuntimeControllerTests {
         #expect(await controller.state == .stopped)
     }
 
+    /**
+     Uninstall with the runtime stopped wakes it first.
+
+     Docker Desktop quit, or the Colima VM paused — ordinary on a Mac, and likely on the day somebody
+     decides to remove an app. Every removal used to run against no daemon, fail inside a `try?`,
+     and leave every volume where it was while the screen said everything had been removed.
+     */
+    @Test func uninstallWakesAStoppedRuntimeBeforeRemovingAnything() async {
+        let driver = FakeDriver()
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
+        )
+        await controller.start(environment: environment)
+        await driver.stopDaemon()
+
+        let removed = await controller.uninstall()
+
+        #expect(removed)
+        #expect(await driver.daemonStartRequested)
+        #expect(await driver.remainingVolumes.isEmpty)
+    }
+
+    /// A runtime that will not come up means nothing was removed, and uninstall has to say so
+    /// rather than let the app wipe its keys and announce success over volumes it never touched.
+    @Test func uninstallThatCannotReachTheRuntimeSaysSo() async {
+        let driver = FakeDriver(script: .init(daemonStartSucceeds: false))
+        let controller = RuntimeController(
+            driver: driver,
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore(),
+            dumpURL: isolatedDumpURL()
+        )
+        await controller.start(environment: environment)
+        await driver.stopDaemon()
+
+        let removed = await controller.uninstall()
+
+        #expect(!removed)
+        #expect(!(await driver.remainingVolumes.isEmpty))
+    }
+
     /// The pre-upgrade dump is the database in plain SQL — agents, settings, everything the volume
     /// held. It lives outside the volume on purpose, so removing the volumes never touched it, and
     /// the screen said "Everything xBot stored has been removed" while a copy sat in Application
