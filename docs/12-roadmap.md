@@ -268,7 +268,8 @@ it.**
   main window rather than a separate scene.
 - The honest v1 limitations stated in the UI: shared browser, shared workspace. **Done** — Settings →
   Computer, in the wording docs/10-security.md specifies.
-- Website with the download and the security explanation.
+- Website with the download and the security explanation. **Built** — `site/index.html`, published by
+  `.github/workflows/pages.yml`; enabling Pages is a one-time repository setting.
 
 **The first-run supply chain is verified anonymously**, which is the part of "installs from the
 website and uses it" that does not need a person. From a shell holding no credentials: the manifest

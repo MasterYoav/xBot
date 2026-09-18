@@ -163,12 +163,16 @@ bugs, and they are only visible on the first run.
 
 ---
 
-## 7. The website
+## 7. The website — **built; needs Pages turned on**
 
-The last item in M7 and the only one with no code in this repository. It needs the download, the
-security explanation, and — per ADR-0007 — the fact that conversation history is stored by
-CopilotKit, said plainly rather than buried. The README already carries that wording; reuse it
-rather than writing a second version that can drift.
+`site/index.html` is the page: one file, no build step. It carries the download (pointing at
+`releases/latest`), the security explanation, the uninstall instructions — per docs/11 the standalone
+uninstaller is documented here and not in the app — and, per ADR-0007, the fact that conversation
+history is stored by CopilotKit, in the README's wording rather than a second version that can drift.
+
+`.github/workflows/pages.yml` publishes it on every push to master that touches `site/`. **It needs
+you once:** repository → Settings → Pages → Source: **GitHub Actions**. Until then the workflow fails
+at the deploy step. The download link is only useful once step 4 has published a release.
 
 ---
 
