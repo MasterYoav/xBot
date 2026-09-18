@@ -790,6 +790,31 @@ extension RuntimeControllerTests {
         #expect(await controller.state == .stopped)
     }
 
+    /// The pre-upgrade dump is the database in plain SQL — agents, settings, everything the volume
+    /// held. It lives outside the volume on purpose, so removing the volumes never touched it, and
+    /// the screen said "Everything xBot stored has been removed" while a copy sat in Application
+    /// Support. The restore log beside it goes too.
+    @Test func uninstallRemovesThePreUpgradeDump() async throws {
+        let dumpURL = isolatedDumpURL()
+        let directory = dumpURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("-- dump".utf8).write(to: dumpURL)
+        let logURL = directory.appendingPathComponent("restore.log")
+        try Data("log".utf8).write(to: logURL)
+        let controller = RuntimeController(
+            driver: FakeDriver(),
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore(),
+            dumpURL: dumpURL
+        )
+
+        await controller.uninstall()
+
+        #expect(!FileManager.default.fileExists(atPath: dumpURL.path))
+        #expect(!FileManager.default.fileExists(atPath: logURL.path))
+    }
+
     /// Uninstall runs once and cannot ask the person to try again, so a step whose work is already
     /// done must not stop the rest. Without this, a half-uninstalled machine keeps its volumes.
     @Test func uninstallSurvivesAnythingAlreadyGone() async {

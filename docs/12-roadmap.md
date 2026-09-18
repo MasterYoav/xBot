@@ -221,7 +221,7 @@ digest from `manifests/engine-stable.json`.
   it works against a live engine and not only the stub. It used to reach the message bubble and
   nowhere else, and `activity(for:)` returns an empty list on HTTP by design, so the panel promised
   "commands, files, and pages will show up here" and nothing could deliver it.
-- Plugins admin webview + native grant toggles (partial — other admin surfaces still open).
+- Plugins admin webview + native grant toggles. Other admin surfaces via **Engine admin…** (same webview).
 
 **Done when:** create an agent in the app, send a message, watch it browse, take control, hand it
 back — all native. `scripts/verify-m5-handoff.sh` covers the smoke path against a running engine.
@@ -258,14 +258,18 @@ it.**
   still open.**
 - Engine update flow including rollback, and the migration-rollback decision. **Done** — the dump,
   per docs/11's recommendation: taken before the new image can migrate, restored on rollback.
-- Uninstall, complete.
+- Uninstall, complete. **Done** — Settings → Advanced removes the container, volumes, Keychain items,
+  preferences and the pre-upgrade dump (which it used to leave behind); `Uninstall xBot.command` ships
+  in the DMG for somebody who already trashed the app.
 - Admin surfaces embedded (webview). **Plugins admin ships; the audit trail is native rather than
-  embedded, per ADR-0004's exception; credentials, playground, etc. still open.**
+  embedded, per ADR-0004's exception; every other surface opens in the same window at `/admin`, whose own sidebar reaches credentials,
+  computers, playground and the rest.**
 - Settings: General, Models, Agents, Computer, Advanced, Updates. **Built** — all seven panes, in the
   main window rather than a separate scene.
 - The honest v1 limitations stated in the UI: shared browser, shared workspace. **Done** — Settings →
   Computer, in the wording docs/10-security.md specifies.
-- Website with the download and the security explanation.
+- Website with the download and the security explanation. **Built** — `site/index.html`, published by
+  `.github/workflows/pages.yml`; enabling Pages is a one-time repository setting.
 
 **The first-run supply chain is verified anonymously**, which is the part of "installs from the
 website and uses it" that does not need a person. From a shell holding no credentials: the manifest

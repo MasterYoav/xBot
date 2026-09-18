@@ -2,7 +2,8 @@ import SwiftUI
 import XBotCore
 import XBotEngine
 
-/// The upstream plugins admin UI, embedded per ADR-0004.
+/// The upstream admin UI, embedded per ADR-0004. One window for every admin surface: the deep link
+/// decides which, so this opens at plugins or at the admin index.
 public struct PluginsAdminView: View {
     @Environment(AppState.self) private var state
 
@@ -26,9 +27,14 @@ public struct PluginsAdminView: View {
             Image(systemName: "puzzlepiece.extension")
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(Palette.textSecondary)
-            Text(String(localized: "Plugins need a running engine"))
+            Text(String(localized: "These tools need a running engine"))
                 .sectionTitle()
-            Text(String(localized: "Start the engine from onboarding or the main window, then open Plugins again."))
+            Text(
+                String(
+                    localized:
+                        "The engine's admin tools are served by the engine itself. Start it from the main window, then open this again."
+                )
+            )
                 .bodyText()
                 .foregroundStyle(Palette.textSecondary)
                 .multilineTextAlignment(.center)

@@ -68,10 +68,15 @@ wrong identity string and is a missing certificate.
 Updates are dead until this exists, and it cannot be retrofitted: an app shipped without the public
 key baked in can never verify an update, so v1.0 users would be stranded on v1.0 forever.
 
-1. Generate the EdDSA key pair with Sparkle's tool (`generate_keys` from the Sparkle release
-   archive). It writes the private key to your login Keychain and prints the public key.
-2. Add two more secrets: `SPARKLE_EDDSA_PRIVATE_KEY` (the private key) and `XBOT_SPARKLE_PUBLIC_KEY`
-   (the public one, which gets baked into the bundle).
+1. Run `scripts/generate-sparkle-keys.sh`. It writes the private key to your login Keychain and
+   prints the public key. There is nothing to download — Sparkle's own `generate_keys` is already in
+   the SwiftPM artifacts, and the script only finds it. Running it twice is safe: it prints the
+   existing public key rather than replacing a key your shipped builds were signed against.
+2. Add two more secrets: `SPARKLE_EDDSA_PRIVATE_KEY` and `XBOT_SPARKLE_PUBLIC_KEY` (the public one,
+   which gets baked into the bundle). The private key is in the Keychain, not on disk, so export it
+   first — `apps/mac/.build/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle-private.key` —
+   paste the file's contents into the secret, and then delete the file. That export is the key
+   itself: anything holding it can sign an update your users' apps will install.
 3. Decide where the appcast lives and set `XBOT_APPCAST_URL` to it. GitHub Releases plus a raw file
    in the repo is enough to start; `XBOT_RELEASE_DOWNLOAD_PREFIX` is optional and only needed if the
    DMG is served from somewhere other than the appcast's own host.
@@ -163,12 +168,16 @@ bugs, and they are only visible on the first run.
 
 ---
 
-## 7. The website
+## 7. The website — **built; needs Pages turned on**
 
-The last item in M7 and the only one with no code in this repository. It needs the download, the
-security explanation, and — per ADR-0007 — the fact that conversation history is stored by
-CopilotKit, said plainly rather than buried. The README already carries that wording; reuse it
-rather than writing a second version that can drift.
+`site/index.html` is the page: one file, no build step. It carries the download (pointing at
+`releases/latest`), the security explanation, the uninstall instructions — per docs/11 the standalone
+uninstaller is documented here and not in the app — and, per ADR-0007, the fact that conversation
+history is stored by CopilotKit, in the README's wording rather than a second version that can drift.
+
+`.github/workflows/pages.yml` publishes it on every push to master that touches `site/`. **It needs
+you once:** repository → Settings → Pages → Source: **GitHub Actions**. Until then the workflow fails
+at the deploy step. The download link is only useful once step 4 has published a release.
 
 ---
 

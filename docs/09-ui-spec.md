@@ -26,7 +26,7 @@ The app drives a `RuntimeController` and `HTTPEngineClient` in production, and s
 | Design system | Built — tokens, aurora field, frosted glass, Reduce Motion and Reduce Transparency inside tokens |
 | Onboarding | **Built (M6 in progress)** — five steps, Colima install-for-me, engine adoption, provider keys, handoff to main window. VM clean-machine validation still open |
 | Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General, Models, **Agents** (defaults), **Computer** (policy presets + boundaries admin), **Usage** (placeholder), Updates, Advanced |
-| Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). **The audit trail is native** (Settings → Audit), which is ADR-0004's one exception to the webview rule. Credentials, playground and the rest **not embedded** |
+| Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). **The audit trail is native** (Settings → Audit), which is ADR-0004's one exception to the webview rule. Credentials, playground and the rest reached from **Engine admin…** in the same window |
 
 ## The main window
 
@@ -362,7 +362,7 @@ A separate floating panel was tried first and removed: it put settings somewhere
 and find, and it hid the rail — so which agent was selected stopped being visible while its model
 was being changed.
 
-**Shipped today:** General, Models, **Agents** (default model + description; shared preamble deferred), **Computer** (auto-review + preset deny rules + boundaries admin webview), **Usage** (honest placeholder — engine accounting still open), Updates (Sparkle scaffold + engine install with health rollback), Advanced (Plugins, uninstall).
+**Shipped today:** General, Models, **Agents** (default model + description; shared preamble deferred), **Computer** (auto-review + preset deny rules + boundaries admin webview), **Usage** (real per-agent token counts; the agent sums `usage_metadata` across a turn and emits `xbot.usage`), Updates (Sparkle scaffold + engine install with health rollback), Advanced (Plugins, Engine admin, uninstall).
 
 | Tab | Contents |
 | --- | --- |
@@ -423,7 +423,7 @@ from Settings → Advanced, not inside the main window.
 | --- | --- |
 | **Plugins (full manager)** | `WKWebView` at the engine's `/admin/plugins` — OAuth setup, catalogue, per-tool config |
 | **Plugin grants (per agent)** | Native — **What it can reach** and **Handoff grants** in the panel's Agent settings |
-| Everything else in the table above | **Not embedded yet** — same webview pattern when added |
+| **Everything else** — credentials, boundaries, computers, skills, components, playground, people, identity providers | Same webview, opened at `/admin` from Settings → Advanced → **Engine admin…**. Upstream's admin sidebar reaches each one, so no per-surface wiring |
 
 The webview injects the loopback bearer token at document start so the upstream React admin can call
 `/api` without a sign-in flow. The token never appears in page-visible UI.

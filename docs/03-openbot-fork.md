@@ -334,7 +334,7 @@ security-sensitive codebase within a year.
 | Local-token auth | 3–4 days | **Done** — `EngineTokenStore`, bearer on loopback |
 | Config surface → app settings | 1–2 weeks | **Done** — `EngineEnvironment` + [`env-mapping.md`](env-mapping.md) |
 | Port negotiation + runtime driver | 1–2 weeks | **Done** — `DockerDriver`, adoption, `RuntimeController` |
-| Admin webview embedding | 3–4 days | **Partially done** — plugins admin webview ships; other admin surfaces still open |
+| Admin webview embedding | 3–4 days | **Done** — one webview; Plugins opens at `/admin/plugins`, Engine admin at `/admin`, whose sidebar reaches the rest |
 | **Engine total** | **~9–14 weeks** | |
 
 The Mac client is estimated separately in [12-roadmap.md](12-roadmap.md). The two streams can run in

@@ -124,7 +124,7 @@ struct XBotApp: App {
             }
         }
 
-        Window(String(localized: "Plugins"), id: "plugins-admin") {
+        Window(String(localized: "Engine Admin"), id: "plugins-admin") {
             PluginsAdminView()
                 .environment(state)
         }

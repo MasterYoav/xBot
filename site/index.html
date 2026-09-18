@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>xBot — your own AI coworkers, on your own Mac</title>
+    <meta
+      name="description"
+      content="A native Mac app for AI agents that run on your own machine. Each agent gets its own computer and browser. Bring any model."
+    />
+    <meta property="og:title" content="xBot" />
+    <meta property="og:description" content="Your own AI coworkers, on your own Mac." />
+    <meta property="og:image" content="banner.png" />
+    <style>
+      /* One file, no build step, no dependencies. The app has a design system; this page has a
+         palette borrowed from it and nothing else. */
+      :root {
+        --bg: #0b0b0f;
+        --surface: #15151c;
+        --text: #f4f4f6;
+        --muted: #a0a0ad;
+        --line: #26262f;
+        --accent: #6f7bff;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #fbfbfd;
+          --surface: #fff;
+          --text: #16161a;
+          --muted: #5c5c6a;
+          --line: #e4e4ec;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 17px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main { max-width: 68ch; margin: 0 auto; padding: 0 24px 96px; }
+      header { text-align: center; padding: 72px 24px 40px; }
+      header img { width: 100%; max-width: 640px; height: auto; border-radius: 12px; }
+      h1 { font-size: 2.2rem; line-height: 1.15; letter-spacing: -0.02em; margin: 32px 0 8px; }
+      h2 { font-size: 1.3rem; letter-spacing: -0.01em; margin: 48px 0 12px; }
+      p { margin: 0 0 16px; }
+      .lede { font-size: 1.15rem; color: var(--muted); }
+      a { color: var(--accent); }
+      .download {
+        display: inline-block;
+        margin: 24px 0 8px;
+        padding: 14px 28px;
+        border-radius: 12px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        text-decoration: none;
+        /* Feedback on pointer-down, per docs/08. */
+        transition: transform 120ms ease-out;
+      }
+      .download:active { transform: scale(0.97); }
+      .req { color: var(--muted); font-size: 0.92rem; }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px 24px;
+        margin: 24px 0;
+      }
+      code {
+        font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 6px;
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.9rem;
+        text-align: center;
+        padding: 32px 24px 64px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .download { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="banner.png" alt="xBot" />
+      <h1>Your own AI coworkers, on your own Mac</h1>
+      <p class="lede">
+        Create agents, give them a computer, watch them work, and take the wheel when you want to.
+      </p>
+      <a class="download" href="https://github.com/MasterYoav/xBot/releases/latest">Download for Mac</a>
+      <p class="req">Free and open source. macOS 14 Sonoma or later, Apple Silicon or Intel.</p>
+    </header>
+
+    <main>
+      <h2>What it is</h2>
+      <p>
+        xBot is a native Mac app. You download it, drag it to Applications, and open it. It walks you
+        through everything else — there is no terminal, no configuration file to edit, and no log to
+        read.
+      </p>
+      <p>
+        Behind the app, a full agent platform runs in containers on your Mac. Each agent gets its own
+        computer with its own browser, its own files, and only the tools you grant it. Every action an
+        agent takes is checked against a policy before it happens, and recorded after.
+      </p>
+      <p>
+        Bring any model: OpenAI, Anthropic, Google, xAI, or one running locally through
+        <a href="https://ollama.com">Ollama</a>. xBot supplies no intelligence of its own, so there is
+        nothing to lock you in.
+      </p>
+
+      <h2>Where your things live</h2>
+      <p>
+        Your agents, their files, and the websites they are signed in to stay on your Mac. Your model
+        keys are held in the macOS Keychain — never in a file, never in a log. The engine listens on
+        loopback only, so nothing outside your machine can reach it, and a bearer token is required
+        even from inside it.
+      </p>
+      <div class="card">
+        <p>
+          <strong>One exception, and we would rather you read it here than find it later.</strong> In
+          version 1, your conversation history is stored by
+          <a href="https://copilotkit.ai">CopilotKit</a>, the service xBot's engine is built on. Your
+          agents' files and browsers are not — only the transcript. Onboarding says so before you type
+          a key, and
+          <a href="https://github.com/MasterYoav/xBot/blob/master/docs/decisions/0007-wrap-openbot-keep-intelligence.md">ADR-0007</a>
+          records why and what replaces it.
+        </p>
+      </div>
+
+      <h2>Removing it</h2>
+      <p>
+        <strong>Settings → Advanced → Remove all xBot data</strong> deletes the containers, the
+        volumes, the Keychain items and the preferences, then tells you to drag the app to the Trash.
+        It leaves Docker or Colima alone, since you may be using those for something else.
+      </p>
+      <p>
+        If you already moved the app to the Trash and want the rest gone, the disk image contains
+        <code>Uninstall xBot.command</code>. Open the <code>.dmg</code> and double-click it. That is
+        the one place xBot asks you to use a terminal, and it exists so that orphaned data is never
+        unremovable.
+      </p>
+
+      <h2>Built on OpenBot</h2>
+      <p>
+        xBot's engine is a fork of <a href="https://github.com/CopilotKit/openbot">OpenBot</a> by
+        <a href="https://copilotkit.ai">CopilotKit</a>, used under the MIT licence. Copyright © 2026
+        CopilotKit.
+      </p>
+    </main>
+
+    <footer>
+      <a href="https://github.com/MasterYoav/xBot">Source on GitHub</a> ·
+      <a href="https://github.com/MasterYoav/xBot/tree/master/docs">Documentation</a> ·
+      <a href="https://github.com/MasterYoav/xBot/blob/master/docs/10-security.md">Security</a>
+      · MIT licence
+    </footer>
+  </body>
+</html>
