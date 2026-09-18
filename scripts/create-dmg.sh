@@ -30,6 +30,17 @@ ln -s /Applications "${STAGE}/Applications"
 cp "${ROOT}/scripts/uninstall-xbot.command" "${STAGE}/Uninstall xBot.command"
 chmod +x "${STAGE}/Uninstall xBot.command"
 
+# Signed like anything else that ships, when there is an identity to sign with.
+#
+# A .command carries its signature in extended attributes rather than inside the file, and both `cp`
+# and the disk image preserve those. Unsigned, it arrives quarantined from a download and macOS
+# refuses it as coming from an unidentified developer — which, for the person who already trashed
+# the app and wants their volumes back, is a dead end with no second path.
+if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]]; then
+  codesign --force --timestamp --sign "${MACOS_SIGNING_IDENTITY}" \
+    "${STAGE}/Uninstall xBot.command"
+fi
+
 hdiutil create -volname "${VOLUME}" -srcfolder "${STAGE}" -ov -format UDZO "${DMG}"
 rm -rf "${STAGE}"
 
