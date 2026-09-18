@@ -36,7 +36,13 @@ chmod +x "${STAGE}/Uninstall xBot.command"
 # and the disk image preserve those. Unsigned, it arrives quarantined from a download and macOS
 # refuses it as coming from an unidentified developer — which, for the person who already trashed
 # the app and wants their volumes back, is a dead end with no second path.
-if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]]; then
+#
+# Only when the identity is actually in a keychain, not merely named. In CI this script runs twice:
+# once before the certificate is imported (an unsigned DMG, so a run with no secrets still produces
+# one) and again from sign-mac-app.sh afterwards. Keyed on the name alone, the first pass failed the
+# release with "no identity found".
+if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]] \
+  && security find-identity -v -p codesigning | grep -qF "${MACOS_SIGNING_IDENTITY}"; then
   codesign --force --timestamp --sign "${MACOS_SIGNING_IDENTITY}" \
     "${STAGE}/Uninstall xBot.command"
 fi
