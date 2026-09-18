@@ -68,8 +68,10 @@ wrong identity string and is a missing certificate.
 Updates are dead until this exists, and it cannot be retrofitted: an app shipped without the public
 key baked in can never verify an update, so v1.0 users would be stranded on v1.0 forever.
 
-1. Generate the EdDSA key pair with Sparkle's tool (`generate_keys` from the Sparkle release
-   archive). It writes the private key to your login Keychain and prints the public key.
+1. Run `scripts/generate-sparkle-keys.sh`. It writes the private key to your login Keychain and
+   prints the public key. There is nothing to download — Sparkle's own `generate_keys` is already in
+   the SwiftPM artifacts, and the script only finds it. Running it twice is safe: it prints the
+   existing public key rather than replacing a key your shipped builds were signed against.
 2. Add two more secrets: `SPARKLE_EDDSA_PRIVATE_KEY` (the private key) and `XBOT_SPARKLE_PUBLIC_KEY`
    (the public one, which gets baked into the bundle).
 3. Decide where the appcast lives and set `XBOT_APPCAST_URL` to it. GitHub Releases plus a raw file
