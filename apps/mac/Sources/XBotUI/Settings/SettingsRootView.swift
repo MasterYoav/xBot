@@ -49,13 +49,19 @@ public struct AdvancedSettingsView: View {
                     state.preparePluginsAdmin()
                     openWindow(id: "plugins-admin")
                 }
+                // One webview for every admin surface: upstream's admin has its own sidebar, so its index
+                // reaches credentials, computers, the playground and the rest without wiring each.
+                Button(String(localized: "Engine admin…")) {
+                    state.preparePluginsAdmin(path: "admin")
+                    openWindow(id: "plugins-admin")
+                }
             } header: {
                 Text(String(localized: "Admin"))
             } footer: {
                 Text(
                     String(
                         localized:
-                            "Connect third-party services and choose which agents may use their tools. Opens the engine's plugins manager."
+                            "Plugins connects third-party services and chooses which agents may use their tools. Engine admin opens the engine's own tools: credentials, computers, the playground, and people."
                     )
                 )
             }
