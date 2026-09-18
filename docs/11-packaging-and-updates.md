@@ -310,7 +310,13 @@ It says so.
 
 **Also ship a standalone uninstaller script** in the DMG for the user who already dragged the app to
 the Trash and then found the volumes. It is `Uninstall xBot.command`, copied from
-`scripts/uninstall-xbot.command`, and it mirrors `AppState.uninstall()` step for step. ⚠️ Yes, this is a terminal — it is the one place the no-terminal
+`scripts/uninstall-xbot.command`, and it mirrors `AppState.uninstall()` step for step.
+
+**It is signed with the same identity as the app**, in `create-dmg.sh`, so the DMG's notarization
+covers it. A `.command` keeps its signature in extended attributes, which both the copy and the disk
+image preserve. Unsigned, it arrives quarantined and macOS refuses it as coming from an unidentified
+developer — and the person meeting that has already trashed the app, so there is no second path to
+their volumes. ⚠️ Yes, this is a terminal — it is the one place the no-terminal
 promise yields, because the alternative is orphaned data with no way to remove it. It is documented
 on the website, not in the app.
 
