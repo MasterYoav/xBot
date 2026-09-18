@@ -362,7 +362,7 @@ A separate floating panel was tried first and removed: it put settings somewhere
 and find, and it hid the rail — so which agent was selected stopped being visible while its model
 was being changed.
 
-**Shipped today:** General, Models, **Agents** (default model + description; shared preamble deferred), **Computer** (auto-review + preset deny rules + boundaries admin webview), **Usage** (honest placeholder — engine accounting still open), Updates (Sparkle scaffold + engine install with health rollback), Advanced (Plugins, uninstall).
+**Shipped today:** General, Models, **Agents** (default model + description; shared preamble deferred), **Computer** (auto-review + preset deny rules + boundaries admin webview), **Usage** (real per-agent token counts; the agent sums `usage_metadata` across a turn and emits `xbot.usage`), Updates (Sparkle scaffold + engine install with health rollback), Advanced (Plugins, Engine admin, uninstall).
 
 | Tab | Contents |
 | --- | --- |
