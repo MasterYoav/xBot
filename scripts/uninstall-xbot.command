@@ -39,6 +39,18 @@ fi
 DOCKER="${SUPPORT}/bin/docker"
 [[ -x "${DOCKER}" ]] || DOCKER="$(command -v docker || true)"
 
+# Colima that xBot installed for them, started the way the app starts it. Without this the line
+# below would tell somebody to "start Colima" — a tool they never chose and have no way to start.
+COLIMA="${SUPPORT}/bin/colima"
+if [[ -n "${DOCKER}" && -x "${COLIMA}" ]] && ! "${DOCKER}" info >/dev/null 2>&1; then
+  echo "Starting the container runtime xBot installed. This can take a minute…"
+  PATH="${SUPPORT}/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" "${COLIMA}" start >/dev/null 2>&1
+  for _ in $(seq 1 60); do
+    "${DOCKER}" info >/dev/null 2>&1 && break
+    sleep 1
+  done
+fi
+
 if [[ -n "${DOCKER}" ]] && "${DOCKER}" info >/dev/null 2>&1; then
   "${DOCKER}" rm -f xbot-engine >/dev/null 2>&1
   for volume in xbot-data xbot-workspace xbot-profiles; do
