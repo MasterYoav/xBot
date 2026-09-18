@@ -258,6 +258,10 @@ Two judgement calls in it:
   attempts a restore if it was.
 - **`--single-transaction` on the way back in**, so a restore that fails part-way leaves the
   database as it was rather than half-replaced.
+- **An upgrade that succeeded deletes the dump.** Nothing reads it once the new image is up, there
+  being no rollback after a success, so keeping it would leave a plain-SQL copy of somebody's
+  conversations and agents in Application Support until the next upgrade overwrote it. Uninstall
+  removes it too.
 
 ---
 

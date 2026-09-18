@@ -158,7 +158,7 @@ See [06-onboarding.md](06-onboarding.md).
 | Main | `Window` | Rail, conversation, panel. Onboarding crossfades in via `AppShellView` on first run |
 | Onboarding | (in Main) | Fixed-size window mode during first run; not a separate scene |
 | Settings | (in Main) | **Not a `Settings` scene.** In the window, in place of the conversation, via `AppState.isShowingSettings`. A floating panel put them somewhere the person had to go and find, and it hid the rail — so which agent was selected stopped being visible while its model was changed |
-| Plugins admin | `Window` | `WKWebView` at engine `/admin/plugins` |
+| Engine admin | `Window` | One `WKWebView` for every admin surface. Opens at `/admin/plugins` from **Plugins…** or `/admin` from **Engine admin…**, whose upstream sidebar reaches the rest |
 | Agent screen (detached) | — | **Not built** |
 | Menu bar | — | **Not built** — planned for runtime status when the main window is closed |
 
