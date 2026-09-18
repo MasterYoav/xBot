@@ -415,6 +415,10 @@ public actor RuntimeController {
         image = newImage
 
         if await launchEngineWithoutAdoption(environment: environment) {
+            // Nothing reads the dump once the new image is up — there is no rollback after a
+            // success — so keeping it would leave a plain-SQL copy of the person's conversations
+            // and agents in Application Support until the next upgrade overwrote it.
+            removeDump()
             return .succeeded
         }
 
@@ -430,6 +434,14 @@ public actor RuntimeController {
         }
 
         return .failed
+    }
+
+    /// The dump and the log beside it, gone. Called when a restore can no longer be wanted.
+    private func removeDump() {
+        try? FileManager.default.removeItem(at: dumpURL)
+        try? FileManager.default.removeItem(
+            at: dumpURL.deletingLastPathComponent().appendingPathComponent("restore.log")
+        )
     }
 
     /// Whether a dump was taken before the last upgrade, and so whether a restore is possible.
@@ -588,10 +600,7 @@ public actor RuntimeController {
         }
         // The pre-upgrade dump is a plain-SQL copy of the database, kept outside the volume so a
         // rollback can use it — which is exactly why removing the volumes never removed it.
-        try? FileManager.default.removeItem(at: dumpURL)
-        try? FileManager.default.removeItem(
-            at: dumpURL.deletingLastPathComponent().appendingPathComponent("restore.log")
-        )
+        removeDump()
         // Back to stopped, not notDetected: the runtime is still installed and still working — it
         // is only xBot's own data that is gone.
         state = .stopped

@@ -516,6 +516,39 @@ struct RuntimeControllerTests {
     }
 
     /**
+     An upgrade that worked has no use left for the dump, so it should not keep it.
+
+     The dump exists for one reason: restoring a database the new image migrated past what the old
+     one can read. Nothing reads it once the new image is up — there is no roll back to a previous
+     engine after a successful upgrade — so keeping it leaves a plain-SQL copy of the person's
+     conversations and agents in Application Support until the next upgrade happens to overwrite it.
+     */
+    @Test func aSucceededUpgradeDoesNotLeaveTheDumpBehind() async {
+        let dumpURL = isolatedDumpURL()
+        let controller = RuntimeController(
+            driver: FakeDriver(),
+            image: ImageReference(repository: "xbot/engine", tag: "1"),
+            health: { _ in EngineHealth(engineVersion: "0.0.5", schemaVersion: "0000") },
+            ports: isolatedPortStore(),
+            dumpURL: dumpURL
+        )
+        await controller.start(environment: environment)
+
+        let outcome = await controller.upgrade(
+            to: ImageReference(
+                repository: "ghcr.io/masteryoav/xbot-engine",
+                digest: "sha256:abc123def456"
+            ),
+            rollingBackTo: ImageReference(repository: "xbot/engine", tag: "1"),
+            environment: environment
+        )
+
+        #expect(outcome == .succeeded)
+        // The fake writes one when the dump runs, so its absence here is a removal, not a no-op.
+        #expect(!FileManager.default.fileExists(atPath: dumpURL.path))
+    }
+
+    /**
      A pull that fails must leave the running engine exactly where it was.
 
      `upgrade` removed the container first and pulled second, so the engine was down for the whole
