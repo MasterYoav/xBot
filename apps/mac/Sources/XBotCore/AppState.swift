@@ -912,11 +912,15 @@ public final class AppState {
     ///
     /// Returns when the data is gone. Moving the app itself to the Trash is the person's to do,
     /// and the screen says so.
-    public func uninstall() async {
+    /// False when the container runtime could not be reached. Then nothing is removed — not the
+    /// keys, not the preferences — so the person can start Docker and try again from the same
+    /// place, rather than be left with an app that has forgotten everything except the gigabytes.
+    @discardableResult
+    public func uninstall() async -> Bool {
         isEngineBusy = true
         defer { isEngineBusy = false }
 
-        await runtime?.uninstall()
+        if let runtime, await !runtime.uninstall() { return false }
 
         // Every key this app has ever written. Listed rather than enumerated, because a wildcard
         // sweep of the login keychain is not something this app should ever perform.
@@ -958,6 +962,7 @@ public final class AppState {
         questionsForYou = [:]
         engineHealth = nil
         engineBaseURL = nil
+        return true
     }
 
     public static var appVersion: String {
