@@ -72,8 +72,11 @@ key baked in can never verify an update, so v1.0 users would be stranded on v1.0
    prints the public key. There is nothing to download — Sparkle's own `generate_keys` is already in
    the SwiftPM artifacts, and the script only finds it. Running it twice is safe: it prints the
    existing public key rather than replacing a key your shipped builds were signed against.
-2. Add two more secrets: `SPARKLE_EDDSA_PRIVATE_KEY` (the private key) and `XBOT_SPARKLE_PUBLIC_KEY`
-   (the public one, which gets baked into the bundle).
+2. Add two more secrets: `SPARKLE_EDDSA_PRIVATE_KEY` and `XBOT_SPARKLE_PUBLIC_KEY` (the public one,
+   which gets baked into the bundle). The private key is in the Keychain, not on disk, so export it
+   first — `apps/mac/.build/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle-private.key` —
+   paste the file's contents into the secret, and then delete the file. That export is the key
+   itself: anything holding it can sign an update your users' apps will install.
 3. Decide where the appcast lives and set `XBOT_APPCAST_URL` to it. GitHub Releases plus a raw file
    in the repo is enough to start; `XBOT_RELEASE_DOWNLOAD_PREFIX` is optional and only needed if the
    DMG is served from somewhere other than the appcast's own host.
