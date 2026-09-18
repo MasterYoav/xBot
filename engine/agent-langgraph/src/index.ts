@@ -1,15 +1,12 @@
 import type { BaseEvent, RunAgentInput } from "@ag-ui/core";
 import { EventEncoder } from "@ag-ui/encoder";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { type AIMessage, ToolMessage } from "@langchain/core/messages";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import {
   END,
   MessagesAnnotation,
   START,
   StateGraph,
 } from "@langchain/langgraph";
-import { ChatOpenAI } from "@langchain/openai";
 import { serve } from "bun";
 import { hasManagedAgentToken } from "../../shared/agent-authorisation";
 import {
@@ -18,7 +15,8 @@ import {
 } from "../../shared/model-selection";
 import { toLangChainMessages } from "./history";
 import { readReasoningEffort } from "./model-options";
-import { explainModelError, resolveModel } from "./models/registry";
+import { buildChatModel } from "./models/build";
+import { explainModelError } from "./models/registry";
 import { streamRun } from "./stream";
 
 /**
@@ -256,76 +254,18 @@ function toBoundTools(input: RunAgentInput) {
 }
 
 /**
- * The chat model, from whichever provider *this run* is for.
+ * The chat model for this run.
  *
- * Every one of these binds tools the same way and streams the same way, which is exactly why the
- * rest of this file does not know which one it got — and why per-agent selection fits here at all.
- *
- * This is the seam ADR-0002 asks for. The provider used to be a module constant; now it is an
- * argument, and `models/registry.ts` decides what it resolves to. The function is otherwise the
- * upstream one, which is deliberate: a rewritten file is a permanent merge conflict.
+ * The body lives in `models/build.ts` so it can be tested without booting this server — the
+ * provider-to-client hop is the one that has failed silently before, and a wrong client still
+ * answers. This keeps the environment-derived deployment defaults here, where they are read.
  */
 function buildModel(selection: ModelSelection | undefined) {
-  const { model: resolved, problem } = resolveModel({
+  return buildChatModel({
     selection,
     fallback: DEPLOYMENT_DEFAULT,
     keys: DEPLOYMENT_KEYS,
-  });
-  /*
-   * Thrown, not exited. A missing key at *boot* is the deployer's problem and still exits below;
-   * a missing key for one agent mid-flight is that agent's problem, and taking the process down
-   * would end every other agent's conversation over it. `streamRun` turns this into a RUN_ERROR
-   * carrying the sentence the registry wrote, which is the one the person needs to read.
-   */
-  if (!resolved) {
-    throw new Error(problem?.message ?? "No model is selected for this agent.");
-  }
-
-  if (resolved.providerId === "anthropic") {
-    return new ChatAnthropic({
-      model: resolved.model,
-      apiKey: resolved.apiKey,
-      streaming: true,
-      ...(resolved.baseURL ? { anthropicApiUrl: resolved.baseURL } : {}),
-    });
-  }
-  if (resolved.providerId === "google") {
-    return new ChatGoogleGenerativeAI({
-      model: resolved.model,
-      apiKey: resolved.apiKey,
-      streaming: true,
-      ...(resolved.baseURL ? { baseUrl: resolved.baseURL } : {}),
-    });
-  }
-  /*
-   * OpenAI and `openai-compatible` are the same client with a different address.
-   *
-   * That is the whole trick, and why docs/04 calls the compatible adapter the highest-leverage
-   * piece of the router: xAI, Ollama, OpenRouter, Groq, Together, DeepSeek, LM Studio and any
-   * corporate gateway all speak this API, so they cost a base URL rather than an adapter each.
-   */
-  return new ChatOpenAI({
-    model: resolved.model,
-    apiKey: resolved.apiKey,
-    streaming: true,
-    ...(resolved.baseURL
-      ? { configuration: { baseURL: resolved.baseURL } }
-      : {}),
-    ...(resolved.useResponsesApi ? { useResponsesApi: true } : {}),
-    /*
-     * `reasoning.effort`, not the `reasoningEffort` convenience field: the integration deprecated
-     * the latter in favour of merging it into this object, and one of them is the one that survives.
-     *
-     * Gated on the *resolved* provider, not the configured one. The startup check below only knows
-     * what the environment chose, so without this an agent switched to Anthropic from a dropdown
-     * would be sent an OpenAI-only setting — the "configuration that goes nowhere" failure the
-     * effort check exists to prevent, arriving by the new route.
-     */
-    ...(REASONING_EFFORT &&
-    resolved.providerId === "openai" &&
-    resolved.useResponsesApi
-      ? { reasoning: { effort: REASONING_EFFORT } }
-      : {}),
+    reasoningEffort: REASONING_EFFORT,
   });
 }
 

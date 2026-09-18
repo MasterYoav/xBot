@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!**/dist",
+      "!**/.impeccable",
       "!.",
       "!app/src/components/ui",
       "!app/src/lib/generated/application-config.ts",
