@@ -103,15 +103,15 @@ struct ConversationRecoveryTests {
     }
 
     @Test func environmentReadsCredentialsOnlyWhenStarting() {
-        let reads = CredentialReads()
+        let keys = CredentialReads()
+        let tokens = CredentialReads()
         let environment = EngineBootstrap.environmentFactory(
-            keyEncryptionKey: { "test-encryption-key" },
-            engineToken: { "test-token" },
-            intelligence: { reads.next() }
+            keyEncryptionKey: { keys.next(prefix: "key") },
+            engineToken: { tokens.next(prefix: "token") }
         )
-        #expect(reads.count == 0)
-        #expect(environment(3001, "gateway")["INTELLIGENCE_API_KEY"] == "test-key-1")
-        #expect(environment(3001, "gateway")["INTELLIGENCE_API_KEY"] == "test-key-2")
+        #expect(keys.count == 0 && tokens.count == 0)
+        #expect(environment(3001, "gateway")["KEY_ENCRYPTION_KEY"] == "key-1")
+        #expect(environment(3001, "gateway")["KEY_ENCRYPTION_KEY"] == "key-2")
     }
 
     @Test func retryOfPartialReplyKeepsOnePromptAndOneNewAnswer() async throws {
@@ -313,10 +313,10 @@ private final class CredentialReads: @unchecked Sendable {
     private let lock = NSLock()
     private var value = 0
     var count: Int { lock.withLock { value } }
-    func next() -> EngineEnvironment.Intelligence {
+    func next(prefix: String) -> String {
         lock.withLock {
             value += 1
-            return .init(apiURL: "https://example.invalid", gatewayWsURL: "wss://example.invalid", apiKey: "test-key-\(value)", licenseToken: "test-license")
+            return "\(prefix)-\(value)"
         }
     }
 }

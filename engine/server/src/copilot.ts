@@ -7,7 +7,7 @@ import {
   CopilotRuntime,
 } from "@copilotkit/runtime/v2";
 import { createCopilotHonoHandler } from "@copilotkit/runtime/v2/hono";
-import { createLocalIntelligence } from "./history/local-intelligence";
+import type { LocalThreadRunner } from "./history/local-thread-runner";
 import type { Observable } from "rxjs";
 import { defer, from, switchMap } from "rxjs";
 import { z } from "zod";
@@ -32,17 +32,18 @@ import type { GrantedTool } from "./plugins/tools";
 import { grantedToolGuidance } from "./plugins/tools";
 
 /**
- * The CopilotKit runtime, always in Intelligence mode.
+ * The CopilotKit runtime, in Intelligence mode or in local mode.
  *
  * Package-declared built-in Bots run as CopilotKit `BuiltInAgent` instances. External Bots are
  * reached over AG-UI as `HttpAgent` instances, so anything that speaks the protocol remains a Bot
  * with no framework adapter here: LangGraph, Pydantic-AI, CrewAI, Mastra, ADK, or a hand-written
  * server.
  *
- * There is no SSE branch. Intelligence is a requirement of the product, not a tier: it owns
- * durable threads, memory and learning, and a deployment without it silently forgets every
- * conversation. config.ts refuses to boot without the full contract, so by the time this runs the
- * settings are present and this file has one mode.
+ * Upstream had no SSE branch, and its reason still holds: a deployment without durable threads
+ * silently forgets every conversation, so an in-memory runner is not a mode. Local mode is the SSE
+ * branch with durability added — `LocalThreadRunner` keeps threads in this deployment's database —
+ * and it is what xBot runs, because the native client speaks SSE (ADR-0008). Intelligence mode is
+ * unchanged.
  */
 
 /** Resolve the signed-in person for a request. Threads and memory are scoped to whoever this returns. */
@@ -1053,8 +1054,31 @@ export function mountCopilotRuntime(
    * awaited in the lock path and a failure in it never touches whether the lock was taken.
    */
   onRunBusy?: (input: { threadId: string; busy: boolean }) => void,
+  /**
+   * Where conversations are kept when there is no Intelligence (ADR-0008). Required in local mode:
+   * the vendor's fallback is an in-memory runner, and a conversation that silently forgets itself
+   * on restart is the degraded mode ADR-0007 rejected outright.
+   */
+  localRunner?: LocalThreadRunner,
 ) {
   const capabilities = config.runtime;
+  if (capabilities.mode === "local") {
+    if (!localRunner) {
+      throw new Error(
+        "Local history needs its thread runner; mountCopilotRuntime was called without one.",
+      );
+    }
+    /*
+     * One person or none. SSE mode has no `identifyUser`, so a thread is reachable by anybody who
+     * holds its id. That is the same boundary as a single-user deployment already has; with more
+     * than one person it would be a way to read somebody else's conversation.
+     */
+    if (!config.singleUser) {
+      throw new Error(
+        "Local history keeps no per-person boundary, so it runs only with OPENBOT_SINGLE_USER on. A deployment for more than one person needs CopilotKit Intelligence.",
+      );
+    }
+  }
 
   /**
    * The same Bot a person's run would get, built without a request.
@@ -1110,26 +1134,9 @@ export function mountCopilotRuntime(
           wsUrl: capabilities.intelligence.gatewayWsUrl,
           apiKey: capabilities.intelligence.apiKey,
         })
-      : createLocalIntelligence({
-          selfUrl: config.appUrl ?? "http://127.0.0.1:3001",
-        });
+      : undefined;
 
-  const runtime = new CopilotRuntime({
-    // `mode` is inferred from the presence of `intelligence`; passing it is a type error.
-    //
-    // identifyUser is NOT optional in practice. Threads and memory are scoped to the user it
-    // returns, so omitting it puts every person in the deployment in the same thread space and one
-    // person's conversations become another's.
-    identifyUser,
-    // The subclass, not the base: a thread nobody has run yet reads as empty rather than as a 500.
-    // See IntelligenceKnowingANewThread.
-    intelligence: intelligenceClient,
-    // Telemetry only: the runtime stores it and derives a telemetry id from it, and validates
-    // nothing. A local deployment is not a licensed user of Intelligence and sends none.
-    licenseToken:
-      capabilities.mode === "intelligence"
-        ? capabilities.intelligence.licenseToken
-        : undefined,
+  const options = {
     // Carried on the events the runtime already sends, so OpenBot's traffic is separable from any
     // other deployment's. Adds no events of its own.
     ...(config.accessibility
@@ -1174,7 +1181,54 @@ export function mountCopilotRuntime(
       agentFetch,
       handoffForActor,
     ) as never,
-  });
+  };
+
+  // `mode` is inferred from the presence of `intelligence`; passing it is a type error.
+  const runtime = intelligenceClient
+    ? new CopilotRuntime({
+        ...options,
+        // identifyUser is NOT optional in practice. Threads and memory are scoped to the user it
+        // returns, so omitting it puts every person in the deployment in the same thread space and
+        // one person's conversations become another's.
+        identifyUser,
+        // The subclass, not the base: a thread nobody has run yet reads as empty rather than as a
+        // 500. See IntelligenceKnowingANewThread.
+        intelligence: intelligenceClient,
+        // Telemetry only: the runtime stores it and derives a telemetry id from it, and validates
+        // nothing. A local deployment is not a licensed user of Intelligence and sends none.
+        licenseToken:
+          capabilities.mode === "intelligence"
+            ? capabilities.intelligence.licenseToken
+            : undefined,
+      })
+    : // SSE mode: runs stream back on the request, and threads are answered by the runner. There is
+      // no `identifyUser` to pass — see the single-user guard above.
+      new CopilotRuntime({ ...options, runner: localRunner });
+
+  /*
+   * The conversation's run lock, with no platform to issue it.
+   *
+   * The runner already refuses a second run on a busy thread, so asking it is the whole lock, and
+   * there is no expiry to renew. The busy signal is kept, because a channel showing it is working is
+   * the same promise in either mode.
+   */
+  const localThreadLock = {
+    acquire: async (input: { threadId: string; runId: string }) => {
+      if (await localRunner?.isRunning({ threadId: input.threadId })) {
+        return null;
+      }
+      try {
+        onRunBusy?.({ threadId: input.threadId, busy: true });
+      } catch {}
+      return { runId: input.runId };
+    },
+    renew: async () => {},
+    release: async (input: { threadId: string }) => {
+      try {
+        onRunBusy?.({ threadId: input.threadId, busy: false });
+      } catch {}
+    },
+  };
 
   return {
     handler: createCopilotHonoHandler({ runtime, basePath }),
@@ -1187,10 +1241,17 @@ export function mountCopilotRuntime(
      * the token that holds it is not the API key. The runtime asks the client for both, so anything
      * else driving a run has to ask the same client the same way.
      */
-    runnerConnection: () => ({
-      url: intelligenceClient.ɵgetRunnerWsUrl(),
-      authToken: intelligenceClient.ɵgetRunnerAuthToken(),
-    }),
+    runnerConnection: () => {
+      if (!intelligenceClient) {
+        throw new Error(
+          "A local deployment runs every turn through its own thread runner; there is no platform runner to reach.",
+        );
+      }
+      return {
+        url: intelligenceClient.ɵgetRunnerWsUrl(),
+        authToken: intelligenceClient.ɵgetRunnerAuthToken(),
+      };
+    },
     /**
      * The conversation's run lock, as the platform issues it.
      *
@@ -1201,65 +1262,69 @@ export function mountCopilotRuntime(
      *
      * A conversation somebody else is already running in refuses rather than queues, which is right:
      * the caller waits and tries again rather than two Bots writing over each other.
+     *
+     * Locally the runner is the authority instead; see `localThreadLock` above.
      */
-    threadLock: {
-      acquire: async (input: {
-        threadId: string;
-        runId: string;
-        userId: string;
-        agentId: string;
-      }) => {
-        try {
-          const held = await intelligenceClient.ɵacquireThreadLock(input);
-          // A run started on this thread. Side effect only, never awaited: a channel showing it is
-          // working is worth nothing next to the lock the run depends on.
-          try {
-            onRunBusy?.({ threadId: input.threadId, busy: true });
-          } catch {}
-          /*
-           * The run id only. The lock also hands back a join token, which is what a browser presents
-           * to watch the conversation; the runner's socket has its own credential and passing this
-           * one in place of it means a socket that is refused and a run that never starts. See the
-           * note on `runner.run` in handoff-delivery.ts.
-           */
-          return { runId: held.runId };
-        } catch (error) {
-          /*
-           * ONLY A CONFLICT MEANS "NOT NOW". Everything else is raised.
-           *
-           * A conversation somebody is already running in answers 409, and that is ordinary: the hop
-           * waits and is tried again. Anything else is not — a platform that cannot be reached, a
-           * token that stopped working, or one of the underscored APIs below being renamed by a
-           * routine version bump. Returned as `null` those all read as contention: every hop retries
-           * to exhaustion, every person is told their question was never answered, and the only
-           * evidence is a warning line that looks like a busy conversation.
-           *
-           * Raised, the runner writes the real reason onto `agent.handoff_failed`, and the sentence
-           * the person eventually gets names it.
-           */
-          const status =
-            error instanceof Error && "status" in error
-              ? (error as { status?: unknown }).status
-              : undefined;
-          if (status === 409) return null;
-          throw error;
+    threadLock: intelligenceClient
+      ? {
+          acquire: async (input: {
+            threadId: string;
+            runId: string;
+            userId: string;
+            agentId: string;
+          }) => {
+            try {
+              const held = await intelligenceClient.ɵacquireThreadLock(input);
+              // A run started on this thread. Side effect only, never awaited: a channel showing it is
+              // working is worth nothing next to the lock the run depends on.
+              try {
+                onRunBusy?.({ threadId: input.threadId, busy: true });
+              } catch {}
+              /*
+               * The run id only. The lock also hands back a join token, which is what a browser presents
+               * to watch the conversation; the runner's socket has its own credential and passing this
+               * one in place of it means a socket that is refused and a run that never starts. See the
+               * note on `runner.run` in handoff-delivery.ts.
+               */
+              return { runId: held.runId };
+            } catch (error) {
+              /*
+               * ONLY A CONFLICT MEANS "NOT NOW". Everything else is raised.
+               *
+               * A conversation somebody is already running in answers 409, and that is ordinary: the hop
+               * waits and is tried again. Anything else is not — a platform that cannot be reached, a
+               * token that stopped working, or one of the underscored APIs below being renamed by a
+               * routine version bump. Returned as `null` those all read as contention: every hop retries
+               * to exhaustion, every person is told their question was never answered, and the only
+               * evidence is a warning line that looks like a busy conversation.
+               *
+               * Raised, the runner writes the real reason onto `agent.handoff_failed`, and the sentence
+               * the person eventually gets names it.
+               */
+              const status =
+                error instanceof Error && "status" in error
+                  ? (error as { status?: unknown }).status
+                  : undefined;
+              if (status === 409) return null;
+              throw error;
+            }
+          },
+          renew: async (input: { threadId: string; runId: string }) => {
+            await intelligenceClient.ɵrenewThreadLock({
+              ...input,
+              ttlSeconds: THREAD_LOCK_TTL_SECONDS,
+            });
+          },
+          release: async (input: { threadId: string; runId: string }) => {
+            // The run on this thread is over. Cleared here rather than trusting a browser: the run may
+            // have outlived the tab that started it, and this is where the platform is told it ended.
+            try {
+              onRunBusy?.({ threadId: input.threadId, busy: false });
+            } catch {}
+            await intelligenceClient.ɵcleanupThreadLock(input);
+          },
         }
-      },
-      renew: async (input: { threadId: string; runId: string }) => {
-        await intelligenceClient.ɵrenewThreadLock({
-          ...input,
-          ttlSeconds: THREAD_LOCK_TTL_SECONDS,
-        });
-      },
-      release: async (input: { threadId: string; runId: string }) => {
-        // The run on this thread is over. Cleared here rather than trusting a browser: the run may
-        // have outlived the tab that started it, and this is where the platform is told it ended.
-        try {
-          onRunBusy?.({ threadId: input.threadId, busy: false });
-        } catch {}
-        await intelligenceClient.ɵcleanupThreadLock(input);
-      },
-    },
+      : localThreadLock,
     agentFor,
     /**
      * A thread's messages, as the platform holds them.
@@ -1268,6 +1333,9 @@ export function mountCopilotRuntime(
      * than a second view of it that could disagree.
      */
     history: async (input: { threadId: string; actorId: string }) => {
+      if (!intelligenceClient) {
+        return localRunner?.getThreadMessages(input.threadId) ?? [];
+      }
       /*
        * The platform's own message type rather than AG-UI's, inferred rather than named: the two are
        * compatible where it matters and naming the wrong one here would mean converting a history

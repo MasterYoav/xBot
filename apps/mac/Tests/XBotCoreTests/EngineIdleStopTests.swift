@@ -25,8 +25,7 @@ struct EngineIdleStopTests {
             runtime: runtime,
             environment: environment,
             engineFactory: { _ in engine },
-            providers: isolatedConnectionStore(),
-            conversationStore: { .ready }
+            providers: isolatedConnectionStore()
         )
         await state.load()
         state.startEngine()
@@ -134,7 +133,6 @@ struct EngineLaunchTests {
             environment: environment,
             engineFactory: { _ in StubEngineClient(tokenDelay: .zero) },
             providers: isolatedConnectionStore(),
-            conversationStore: { .ready },
             startsEngineOnLaunch: { startsOnLaunch }
         )
     }
@@ -187,8 +185,7 @@ struct EngineQuitTests {
             ),
             environment: environment,
             engineFactory: { _ in engine },
-            providers: isolatedConnectionStore(),
-            conversationStore: { .ready }
+            providers: isolatedConnectionStore()
         )
         await state.load()
         state.startEngine()
@@ -281,8 +278,7 @@ struct EngineCrashNoticedTests {
             ),
             environment: environment,
             engineFactory: { _ in StubEngineClient(tokenDelay: .zero) },
-            providers: isolatedConnectionStore(),
-            conversationStore: { .ready }
+            providers: isolatedConnectionStore()
         )
         state.healthCheckInterval = .milliseconds(20)
         await state.load()

@@ -1,11 +1,22 @@
 # ADR-0007 — Wrap OpenBot rather than re-engineer it, and keep Intelligence for v1
 
-**Status:** Accepted
+**Status:** Accepted, and partially superseded by [ADR-0008](0008-local-thread-runner.md).
 **Date:** 2026-09
 **Supersedes:** nothing. **Defers** [ADR-0001](0001-local-history-provider.md) — it stays accepted
 and stays unimplemented.
 **Related:** [01-vision.md](../01-vision.md), [03-openbot-fork.md](../03-openbot-fork.md),
 [12-roadmap.md](../12-roadmap.md)
+
+> **Update, see [ADR-0008](0008-local-thread-runner.md).** "Keep Intelligence for v1" was written
+> against the assumption that the local-mode seam this ADR left unimplemented would stay
+> unimplemented through v1. It did not: no CopilotKit account was available to build against, so
+> local mode was built out — narrowly, reusing the vendor's own SSE runner rather than ADR-0001's
+> full `HistoryProvider` design — and the Mac app now ships with **no path to connect an
+> Intelligence key at all**. The two promises this ADR's Consequences section said v1 would not
+> keep — "no account" and "nothing leaves your machine except the calls you choose" — are true again
+> for the conversation. They are still not true for a message's content, which still goes to
+> whichever model was chosen. Read this ADR for *why the engine is wrapped rather than
+> re-engineered*, which still holds; read ADR-0008 for what actually shipped instead of Intelligence.
 
 ---
 

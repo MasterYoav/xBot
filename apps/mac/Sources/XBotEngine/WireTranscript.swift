@@ -21,11 +21,15 @@ public struct WireMessage: Sendable, Equatable {
     public init?(row: [String: Any]) {
         guard let id = row["id"] as? String, let role = row["role"] as? String else { return nil }
         let calls = (row["toolCalls"] as? [[String: Any]] ?? []).compactMap { call -> WireToolCall? in
+            // The runtime's thread route flattens a call to `name` and `args`; AG-UI nests it under
+            // `function`. History arrives flat, and reading only the nested shape dropped every call
+            // while keeping its result — a conversation the model vendor refuses to continue.
+            let function = call["function"] as? [String: Any]
             guard let callId = call["id"] as? String,
-                  let function = call["function"] as? [String: Any],
-                  let name = function["name"] as? String
+                  let name = function?["name"] as? String ?? call["name"] as? String
             else { return nil }
-            return WireToolCall(id: callId, name: name, arguments: function["arguments"] as? String ?? "")
+            let arguments = function?["arguments"] as? String ?? call["args"] as? String ?? ""
+            return WireToolCall(id: callId, name: name, arguments: arguments)
         }
         self.init(id: id, role: role, content: row["content"] as? String, toolCalls: calls, toolCallId: row["toolCallId"] as? String)
     }

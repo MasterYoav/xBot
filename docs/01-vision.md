@@ -49,22 +49,22 @@ is close, the tiebreak is whichever option keeps this promise intact.
 ### What the promise does not cover in v1
 
 An earlier version of this document also promised *"no account"* and *"nothing leaves your machine
-except the calls you choose."* **Neither holds in v1**, and they are corrected here rather than
-quietly reinterpreted. See [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md).
+except the calls you choose."* [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) recorded
+that neither held for the v1 it planned, which ran on CopilotKit Intelligence for durable threads and
+memory.
 
-v1 runs on CopilotKit Intelligence for durable threads and memory, which means:
+**As of [ADR-0008](decisions/0008-local-thread-runner.md), both hold again, for the conversation.**
+The engine keeps threads itself (`LocalThreadRunner`) rather than on CopilotKit's infrastructure, and
+onboarding has no field anywhere that asks for a CopilotKit key. What still leaves the Mac is what it
+always did: whatever you send goes to the model you picked, unless that model runs here too. That is
+a request, not a transcript, and it is the one thing this promise never covered.
 
-- **Onboarding asks for a CopilotKit key**, entered in the app. No terminal, no CLI — the central
-  promise survives — but it is an account, and calling it anything else would be dishonest.
-- **Conversation history transits and rests on CopilotKit's infrastructure.** Model calls were
-  always outbound. This is different in kind, because it is the transcript rather than the request.
+**Onboarding says this — where the local claim ends — in one sentence, before a model key is typed.**
+Not in a privacy policy, not afterwards. An app that sells local control cannot be vague about the
+part that is not local.
 
-**Onboarding says this in one sentence, before the user types a key.** Not in a privacy policy,
-not afterwards. An app that sells local control cannot be vague about the part that is not local.
-
-The engine already boots without it — the seam is built and measured — so this is a v1 sequencing
-decision, not a permanent shape. Everything else on this page is unchanged: the agents, their
-computers, their browsers, their files, and the model keys are all yours and all local.
+Everything else on this page holds without qualification: the agents, their computers, their
+browsers, their files, and the model keys are all yours and all local.
 
 Concretely, that means the app owns:
 

@@ -45,4 +45,17 @@ struct WireTranscriptTests {
         let calls = try #require(wire["toolCalls"] as? [[String: Any]])
         #expect((calls.first?["function"] as? [String: Any])?["name"] as? String == "computer_read")
     }
+
+    /// The shape `/threads/:id/messages` actually answers with. Read as nested-only, the call vanished
+    /// and its result stayed, and the next run was refused by the model vendor.
+    @Test func aFlatHistoryRowKeepsItsToolCalls() throws {
+        let row: [String: Any] = [
+            "id": "a1", "role": "assistant",
+            "toolCalls": [["id": "c1", "name": "computer_navigate", "args": "{\"url\":\"https://example.com\"}"]],
+        ]
+        let message = try #require(WireMessage(row: row))
+        #expect(message.toolCalls == [
+            WireToolCall(id: "c1", name: "computer_navigate", arguments: "{\"url\":\"https://example.com\"}"),
+        ])
+    }
 }

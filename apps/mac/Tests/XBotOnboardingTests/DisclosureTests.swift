@@ -5,16 +5,17 @@ import Testing
 /**
  The promises the first run makes, checked against what v1 actually does.
 
- ADR-0007 keeps CopilotKit Intelligence for v1 and is explicit that two claims in the vision do not
- hold because of it: "No account", and "nothing leaves your machine except the calls you choose".
- The ADR says the vision document "has been changed rather than quietly reinterpreted" — but the
- first screen of the product still said "Everything stays here. No account, no cloud", which asserts
- both of them.
+ Since ADR-0008, conversations are kept by the engine's own local history (`LocalThreadRunner`)
+ rather than CopilotKit Intelligence, so "no account" and "everything stays on this Mac" are true
+ again — for the conversation. They are still not true for a message's content: whatever a person
+ sends still goes to whichever model they picked, unless that model runs on this Mac too. "No cloud"
+ stays unsaid because it would claim the model call as local as well, which it is not.
 
  These are string tests, which is unusual and deliberate. The claim is the feature: an app whose
  pitch is local control must not be vague about the part that is not local, and a copy edit is
  exactly how that protection would be lost.
  */
+@MainActor
 @Suite
 struct OnboardingDisclosureTests {
     @Test func theWelcomeScreenDoesNotPromiseNoCloud() {
@@ -27,8 +28,9 @@ struct OnboardingDisclosureTests {
 
     @Test func theKeyStepSaysWhereConversationsAreKept() {
         let disclosure = ConnectModelStep.transcriptDisclosureText.lowercased()
-        // The part that is not local, named rather than implied.
-        #expect(disclosure.contains("copilotkit"))
-        #expect(disclosure.contains("leaves your mac"))
+        // What is local, named rather than implied…
+        #expect(disclosure.contains("conversations stay on this mac"))
+        // …and what is not: whatever is sent still goes to the model that was picked.
+        #expect(disclosure.contains("goes to the model"))
     }
 }

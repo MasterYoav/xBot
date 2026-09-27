@@ -61,6 +61,10 @@ import {
 } from "./credentials";
 import { createDatabase } from "./db/client";
 import { intelligenceChannelMappings } from "./db/schema";
+import {
+  LocalThreadRunner,
+  localRoutineIntelligence,
+} from "./history/local-thread-runner";
 import { createOnboardingStore } from "./people/onboarding";
 import { createPeopleStore } from "./people/store";
 import { useRoutineTools } from "./plugins/builtin-routines";
@@ -156,6 +160,13 @@ if (
 const port = Number.parseInt(rawPort, 10);
 const database = createDatabase(config.databaseUrl);
 await initializeDevActorUser(database, config.singleUser);
+/*
+ * Where conversations live when there is no Intelligence (ADR-0008). Read back before anything can
+ * ask for one, because the runtime reads a thread's messages synchronously.
+ */
+const localThreadRunner =
+  config.runtime.mode === "local" ? new LocalThreadRunner(database) : undefined;
+await localThreadRunner?.hydrate();
 // The vault, built before the agent store because a customer's agent may sit behind a key and that
 // key belongs here rather than on the agent row. See agents/auth-header.ts.
 const credentialStore = createCredentialStore(database);
@@ -697,11 +708,10 @@ const buildAgentFor = async ({
  *
  * THE SECOND MODE ARRIVED, and this is the guard the previous version of this comment said would
  * have to be written. A local deployment has no Intelligence settings to build the pair from and no
- * gateway to drive a headless turn through, so it gets no routine runner, and `createApp` leaves
- * `/internal/routines/run` unmounted rather than mounted over a runner that cannot run — which is
- * what the optional parameter there has always been for. Routines are dark in local mode until a
- * local runner exists; a routine that fires and fails is worse than one that was never scheduled,
- * so the routes go too. See ADR-0001 and `routines/run-turn.ts`.
+ * gateway to drive a headless turn through. It drives the turn through `LocalThreadRunner` instead —
+ * the same runner a person's own messages go through, so a routine's turn lands in the conversation
+ * the person reads — with `localRoutineIntelligence` standing in for the client. See ADR-0008 and
+ * `routines/run-turn.ts`.
  *
  * One runner for the process, reused across firings: it opens a socket per run and holds no idle
  * connection, but its `threads` map is per instance, and a runner per turn would fragment the
@@ -729,7 +739,16 @@ const routineRunner =
           }),
         });
       })()
-    : undefined;
+    : localThreadRunner &&
+      createRoutineRunner({
+        routineStore,
+        channelStore,
+        runTurn: createTurnRunner({
+          intelligence: localRoutineIntelligence(localThreadRunner),
+          runner: localThreadRunner,
+          buildAgentFor,
+        }),
+      });
 
 /**
  * The runtime, and the two things beside it a hop needs.
@@ -834,6 +853,7 @@ const copilotRuntime = mountCopilotRuntime(
   (input) => {
     void channelStore.signalBusy(input.threadId, input.busy).catch(() => {});
   },
+  localThreadRunner,
 );
 
 /**
@@ -935,10 +955,12 @@ if (config.handoff.maxDepth > 0 && config.handoff.maxPerRun > 0) {
       newRunId: () => randomUUID(),
       // The same address and the same token the runtime uses. Assembling either from configuration
       // produced a runner every join was refused for, because the thread's active run is a lock the
-      // platform issues rather than something an API key can claim.
-      runner: new IntelligenceAgentRunner(
-        copilotRuntime.runnerConnection(),
-      ) as never,
+      // platform issues rather than something an API key can claim. Locally, the runtime's own
+      // runner: a hop's answer is kept exactly where a person's would be.
+      runner: (localThreadRunner ??
+        new IntelligenceAgentRunner(
+          copilotRuntime.runnerConnection(),
+        )) as never,
     }),
   });
 
