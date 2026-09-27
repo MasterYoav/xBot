@@ -32,11 +32,14 @@ been offered a browser, files, or a shell — the product's headline feature doe
 - **C1 done**, verified against a real engine: navigate, snapshot, write/read a file, run a command
   (`LiveComputerToolsTests`).
 - **C2 done.** Every run carries `ComputerTools.wireTools`.
-- **C3 done, verified only against a stubbed engine.** `WireTranscript` rebuilds the conversation with
+- **C3 done, verified against a real engine** on 27 September (`LiveConversationTests`, local
+  Ollama, no CopilotKit key): the follow-up run continues after `computer_navigate`, and the thread
+  holds each message once.
+  `WireTranscript` rebuilds the conversation with
   `@ag-ui/client`'s reducer, id for id, starting from the thread's stored history — which also fixes
   agents having no memory of earlier messages. `HTTPEngineClient.stream` runs pending calls at
-  `RUN_FINISHED` and follows up, capped at 25 rounds. **Needs one real conversation with a CopilotKit
-  key** before v1: that the history route's rows round-trip, and that follow-ups do not duplicate.
+  `RUN_FINISHED` and follows up, capped at 25 rounds. The real conversation this waited on no longer
+  needs a CopilotKit key (ADR-0008), and has been held: rows round-trip and follow-ups do not duplicate.
 - **C4 done, verified against a stubbed engine.** While a turn runs, `AppState` polls `/control`
   every two seconds, as upstream's client does. A help request shows "needs you" with Take control,
   which opens the screen; handing back ends the wait. A secret request shows a masked field that posts

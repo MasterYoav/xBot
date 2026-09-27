@@ -80,7 +80,11 @@ export function buildChatModel({
    */
   return new ChatOpenAI({
     model: resolved.model,
-    apiKey: resolved.apiKey,
+    // A keyless compatible endpoint (a local Ollama) still needs *a* key: without one the client
+    // falls back to OPENAI_API_KEY and refuses the run. The endpoint ignores whatever is sent.
+    apiKey:
+      resolved.apiKey ||
+      (resolved.providerId === "openai-compatible" ? "not-needed" : undefined),
     streaming: true,
     ...(resolved.baseURL
       ? { configuration: { baseURL: resolved.baseURL } }
