@@ -45,10 +45,7 @@ struct RuntimeConnectedTests {
             engineFactory: { _ in StubEngineClient(tokenDelay: .zero) },
             // Its own domain. Resetting the shared one used to race the provider suite, which
             // reads the same two keys — the composer assertions below are about the runtime.
-            providers: isolatedConnectionStore(),
-            // These tests are about the runtime, not about whether this machine has a CopilotKit
-            // key. Reading the real Keychain here is what made them depend on the machine.
-            conversationStore: { .ready }
+            providers: isolatedConnectionStore()
         )
         return (state, runtime)
     }

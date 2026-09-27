@@ -69,10 +69,6 @@ struct LiveEngineTests {
      the app stores one; an agent is pointed at Anthropic; a message is sent. If the key never reached
      the vendor the failure would be the router's "no key" sentence, or no managed Bot at all. Only a
      key that travelled the whole way comes back as Anthropic refusing it.
-
-     Needs an engine started with CopilotKit Intelligence (`XBOT_LIVE_ENGINE_HAS_INTELLIGENCE=1`).
-     Without it every run stops before the Bot — ADR-0007's local mode throws at `getOrCreateThread` —
-     and the send answers 502 whatever the key. The vault half is still checked on its own below.
      */
     @Test func aStoredKeyReachesTheVault() async throws {
         let client = client
@@ -93,7 +89,11 @@ struct LiveEngineTests {
         #expect(try await client.liveModelKeys().allSatisfy { $0.keyId != "xbot-model:anthropic" })
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["XBOT_LIVE_ENGINE_HAS_INTELLIGENCE"] == "1"))
+    /// Since ADR-0008, `LocalThreadRunner` answers this without an Intelligence key — the throwaway
+    /// engine this suite runs against no longer needs `XBOT_LIVE_ENGINE_HAS_INTELLIGENCE` set. The
+    /// variable still gates a run against a deployment that configures Intelligence by hand, which is
+    /// why the check stays rather than being deleted outright.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["XBOT_LIVE_ENGINE_HAS_INTELLIGENCE"] != "0"))
     func aStoredKeyTravelsAllTheWayToTheVendor() async throws {
         let client = client
         try await client.storeModelKey(

@@ -99,7 +99,7 @@ struct HTTPEngineClientTests {
                 ])
             ),
             forHost: host,
-            path: "/api/copilotkit/threads"
+            path: "/api/copilotkit/threads/thread-1/messages"
         )
 
         let messages = try await client(host: host).messages(in: "channel-1")
@@ -332,7 +332,7 @@ struct HTTPEngineClientTests {
         StubURLProtocol.register(
             .init(body: Self.json(["messages": [["id": "old-1", "role": "user", "content": "earlier"]]])),
             forHost: host,
-            path: "/api/copilotkit/threads"
+            path: "/api/copilotkit/threads/thread-1/messages"
         )
         StubURLProtocol.register(
             .init(body: Self.json(["title": "Example Domain", "url": "https://example.com", "text": "hi"])),

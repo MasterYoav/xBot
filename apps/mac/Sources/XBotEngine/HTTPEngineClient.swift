@@ -121,7 +121,7 @@ public actor HTTPEngineClient: EngineClient {
         else { return [] }
 
         let (threadData, response) = try await send(
-            request(.get, "/api/copilotkit/threads?threadId=\(threadId)")
+            request(.get, Self.threadMessagesPath(threadId))
         )
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { return [] }
         guard
@@ -588,9 +588,20 @@ public actor HTTPEngineClient: EngineClient {
         continuation.finish()
     }
 
+    /// The runtime's route for one thread's messages.
+    ///
+    /// Not `/threads?threadId=`, which is what this used to ask: the runtime matches that as the
+    /// thread *list*, which answers `{ threads }` — or a 400 without an agent id — and never
+    /// `{ messages }`. Every history read came back empty, so a conversation was blank after a
+    /// restart and every agent forgot everything said before the newest message.
+    static func threadMessagesPath(_ threadId: String) -> String {
+        let encoded = threadId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? threadId
+        return "/api/copilotkit/threads/\(encoded)/messages"
+    }
+
     /// The thread's messages as AG-UI messages, or none for a thread that does not exist yet.
     private func threadMessages(_ threadId: String) async throws -> [WireMessage] {
-        let (data, response) = try await send(request(.get, "/api/copilotkit/threads?threadId=\(threadId)"))
+        let (data, response) = try await send(request(.get, Self.threadMessagesPath(threadId)))
         guard (response as? HTTPURLResponse)?.statusCode == 200,
               let thread = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rows = thread["messages"] as? [[String: Any]]

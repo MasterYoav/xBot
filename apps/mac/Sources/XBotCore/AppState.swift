@@ -263,10 +263,8 @@ public final class AppState {
     public init(
         engine: any EngineClient,
         providers: ProviderConnectionStore = .shared,
-        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared,
-        conversationStore: @escaping @Sendable () -> ConversationStore = { .ready }
+        appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared
     ) {
-        self.conversationStore = conversationStore
         self.engine = engine
         self.runtime = nil
         self.environmentFactory = nil
@@ -294,8 +292,6 @@ public final class AppState {
         /// Injected so a test gets its own preference domain. See `ProviderConnectionStore`.
         providers: ProviderConnectionStore = .shared,
         appUpdates: any AppUpdateControlling = DisabledAppUpdateController.shared,
-        /// Defaults to the real credential, because this initializer is the production one.
-        conversationStore: @escaping @Sendable () -> ConversationStore = { EngineBootstrap.conversationStore },
         /// Whether opening the app should bring the engine up. False by default so a test's answer
         /// never depends on whether this Mac has finished onboarding; the app passes the real one.
         startsEngineOnLaunch: @escaping @Sendable () -> Bool = { false },
@@ -306,7 +302,6 @@ public final class AppState {
             ModelKeySync.fingerprint(of: $0, keyEncryptionKey: "test")
         }
     ) {
-        self.conversationStore = conversationStore
         self.startsEngineOnLaunch = startsEngineOnLaunch
         self.modelKeys = modelKeys
         self.modelKeyFingerprint = modelKeyFingerprint
@@ -332,12 +327,6 @@ public final class AppState {
     /// Endpoints the person added by hand, which the agent picker offers alongside the vendors.
     private let customProviders = CustomProviderStore.shared
 
-    /// Whether the engine can keep a conversation at all.
-    ///
-    /// Injected rather than read from the Keychain here, for the reason `ProviderConnectionStore`
-    /// documents: a state object that reaches for a machine-wide store cannot be asserted without
-    /// the machine's contents deciding the answer.
-    private let conversationStore: @Sendable () -> ConversationStore
     private var startsEngineOnLaunch: @Sendable () -> Bool = { false }
     private var modelKeys: @Sendable () throws -> [DesiredModelKey] = { [] }
     private var modelKeyFingerprint: @Sendable (String) throws -> String = {
@@ -504,26 +493,9 @@ public final class AppState {
             engineBaseURL = endpoint.baseURL
             pinnedEngineImage = await runtime?.currentImageReference.full
             engineHealth = await runtime?.checkHealth()
-            if providers.requiresModelForComposer() {
-                composerBlock = .noModelConnected
-            } else {
-                /*
-                 * The engine is up and may not be able to hold a conversation.
-                 *
-                 * Without a CopilotKit key it boots into local mode, where the history client
-                 * throws past wiring — but it still starts, still answers `/health`, and still
-                 * lists agents, so every other signal in the app says everything is fine. Saying so
-                 * here is invariant 7: never an empty state that implies all is well.
-                 *
-                 * Two ways to not have one, and they need opposite sentences: nobody connected a
-                 * key, or the Keychain would not hand over the key that is there.
-                 */
-                composerBlock = switch conversationStore() {
-                case .ready: nil
-                case .notConnected: .noConversationStore
-                case .unreadable: .conversationStoreUnreadable
-                }
-            }
+            // Conversations are kept by the engine itself (ADR-0008), so a model is the one thing a
+            // running engine can still be missing.
+            composerBlock = providers.requiresModelForComposer() ? .noModelConnected : nil
             pausedWhenIdle = false
             noteEngineActivity()
             // Before anything can run: a message that woke the engine is about to be answered, and
@@ -785,7 +757,7 @@ public final class AppState {
         guard let (message, channel) = messageThatWokeTheEngine else { return }
         messageThatWokeTheEngine = nil
         guard composerBlock == nil, modelKeySyncProblem == nil, !isSyncingModelKeys else {
-            // It woke into something that needs the person — no model, no CopilotKit key. The
+            // It woke into something that needs the person — no model, say. The
             // message is kept and made retryable, carrying the same sentence the composer shows.
             let reason = composerBlock?.sentence ?? modelKeySyncProblem ?? String(localized: "Couldn't send that message.")
             mark(message.id, as: .failed(reason: reason), in: channel)
@@ -928,16 +900,6 @@ public final class AppState {
         }
         try? EngineTokenStore.remove()
         try? KeyEncryptionKeyStore.remove()
-        /*
-         * The CopilotKit key and its licence token, which this list used to miss.
-         *
-         * The comment above promises every key this app has written, and the one real third-party
-         * credential among them was not on it — so after Uninstall, the person's CopilotKit key sat
-         * on in the login Keychain for an app that was gone. Both are removed now; the token is
-         * generated per install and meaningless without the app, the key is theirs.
-         */
-        try? IntelligenceCredentialStore.removeAPIKey()
-        try? IntelligenceCredentialStore.removeLicenseToken()
 
         EngineUpdateCheckStore.reset()
         AppUpdateCheckStore.reset()
@@ -971,13 +933,9 @@ public final class AppState {
             startEngine()
         case .humanHoldsControl:
             setControl(.agent)
-        case .noModelConnected, .noConversationStore:
-            // Both are fixed in the same place, and settings are in this window now.
+        case .noModelConnected:
+            // Settings are in this window now.
             isShowingSettings = true
-        case .conversationStoreUnreadable:
-            // Nothing to open — the key is already there. Ask the Keychain again, which is what a
-            // locked one or a dismissed prompt needs, and let the engine come back up with it.
-            startEngine()
         case .runtimeUnavailable, nil:
             // Runtime install is M6.
             break

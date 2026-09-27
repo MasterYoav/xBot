@@ -43,15 +43,6 @@ public final class OnboardingCoordinator {
 
     public var selectedProviderID: String = ModelProviderCatalog.all[0].id
     public var apiKey = ""
-
-    /// The CopilotKit key, which is what lets the engine keep conversations at all.
-    ///
-    /// ADR-0007: "The app ships with an Intelligence key configured at onboarding alongside the
-    /// model key." Without it the engine boots into local mode and cannot hold a conversation, so
-    /// this is not optional in the way a model key is — skipping the model step leaves a usable app
-    /// with a disabled composer, while skipping this one leaves an app that looks fine and fails on
-    /// the first turn.
-    public var intelligenceKey = ""
     public private(set) var validation: ValidationState = .idle
     public private(set) var ollamaModelCount: Int?
     public private(set) var didSkipModel = false
@@ -262,12 +253,6 @@ public final class OnboardingCoordinator {
                 if selectedProviderID != "ollama" {
                     try ProviderKeyStore.save(apiKey, for: selectedProviderID)
                 }
-                // Saved beside the model key, which is the pairing ADR-0007 describes. Empty is
-                // allowed: the person can add it later in Settings, and the composer says so
-                // rather than the first turn failing.
-                if !ProviderKeyStore.normalize(intelligenceKey).isEmpty {
-                    try IntelligenceCredentialStore.save(apiKey: intelligenceKey)
-                }
                 ProviderConnectionStore.shared.markConnected(selectedProviderID)
                 validation = .succeeded(modelCount: count)
                 didSkipModel = false
@@ -290,23 +275,8 @@ public final class OnboardingCoordinator {
     }
 
     public func createFirstAgent() async -> Agent.ID? {
-        /*
-         * Restart the engine once the CopilotKit key exists — which, on a first run, is always after
-         * the engine started.
-         *
-         * The engine starts in step three and the key is asked for in step four, and the engine reads
-         * its CopilotKit credentials from its environment at start. So the engine onboarding handed
-         * over was running without them while the composer, which checks the Keychain, opened as if
-         * all was well, and the first conversation anybody had failed. The restart recreates the
-         * container with the key (see `RuntimeController.environmentFingerprint`), keeping every
-         * volume. It happens here, behind "Creating your first agent…", rather than mid-typing.
-         *
-         * Here and not in a `finish()`: it was first put there, and nothing called `finish()` — the
-         * Meet-your-agent screen calls this directly — so it would never have run.
-         */
-        if IntelligenceCredentialStore.settings() != nil {
-            await runtime.restart(environment: environmentFactory)
-        }
+        // No restart: the only key asked for here is a model's, and model keys reach the engine
+        // through its credential vault when the app syncs them, not through its environment.
         guard case .running(let endpoint) = await runtime.state else { return nil }
         let token = try? EngineTokenStore.token()
         let client = HTTPEngineClient(baseURL: endpoint.baseURL, token: token)

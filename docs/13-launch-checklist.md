@@ -106,26 +106,25 @@ prevent.
 
 ---
 
-## 5. End-to-end conversation — **needs a CopilotKit key**
+## 5. End-to-end conversation — **no CopilotKit key needed**
 
-ADR-0007 keeps CopilotKit Intelligence for v1. Without a key the engine boots into local mode, whose
-history client throws past wiring, so no conversation can complete. The app now says so rather than
-failing silently, and the key can be pasted, replaced or revoked in Settings → Models → Conversation
-history.
+ADR-0007 kept CopilotKit Intelligence for v1; [ADR-0008](decisions/0008-local-thread-runner.md)
+changed that. No key was available to build or verify against, so the engine's local-mode seam was
+built out instead — `LocalThreadRunner`, a durable wrapper around the vendor's own SSE runner. The
+app has no field anywhere to paste an Intelligence key; conversations are kept by the engine itself.
 
-1. Get a key from CopilotKit.
-2. Paste it in Settings → Models, or during onboarding.
-3. Start the engine and hold a real conversation with an agent: send a message, get a reply, let it
+1. Start the engine and hold a real conversation with an agent: send a message, get a reply, let it
    call a tool, and confirm the reply survives a restart of the app.
 
-That last part is the actual test. The transcript living on their infrastructure is precisely what
-this key buys, so a reply that does not survive a restart means it is not working.
+That last part is the actual test. `LocalThreadRunner` persisting to Postgres and hydrating on boot
+is precisely what this buys, so a reply that does not survive a restart means it is not working.
 
 Three more things only this conversation can prove, all built on 14 September against a stubbed
 engine (`docs/plans/computer-client-tools.md`):
 
-- **Memory.** Tell the agent something, then ask about it two messages later. Each run now carries the
-  whole conversation; before, every agent forgot everything between messages.
+- **Memory, within one conversation.** Tell the agent something, then ask about it two messages
+  later. Each run carries the whole conversation; before, every agent forgot everything between
+  messages. (Recall *across* separate conversations is pgvector work ADR-0001 still owns, not this.)
 - **Its computer.** Ask it to open a page and say what is on it. The Activity panel should show
   `computer_navigate` and the screen should show the page. Then check the conversation after an app
   restart has no duplicated messages — the tool-call loop resends messages the thread already holds,
@@ -135,10 +134,11 @@ engine (`docs/plans/computer-client-tools.md`):
 
 **There is an automated version of the engine half.** `apps/mac/Tests/XBotEngineTests/LiveEngineTests.swift`
 drives the real client against a running engine — point it at a throwaway one, since it creates
-agents. With Intelligence configured, set `XBOT_LIVE_ENGINE_HAS_INTELLIGENCE=1` as well and it proves
-the whole key path by sending with a deliberately invalid Anthropic key: the answer should be
-"Anthropic rejected the key". Everything short of the conversation store was verified that way on
-13 September; this is the hop that needs your key.
+agents. Its conversation-store assertions now run against local mode by default; a separate
+`XBOT_LIVE_ENGINE_HAS_INTELLIGENCE=1` branch exists only for a deployment that configures
+Intelligence by hand, which nothing here needs. This suite, and `LocalThreadRunner`'s own
+integration test (`engine/server/tests/local-thread-runner.integration.test.ts`), still need to be
+run before this item can be checked off — see the verification commands in `CLAUDE.md`.
 
 **Also close the last M2 item here:** point one agent at a second real vendor — Anthropic is already
 proven, so use OpenAI or Google — and confirm the reply comes from the vendor you picked. A model
@@ -172,8 +172,9 @@ bugs, and they are only visible on the first run.
 
 `site/index.html` is the page: one file, no build step. It carries the download (pointing at
 `releases/latest`), the security explanation, the uninstall instructions — per docs/11 the standalone
-uninstaller is documented here and not in the app — and, per ADR-0007, the fact that conversation
-history is stored by CopilotKit, in the README's wording rather than a second version that can drift.
+uninstaller is documented here and not in the app — and, per [ADR-0008](decisions/0008-local-thread-runner.md),
+the fact that conversation history is kept by the engine on this Mac, in the README's wording rather
+than a second version that can drift.
 
 `.github/workflows/pages.yml` publishes it on every push to master that touches `site/`. **It needs
 you once:** repository → Settings → Pages → Source: **GitHub Actions**. Until then the workflow fails
@@ -194,8 +195,8 @@ From a shell holding no credentials:
 - On 18 September, a throwaway engine built from master (with the model hop lifted into
   `models/build.ts`) came up healthy on loopback, refused an unauthenticated request with a 401, and
   passed all eight live client tests: health, read endpoints, the vault, agent and conversation
-  round-trip, browser, files, shell, and the asks. Only the conversation store is still unproven,
-  because that is the hop needing a CopilotKit key.
+  round-trip, browser, files, shell, and the asks. That run predates ADR-0008; the conversation store
+  now needs re-running against `LocalThreadRunner` rather than a CopilotKit key — see item 5.
 - The pinned engine is one multi-arch image (linux/amd64 and linux/arm64). On 14 September an Apple
   Silicon Mac pulled it anonymously, got arm64, was healthy in about ten seconds on a port other than
   3001, and passed the live suite: browser, files, shell, and a help request handed back. Before that

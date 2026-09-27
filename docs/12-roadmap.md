@@ -19,13 +19,13 @@ and the ones marked ⚠️ have the widest error bars.
 | | Milestone | State |
 | --- | --- | --- |
 | M0 | Groundwork | **Done.** Engine vendored, CI, Swift package, dev database |
-| M1 | Local history provider | **Deferred past v1.** Seam built and verified; see ADR-0007 |
+| M1 | Local history provider | **Conversation half done, ahead of v1.1.** See ADR-0008: a durable `LocalThreadRunner` ships in place of Intelligence, with no CopilotKit account needed. Memory/recall (pgvector) is still ADR-0001's, deferred to v1.1 |
 | M2 | Model router | **Proven live against a real vendor** (see below). Registry + `openai-compatible` adapter, per-run resolution, selection stored on the agent, forwarded, and read back, Settings → Models, custom providers, **Ollama host-gateway routing**. **The `copilot.ts` hop is now covered by a test that drives the real client and asserts on the posted body** (`server/tests/copilot-model-selection.test.ts`). **Not yet done:** a second real vendor |
 | M3 | Engine runs headless | **Done.** Image published to ghcr on every push to master; manifest pinned and fetched by the app at start |
 | M4 | Mac app skeleton | **Done.** Rail, conversation, composer, panel, palette, design system, runtime driver |
-| M5 | Connected | **Client done, and now driven against a real engine.** The engine image had no Bot and no model key ever reached it, so no agent could be created and no run could authenticate — fixed, see `docs/plans/managed-bot-and-model-keys.md`. `Tests/XBotEngineTests/LiveEngineTests.swift` exercises the real client against a throwaway engine; the final hop needs a CopilotKit key |
+| M5 | Connected | **Client done, and now driven against a real engine.** The engine image had no Bot and no model key ever reached it, so no agent could be created and no run could authenticate — fixed, see `docs/plans/managed-bot-and-model-keys.md`. `Tests/XBotEngineTests/LiveEngineTests.swift` exercises the real client against a throwaway engine. **No longer blocked on a CopilotKit key** — ADR-0008's `LocalThreadRunner` is what the client actually talks to; the `XBOT_LIVE_ENGINE_HAS_INTELLIGENCE=1` branch of that suite now only exercises the Intelligence path for a deployment that opts into it by hand |
 | M6 | Onboarding | **In progress.** Five steps built, install-for-me, adoption, handoff transition, failure branches, runtime choice persistence; VM testing still open |
-| M7 | Ship v1.0 | **In progress (unsigned).** Settings tabs (Agents, Computer, Usage) wired, plus a CopilotKit section so the key can be replaced or revoked; About window credits OpenBot; Sparkle scaffold + appcast scripts done. First-run supply chain verified anonymously. Signing certificates, CI secrets and publish still open — all four remaining items need a person |
+| M7 | Ship v1.0 | **In progress (unsigned).** Settings tabs (Agents, Computer, Usage) wired; the CopilotKit section is gone rather than finished — ADR-0008 means there is no key to replace or revoke. About window credits OpenBot; Sparkle scaffold + appcast scripts done. First-run supply chain verified anonymously. Signing certificates, CI secrets and publish still open — all remaining items need a person |
 
 ---
 
@@ -47,40 +47,32 @@ Set up so the rest can move.
 
 ---
 
-## M1 — The local history provider ⚠️ — **DEFERRED PAST v1**
+## M1 — The local history provider — **conversation half done; recall deferred to v1.1**
 
-**3–5 weeks, and no longer first.** See
-[ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) for why, and
-[ADR-0001](decisions/0001-local-history-provider.md) for the design, which still stands.
+See [ADR-0008](decisions/0008-local-thread-runner.md) for what shipped, and
+[ADR-0001](decisions/0001-local-history-provider.md) for the fuller design that is still v1.1's.
 
-**What is already done:** `RuntimeCapabilities` has both modes, the three call sites are guarded,
-and `history/local-intelligence.ts` enumerates what a local provider must answer. The engine has
-been booted and driven with no `INTELLIGENCE_*` variables set at all.
+The measurement ADR-0007 asked for before re-estimating this — what the native client's SSE-only
+usage actually needs, versus the vendor client's full surface — is now done: `LocalThreadRunner`
+wraps the vendor's own `InMemoryAgentRunner`, adding durability (a `local_threads` Postgres table)
+and hydration on restart. No `HistoryProvider` interface was built; `copilot.ts` branches on
+`intelligence` vs. `localRunner` instead. This is smaller than the original plan below because it
+skips the part that plan called "the bulk of the work" — a rework of `copilot.ts` against a new
+interface — by wrapping the vendor's runner in place.
 
-**What is not:** the provider itself — threads, messages, pgvector recall, and the in-process
-emitter that replaces the hosted realtime gateway.
+**Done, per ADR-0001's own criterion:** the engine starts and runs a full conversation with no
+`INTELLIGENCE_*` variables set at all, and history survives a container restart. The Mac app has no
+UI path left to connect a CopilotKit key at all.
 
-**Before estimating this again, measure.** The native client uses SSE, not the browser's Phoenix
-websocket, so the method surface it actually reaches is smaller than the vendor client's. That
-measurement does not exist until M5 is connected, which is the real reason this comes later.
+**Still not done, and now explicitly v1.1's scope (see below):** pgvector recall/memory, and the
+in-process realtime emitter for a hosted-gateway-shaped consumer — `LocalThreadRunner` has no
+`identifyUser` and is guarded to `config.singleUser`, which is what xBot ships anyway.
 
-The rest of this section is the original plan, unchanged and still correct.
+The original plan, for the part still open:
 
-- `HistoryProvider` interface.
-- Schema: threads, messages, memory (pgvector).
-- `LocalHistoryProvider`: Postgres for threads and messages, pgvector for recall, an in-process
-  emitter where upstream uses the hosted realtime websocket.
-- `IntelligenceHistoryProvider` retained behind a setting, so the diff stays reviewable.
-- Rework `runtimeCapabilities()` from a hard throw to provider selection.
-- Rework `copilot.ts` — the bulk of the work — plus the six other call sites.
-- Tests: thread lifecycle, message ordering, memory recall, concurrent turns, restart durability.
-
-**Done when:** the engine starts and runs a full conversation with **no `INTELLIGENCE_*` variables
-set at all**, and history survives a container restart.
-
-**If this takes more than 6 weeks, stop and re-plan.** It would mean the coupling is deeper than the
-64 references suggested, and the alternatives — vendoring differently, or a much thinner engine —
-need to be back on the table.
+- Schema: memory (pgvector).
+- Recall/remember, tuned for chunking, embedding choice, and ranking.
+- Tests: memory recall, relevance ordering.
 
 ---
 
@@ -147,9 +139,9 @@ outside.
 machine, so "two agents on different providers" was met as two *adapters* — the native Anthropic one
 and `openai-compatible` — rather than two vendors.
 
-An end-to-end conversation through the server needs Intelligence credentials:
-`runtimeCapabilities()` takes all four `INTELLIGENCE_*` variables or none, and none selects
-`LocalIntelligence`, which is a spike that throws (ADR-0007).
+An end-to-end conversation through the server no longer needs Intelligence credentials: with none
+of the `INTELLIGENCE_*` variables set, `copilot.ts` runs on `LocalThreadRunner` (ADR-0008). That run
+through the server is launch checklist item 5, and has not been done yet.
 
 **Still open:** a second live vendor. The three native adapters are built and each is covered by a
 test asserting which client a selection gets (`agent-langgraph/tests/models-build.test.ts`). Usage accounting is done — the agent sums `usage_metadata` across a turn and emits
@@ -277,7 +269,8 @@ at `raw.githubusercontent.com/MasterYoav/xBot/master/manifests/engine-stable.jso
 digest it names resolves at ghcr with an anonymous pull token, the repository is public, and the
 bundled fallback in `XBotApp/Resources` is byte-identical to the published manifest — so a first run
 with the network blocked still starts from a real pin rather than a placeholder. Every outbound URL
-the app can show a person (CopilotKit, OpenBot, Ollama, the docs) answers 200.
+the app can show a person (OpenBot, Ollama, the docs) answers 200. CopilotKit is no longer one of
+them — ADR-0008 means the app has nothing to link to there.
 
 **The ordered version of all this is [13-launch-checklist.md](13-launch-checklist.md).** What still
 needs a person, and cannot be done from here:
@@ -286,34 +279,33 @@ needs a person, and cannot be done from here:
    then every build is ad-hoc signed, which is also why local GUI verification keeps meeting a
    Keychain prompt: the code identity changes on every rebuild.
 2. A clean-VM run of onboarding end to end.
-3. A CopilotKit key, for an end-to-end Intelligence conversation.
-4. A second live vendor key, to close the last M2 item.
+3. A second live vendor key, to close the last M2 item.
 
 **Done when:** someone who has never seen the project installs from the website and uses it, without
 help.
 
-### The Intelligence wiring — resolved
+### The Intelligence wiring — resolved differently than planned
 
 **Was:** the app passed no `intelligence`, so the engine booted into local mode, whose client throws
 past wiring. It shipped a mode in which a conversation cannot work, and the first screen promised
-"Everything stays here. No account, no cloud" — both of the things ADR-0007 says do not hold in v1.
+"Everything stays here. No account, no cloud" — both of the things ADR-0007 said do not hold in v1.
 
-**Now:** ADR-0007 is Accepted and it decided this already; the code had simply never followed.
+**Now, per [ADR-0008](decisions/0008-local-thread-runner.md):** rather than wiring the app up to pass
+a CopilotKit key — the fix this section originally planned — local mode was built out instead, since
+no such key was available to build or verify against. The app has **no UI path left to connect one
+at all**: no field in onboarding, no section in Settings, no `intelligence` ever passed to
+`EngineEnvironment.Inputs`.
 
-- `EngineBootstrap` passes all four `INTELLIGENCE_*`, from `IntelligenceCredentialStore`.
-- The two URLs are constants; the licence token is generated per install, because ADR-0007 measured
-  that nothing validates it and upstream's way of getting one is a terminal command; the API key is
-  pasted at onboarding beside the model key.
-- Onboarding says where conversations are kept **before** a key is typed, which is the placement the
-  ADR specifies, and the Welcome bullet no longer claims otherwise. Both strings are asserted by
-  tests, because the claim is the feature.
-- Without the key the composer says so — `ComposerBlock.noConversationStore` — rather than letting a
-  turn fail against an engine that otherwise looks healthy.
+- `LocalThreadRunner` gives the engine durable local history with no account, satisfying ADR-0001's
+  "no `INTELLIGENCE_*` variables, survives a restart" criterion.
+- Onboarding says where conversations are kept **before** a model key is typed, and both the Welcome
+  bullet and the model step's copy are asserted by tests, because the claim is the feature.
+- The composer no longer has a "no conversation store" block at all — a running engine can always
+  keep a conversation now, so the only thing left for it to be missing is a model.
 
-**Still open, and the reason this is not finished:** nothing has driven a conversation end to end
-against an engine in Intelligence mode. That needs a CopilotKit key on the machine running it. Every
-engine test sets the four variables, so the suite covers the mode; the app's own path to it has
-never been exercised.
+**What is still open:** memory/recall (ADR-0001's pgvector half) and an actual Intelligence
+end-to-end run, which nothing here needs but a future deployment configuring Intelligence by hand
+still could.
 
 ---
 
@@ -332,11 +324,14 @@ the project — and it is the one that decides whether a non-technical person ca
 
 Ordered by value, not by ease.
 
-### v1.1 — Local history (ADR-0001)
+### v1.1 — Recall and memory (the rest of ADR-0001)
 
-The deferred gate, done with a measurement behind it instead of an estimate. This is what makes
-"no account" and "nothing leaves your machine" true, and until it lands both are stated as
-limitations in onboarding and in the UI.
+[ADR-0008](decisions/0008-local-thread-runner.md) already made "no account" and "conversation
+persists on this Mac" true in v1. What is left of ADR-0001 is the part `LocalThreadRunner`
+deliberately does not do: pgvector-backed recall across conversations, tuned rather than a first
+pass. Until it lands, an agent remembers everything sent within one conversation and nothing across
+separate ones — which is also upstream's own behaviour without Intelligence's memory feature turned
+on, not a regression xBot introduced.
 
 ### v1.2 — Per-agent computers
 

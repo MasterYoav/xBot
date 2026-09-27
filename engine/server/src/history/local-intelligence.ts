@@ -3,6 +3,11 @@ import type { CopilotKitIntelligence } from "@copilotkit/runtime/v2";
 /**
  * The platform client, answered locally instead of by CopilotKit Intelligence.
  *
+ * NO LONGER ON THE CONVERSATION PATH. Conversations in local mode run through the runtime's SSE
+ * branch and `LocalThreadRunner` (ADR-0008), which answers what this spike was built to enumerate.
+ * What still reaches this is the `/api/threads` status reader in `app.ts`, which only the upstream
+ * browser app calls. The rest of this note is the spike as it was written.
+ *
  * SPIKE. Nothing here stores anything yet. Every method records that it was reached and then
  * throws, except the handful that are called at wiring time and whose return value is used
  * synchronously — those answer with a local placeholder so the process can finish booting.

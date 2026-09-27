@@ -17,9 +17,6 @@ public struct ModelsSettingsView: View {
     @State private var customModel = ""
     @State private var customKey = ""
     @State private var savingCustom = false
-    @State private var conversationStore = ConversationStoreSettings()
-    @State private var copilotKey = ""
-    @State private var editingCopilotKey = false
 
     public init() {}
 
@@ -68,115 +65,12 @@ public struct ModelsSettingsView: View {
                         )
                 )
             }
-
-            conversationStoreSection
         }
         .formStyle(.grouped)
         .task {
             settings.load()
-            conversationStore.load()
             await settings.detectLocalProviders()
         }
-    }
-
-    /*
-     * The one key that is not a model's.
-     *
-     * ADR-0007 keeps CopilotKit Intelligence for v1, so this is what holds the conversation. It sits
-     * under the model providers rather than in a pane of its own because it is a key, it is pasted
-     * the same way, and the composer's "Open Settings" has to land somewhere a person recognises.
-     */
-    @ViewBuilder
-    private var conversationStoreSection: some View {
-        Section {
-            HStack(spacing: Space.s) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(String(localized: "CopilotKit")).bodyEmphasis()
-                    Text(conversationStoreStateText)
-                        .captionText()
-                        .foregroundStyle(
-                            conversationStore.state == .ready
-                                ? Palette.stateRunning : Palette.textSecondary
-                        )
-                }
-                Spacer()
-                switch conversationStore.state {
-                case .ready:
-                    Button(String(localized: "Disconnect")) {
-                        conversationStore.disconnect()
-                        applyConversationStoreChange()
-                    }
-                    .buttonStyle(XBotButtonStyle())
-                case .notConnected, .unreadable:
-                    Button(
-                        editingCopilotKey
-                            ? String(localized: "Cancel") : String(localized: "Connect")
-                    ) {
-                        withAnimation(Motion.quick) { editingCopilotKey.toggle() }
-                    }
-                    .buttonStyle(XBotButtonStyle())
-                }
-            }
-
-            if editingCopilotKey, conversationStore.state != .ready {
-                HStack(spacing: Space.s) {
-                    SecureField(String(localized: "CopilotKit key"), text: $copilotKey)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit(saveCopilotKey)
-                    Button(String(localized: "Save"), action: saveCopilotKey)
-                        .buttonStyle(XBotButtonStyle())
-                        .disabled(copilotKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-            }
-
-            if let problem = conversationStore.problem {
-                Text(problem).captionText().foregroundStyle(Palette.stateFailed)
-            }
-        } header: {
-            Text(String(localized: "Conversation history"))
-        } footer: {
-            // The part that is not local, said where the key is typed — ADR-0007 requires it in the
-            // product and not only in a document, and this is now a second place a person meets it.
-            Text(
-                String(
-                    localized:
-                        "Your conversation history is stored by CopilotKit, the service xBot's engine is built on, so it leaves your Mac. Changing this key restarts the engine, which takes a few seconds."
-                )
-            )
-        }
-    }
-
-    private var conversationStoreStateText: String {
-        switch conversationStore.state {
-        case .ready: String(localized: "Connected")
-        case .notConnected: String(localized: "Not connected")
-        // Not "not connected": there is a key, and telling somebody to connect one they already
-        // have is the mistake this whole section exists to stop making.
-        case .unreadable: String(localized: "Saved, but unreadable")
-        }
-    }
-
-    private func saveCopilotKey() {
-        conversationStore.connect(copilotKey)
-        copilotKey = ""
-        if conversationStore.state == .ready {
-            withAnimation(Motion.quick) { editingCopilotKey = false }
-            applyConversationStoreChange()
-        }
-    }
-
-    /*
-     * A changed CopilotKit key reaches the engine only through a restart.
-     *
-     * The footer used to say the change "takes effect the next time the engine starts" and leave it
-     * there — but the composer reads the Keychain and opened straight away, so the next message went
-     * to an engine still running on the old credentials and failed. Worse, the next start did not
-     * apply it either: `docker start` reuses the environment a container was created with. The
-     * controller now replaces a container whose environment changed, and this restarts it at once.
-     */
-    private func applyConversationStoreChange() {
-        guard case .running = state.runtimeState else { return }
-        state.restartEngine()
     }
 
     @ViewBuilder
