@@ -134,11 +134,33 @@ engine (`docs/plans/computer-client-tools.md`):
 
 **There is an automated version of the engine half.** `apps/mac/Tests/XBotEngineTests/LiveEngineTests.swift`
 drives the real client against a running engine — point it at a throwaway one, since it creates
-agents. Its conversation-store assertions now run against local mode by default; a separate
-`XBOT_LIVE_ENGINE_HAS_INTELLIGENCE=1` branch exists only for a deployment that configures
-Intelligence by hand, which nothing here needs. This suite, and `LocalThreadRunner`'s own
-integration test (`engine/server/tests/local-thread-runner.integration.test.ts`), still need to be
-run before this item can be checked off — see the verification commands in `CLAUDE.md`.
+agents. **It has now been run** (27 September), against an engine built from the working tree and a
+local Ollama (`qwen2.5:7b`): set `XBOT_LIVE_OLLAMA_MODEL` and `LiveConversationTests` holds a real
+three-turn conversation — it answers, drives `computer_navigate` through the client-tool loop and
+reports the page, remembers a codeword two turns later, and leaves each message in the thread once.
+Restarting that engine left every conversation's message count unchanged. What remains for a person
+is the app half: the same conversation typed into the window, and the asks.
+
+That first run found three engine faults, each of which failed every conversation:
+
+- **The managed Bot could not be dialled.** `createAgentFetch` refused `127.0.0.1:4201`, the
+  address the image itself gives the Bot, so every run through the server ended in "This deployment
+  will not dial…". The Bot's configured host is now added to the allowed hosts
+  (`server/src/agents/managed-agent-host.ts`), and only that host and port.
+- **A keyless `openai-compatible` endpoint was refused locally.** OpenAI's client falls back to
+  `OPENAI_API_KEY` when handed no key, so every Ollama run failed with "Missing credentials". It now
+  gets a placeholder the endpoint ignores (`agent-langgraph/src/models/build.ts`).
+- **Every Anthropic run was refused.** The server's standing role message arrived after the Bot's
+  guidance, and Anthropic accepts a system message only first. All system texts are now merged, in
+  order, into one leading message (`agent-langgraph/src/history.ts`).
+
+**One open finding.** On a freshly started engine, roughly one full live run in six had a turn come
+back empty, or a request go unanswered, while all nine live tests ran at once. The engine logged
+"Thread already running" or, once, "No agents are registered", both of which should be impossible
+there. It was never seen with the conversation suite alone (5 of 5 fresh engines), nor with a
+logging proxy in the path (12 of 12). A leftover process, a database lock, identity, idle
+keep-alive and split request writes were each checked and ruled out. Worth one more look before
+launch, starting from the app under ordinary use rather than nine tests at once.
 
 **Also close the last M2 item here:** point one agent at a second real vendor — Anthropic is already
 proven, so use OpenAI or Google — and confirm the reply comes from the vendor you picked. A model
@@ -197,6 +219,10 @@ From a shell holding no credentials:
   passed all eight live client tests: health, read endpoints, the vault, agent and conversation
   round-trip, browser, files, shell, and the asks. That run predates ADR-0008; the conversation store
   now needs re-running against `LocalThreadRunner` rather than a CopilotKit key — see item 5.
+- On 27 September, it was: a throwaway engine in local mode with no CopilotKit key held a real
+  conversation with a local Ollama model, used its computer through the client-tool loop, remembered
+  across turns, and kept every conversation intact through a restart. Item 5 has the details and
+  the one open finding.
 - The pinned engine is one multi-arch image (linux/amd64 and linux/arm64). On 14 September an Apple
   Silicon Mac pulled it anonymously, got arm64, was healthy in about ten seconds on a port other than
   3001, and passed the live suite: browser, files, shell, and a help request handed back. Before that

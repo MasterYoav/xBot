@@ -24,6 +24,14 @@ export { NO_ANSWER_CAME };
 /** Translate the conversation AG-UI carries into LangChain's message classes. */
 export function toLangChainMessages(input: RunAgentInput): BaseMessage[] {
   const messages: BaseMessage[] = [new SystemMessage(COMPUTER_GUIDANCE)];
+  /*
+   * Every system text, gathered into that first message rather than pushed where it arrived.
+   *
+   * The server sends standing messages of its own — the role, what this Bot holds. OpenAI answers
+   * system messages anywhere; Anthropic refuses the whole run: "System messages are only permitted
+   * as the first passed message". Merged in order, so what each one says is unchanged.
+   */
+  const system = [COMPUTER_GUIDANCE];
 
   /*
    * Which calls in this history were ever answered.
@@ -53,7 +61,7 @@ export function toLangChainMessages(input: RunAgentInput): BaseMessage[] {
       continue;
     }
     if (message.role === "system" || message.role === "developer") {
-      messages.push(new SystemMessage(String(message.content ?? "")));
+      system.push(String(message.content ?? ""));
       continue;
     }
     if (message.role === "tool") {
@@ -123,6 +131,7 @@ export function toLangChainMessages(input: RunAgentInput): BaseMessage[] {
     messages.push(new HumanMessage(CONTINUE_TURN));
   }
 
+  messages[0] = new SystemMessage(system.join("\n\n"));
   return messages;
 }
 

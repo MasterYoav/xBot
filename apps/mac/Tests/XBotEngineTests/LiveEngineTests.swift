@@ -70,23 +70,25 @@ struct LiveEngineTests {
      the vendor the failure would be the router's "no key" sentence, or no managed Bot at all. Only a
      key that travelled the whole way comes back as Anthropic refusing it.
      */
+    // OpenAI, not the Anthropic key the next test stores: Swift Testing runs them at once, and two
+    // replaces of one key racing each other is a 500 from the engine's vault, not a client bug.
     @Test func aStoredKeyReachesTheVault() async throws {
         let client = client
         try await client.storeModelKey(
-            "sk-ant-api03-xbot-live-check-deliberately-invalid",
-            providerId: "anthropic", baseURL: nil, fingerprint: "live-check"
+            "sk-xbot-live-check-deliberately-invalid",
+            providerId: "openai", baseURL: nil, fingerprint: "live-check"
         )
-        let stored = try await client.liveModelKeys().first { $0.keyId == "xbot-model:anthropic" }
+        let stored = try await client.liveModelKeys().first { $0.keyId == "xbot-model:openai" }
         #expect(stored?.fingerprint == "live-check")
 
         // Replacing it leaves one live key, not two.
-        try await client.storeModelKey("sk-ant-replaced", providerId: "anthropic", baseURL: nil, fingerprint: "live-check-2")
-        let live = try await client.liveModelKeys().filter { $0.keyId == "xbot-model:anthropic" }
+        try await client.storeModelKey("sk-replaced", providerId: "openai", baseURL: nil, fingerprint: "live-check-2")
+        let live = try await client.liveModelKeys().filter { $0.keyId == "xbot-model:openai" }
         #expect(live.count == 1)
         #expect(live.first?.fingerprint == "live-check-2")
 
         if let id = live.first?.id { try await client.revokeModelKey(credentialId: id) }
-        #expect(try await client.liveModelKeys().allSatisfy { $0.keyId != "xbot-model:anthropic" })
+        #expect(try await client.liveModelKeys().allSatisfy { $0.keyId != "xbot-model:openai" })
     }
 
     /// Since ADR-0008, `LocalThreadRunner` answers this without an Intelligence key — the throwaway
@@ -246,5 +248,92 @@ struct LiveComputerToolsTests {
         let refused = await client.supplySecret("not asked for", for: agent.id)
         print("unasked secret:", refused ?? "accepted")
         #expect(refused != nil)
+    }
+}
+
+/**
+ A conversation that succeeds, against a real model — a local Ollama, so no key is needed.
+
+ Skipped unless `XBOT_LIVE_OLLAMA_MODEL` is set as well, to a pulled model that can call tools
+ (`qwen2.5:7b` works). Everything above proves how a turn fails; this is the one place a turn is
+ proven to answer, remember within a conversation, drive its computer through the client-tool loop,
+ and leave the thread holding each message once. Launch checklist item 5, the engine half.
+
+ A model is not deterministic, so the prompts ask for things a small one reliably gets right and the
+ assertions check for a word, never a sentence.
+ */
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["XBOT_LIVE_ENGINE_URL"] != nil
+    && ProcessInfo.processInfo.environment["XBOT_LIVE_OLLAMA_MODEL"] != nil))
+struct LiveConversationTests {
+    private let env = ProcessInfo.processInfo.environment
+
+    private var client: HTTPEngineClient {
+        let url = URL(string: env["XBOT_LIVE_ENGINE_URL"] ?? "http://127.0.0.1:3001")!
+        let token = env["XBOT_LIVE_ENGINE_TOKEN_FILE"].flatMap {
+            try? String(contentsOfFile: $0, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return HTTPEngineClient(baseURL: url, token: token)
+    }
+
+    private struct Turn {
+        var text = ""
+        var tools: [String] = []
+        var failure: String?
+    }
+
+    private func turn(_ text: String, in channel: Channel.ID) async throws -> Turn {
+        var turn = Turn()
+        for try await event in client.send(text, to: channel) {
+            switch event {
+            case .textDelta(_, let delta): turn.text += delta
+            case .toolCall(_, _, let name, _): turn.tools.append(name)
+            case .failed(_, let reason): turn.failure = reason
+            default: continue
+            }
+        }
+        print("live turn:", text, "→", turn.tools, turn.failure ?? turn.text)
+        return turn
+    }
+
+    @Test func aConversationAnswersRemembersUsesItsComputerAndIsKeptOnce() async throws {
+        let client = client
+        // What `ModelProviderCatalog.engineRouting(for: "ollama")` sends, which lives in XBotCore.
+        let agent = try await client.createAgent(AgentDraft(
+            name: "Conversation check",
+            model: ModelSelection(
+                provider: "Ollama", providerID: "openai-compatible", model: env["XBOT_LIVE_OLLAMA_MODEL"]!,
+                baseURL: env["XBOT_LIVE_OLLAMA_BASE_URL"] ?? "http://host.docker.internal:11434/v1", capabilities: []
+            )
+        ))
+        let channel = try await client.createChannel(agentIds: [agent.id])
+
+        let told = try await turn("Remember this codeword: tangerine. Reply with just OK.", in: channel.id)
+        #expect(told.failure == nil)
+        #expect(!told.text.isEmpty)
+
+        // A 7B model sometimes writes the call out as text instead of making it. That is the model's
+        // choice, not the loop failing, so it gets one more ask before the loop is judged.
+        var sent = 2
+        var browsed = try await turn(
+            "Use your browser to open https://example.com, then tell me the page's title.", in: channel.id
+        )
+        if !browsed.tools.contains("computer_navigate") {
+            sent += 1
+            browsed = try await turn("Call the computer_navigate tool with https://example.com now.", in: channel.id)
+        }
+        #expect(browsed.failure == nil)
+        #expect(browsed.tools.contains("computer_navigate"))
+        #expect(browsed.text.localizedCaseInsensitiveContains("example"))
+
+        // Two turns and a tool loop later. Each run carries the whole conversation, so this is memory.
+        let asked = try await turn("What was the codeword I gave you? Answer with the word only.", in: channel.id)
+        #expect(asked.failure == nil)
+        #expect(asked.text.localizedCaseInsensitiveContains("tangerine"))
+
+        // The tool loop resends messages the thread already holds and relies on their ids matching.
+        let history = try await client.messages(in: channel.id)
+        print("live history:", history.map { "\($0.isFromUser ? "user" : "agent") \($0.id) \($0.text.prefix(40))" })
+        #expect(Set(history.map(\.id)).count == history.count)
+        #expect(history.filter(\.isFromUser).count == sent + 1)
     }
 }

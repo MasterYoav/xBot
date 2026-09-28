@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { COMPUTER_GUIDANCE } from "../../shared/bot-prompt";
 import { mintRunAssertion, readRunAssertion } from "./agents/callback-token";
 import { createAgentFetch } from "./agents/endpoint";
+import { dialableHosts } from "./agents/managed-agent-host";
 import { askTheirOwnPerson, escalationTool } from "./agents/escalation";
 import { createHandoffDesk, HANDOFF_KIND } from "./agents/handoff";
 import { createHandoffDelivery } from "./agents/handoff-delivery";
@@ -603,8 +604,12 @@ const selectionForActor = (actorId: string): ToolSelection => ({
 // reading and the same one `createApp` takes.
 const agentFetch = createAgentFetch({
   allowPrivateHosts: config.computer?.allowPrivateHosts === true,
-  // Named addresses are reachable on every hop, not only the one that was registered.
-  allowedHosts: config.agentEndpointAllowedHosts,
+  // Named addresses are reachable on every hop, not only the one that was registered. The
+  // deployment's own Bot is one of them: in the one-container image it sits on loopback.
+  allowedHosts: dialableHosts(
+    config.agentEndpointAllowedHosts,
+    config.managedAgent,
+  ),
   // The refusal is what the run already knows; this is what the deployment knows. Written here
   // rather than in `endpoint.ts` so that file keeps deciding and nothing else, the way the
   // target check it reuses does.

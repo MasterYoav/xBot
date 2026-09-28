@@ -141,7 +141,9 @@ and `openai-compatible` — rather than two vendors.
 
 An end-to-end conversation through the server no longer needs Intelligence credentials: with none
 of the `INTELLIGENCE_*` variables set, `copilot.ts` runs on `LocalThreadRunner` (ADR-0008). That run
-through the server is launch checklist item 5, and has not been done yet.
+through the server is launch checklist item 5. Its engine half was run on 27 September against a
+local Ollama model, and found three faults on this hop that every conversation hit; all three are
+fixed and recorded there.
 
 **Still open:** a second live vendor. The three native adapters are built and each is covered by a
 test asserting which client a selection gets (`agent-langgraph/tests/models-build.test.ts`). Usage accounting is done — the agent sums `usage_metadata` across a turn and emits

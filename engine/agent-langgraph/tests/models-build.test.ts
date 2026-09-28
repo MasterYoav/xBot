@@ -54,6 +54,21 @@ describe("the client a selection is answered by", () => {
     );
   });
 
+  test("a keyless openai-compatible endpoint still hands the client a key", () => {
+    // A local Ollama asks for none, but OpenAI's client falls back to OPENAI_API_KEY and refuses the
+    // run without one: "Missing credentials", on every turn, found by the first live Ollama run.
+    const model = buildChatModel({
+      selection: {
+        providerId: "openai-compatible",
+        model: "qwen2.5:7b",
+        baseURL: "http://host.docker.internal:11434/v1",
+      },
+      fallback: undefined,
+      keys: {},
+    }) as ChatOpenAI;
+    expect(model.apiKey).toBeTruthy();
+  });
+
   test("an agent that never chose inherits the workspace default", () => {
     const model = buildChatModel({
       selection: undefined,
