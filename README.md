@@ -17,6 +17,7 @@ Your agents, their files, their browsers and your conversations stay on this Mac
 [![Xcode](https://img.shields.io/badge/Xcode-007ACC?logo=Xcode&logoColor=white)](https://developer.apple.com/xcode/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=fff)](docs/07-container-runtime.md)
 [![Ollama](https://img.shields.io/badge/Ollama-fff?logo=ollama&logoColor=000)](docs/04-model-providers.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
@@ -135,4 +136,5 @@ provider.
 
 ## Licence
 
-MIT.
+MIT. See [`LICENSE`](LICENSE). The engine keeps OpenBot's own MIT licence in
+[`engine/LICENSE`](engine/LICENSE).
