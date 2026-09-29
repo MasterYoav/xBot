@@ -31,6 +31,15 @@ cp "${RES}/xBot.icns" "${APP}/Contents/Resources/xBot.icns"
 cp "${MAC}/Resources/Info.plist" "${APP}/Contents/Info.plist"
 "${ROOT}/scripts/inject-sparkle-plist.sh" "${APP}/Contents/Info.plist"
 
+# The release workflow stamps the version it is publishing. Sparkle compares CFBundleVersion, so it
+# has to rise with every release, and the committed plist's "1" never would.
+if [[ -n "${XBOT_VERSION:-}" ]]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${XBOT_VERSION}" "${APP}/Contents/Info.plist"
+fi
+if [[ -n "${XBOT_BUILD_NUMBER:-}" ]]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${XBOT_BUILD_NUMBER}" "${APP}/Contents/Info.plist"
+fi
+
 chmod +x "${APP}/Contents/MacOS/XBot"
 
 # SwiftPM's per-target resource bundles. `Bundle.module` traps when its bundle is missing, so an app
