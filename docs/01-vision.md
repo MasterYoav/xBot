@@ -121,12 +121,12 @@ is genuinely local and genuinely model-agnostic.
 
 Recorded here rather than discovered in month four.
 
-**⚠️ The engine has a cloud dependency we are living with in v1.** OpenBot's server refuses to
-start without CopilotKit Intelligence unless the seam described in
-[ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) is used. It is built and the engine
-has been run without an account — but v1 ships on Intelligence, so a third party can change its
-free tier and affect the product. The seam is what keeps that from being fatal rather than
-inconvenient. [ADR-0001](decisions/0001-local-history-provider.md) remains the end state.
+**The engine's cloud dependency is gone for conversations.** OpenBot's server refused to start
+without CopilotKit Intelligence; the seam from
+[ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) lets it run without, and
+[ADR-0008](decisions/0008-local-thread-runner.md) made local mode the one v1 ships: conversations
+are kept by the engine's own `LocalThreadRunner`. Cross-conversation memory (pgvector) is still
+[ADR-0001](decisions/0001-local-history-provider.md)'s, for v1.1.
 
 **⚠️ Container runtimes on macOS are a licensing and UX minefield.** Docker Desktop requires a paid
 licence above a company-size threshold, is a large install, and is not something we can bundle.
