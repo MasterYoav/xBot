@@ -2,9 +2,19 @@ name: Mac release
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Marketing version to publish, e.g. 1.0.0. Leave empty to build without publishing."
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark the GitHub release as a pre-release"
+        type: boolean
+        default: false
 
+# Write, for the one step that creates the GitHub release. Nothing else here pushes.
 permissions:
-  contents: read
+  contents: write
 
 # Hoisted to the job so the optional steps can be gated on them.
 #
@@ -16,6 +26,9 @@ env:
   MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
   MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
   SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+  XBOT_VERSION: ${{ inputs.version }}
+  # Sparkle compares CFBundleVersion, so it must rise with every release. The run number does.
+  XBOT_BUILD_NUMBER: ${{ github.run_number }}
 
 jobs:
   build:
@@ -48,7 +61,7 @@ jobs:
 
       - name: Bundle .app
         env:
-          XBOT_APPCAST_URL: ${{ secrets.XBOT_APPCAST_URL }}
+          XBOT_APPCAST_URL: ${{ inputs.version != '' && format('https://github.com/{0}/releases/latest/download/appcast.xml', github.repository) || secrets.XBOT_APPCAST_URL }}
           XBOT_SPARKLE_PUBLIC_KEY: ${{ secrets.XBOT_SPARKLE_PUBLIC_KEY }}
         run: scripts/bundle-mac-app.sh
 
@@ -110,10 +123,13 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: scripts/sign-mac-app.sh
 
+      # The enclosure has to point at the asset this run is about to upload. The feed itself is
+      # served from releases/latest/download/appcast.xml, which GitHub redirects to the newest
+      # release — so each release's appcast only needs to describe itself.
       - name: Generate Sparkle appcast
         if: env.SPARKLE_EDDSA_PRIVATE_KEY != ''
         env:
-          XBOT_RELEASE_DOWNLOAD_PREFIX: ${{ secrets.XBOT_RELEASE_DOWNLOAD_PREFIX }}
+          XBOT_RELEASE_DOWNLOAD_PREFIX: ${{ inputs.version != '' && format('https://github.com/{0}/releases/download/v{1}/', github.repository, inputs.version) || secrets.XBOT_RELEASE_DOWNLOAD_PREFIX }}
         run: scripts/generate-appcast.sh
 
       - uses: actions/upload-artifact@v4
@@ -122,3 +138,34 @@ jobs:
           path: |
             dist/xBot.dmg
             dist/releases/
+
+      # Only a signed, notarized build is published: an unsigned DMG on the download page is the
+      # "cannot be opened" dialog that stops a non-technical person for good.
+      - name: Verify what a stranger's Mac will check
+        if: inputs.version != ''
+        run: |
+          set -euo pipefail
+          mnt="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "${mnt}" dist/xBot.dmg
+          trap 'hdiutil detach "${mnt}" >/dev/null' EXIT
+          spctl -a -vvv -t execute "${mnt}/XBot.app" 2>&1 | tee /dev/stderr | grep -q "Notarized Developer ID"
+          xcrun stapler validate "${mnt}/XBot.app"
+          xcrun stapler validate dist/xBot.dmg
+          test -f dist/releases/appcast.xml
+          grep -q 'sparkle:edSignature=' dist/releases/appcast.xml
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${mnt}/XBot.app/Contents/Info.plist")" = "${XBOT_VERSION}"
+
+      - name: Publish GitHub release
+        if: inputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v${XBOT_VERSION}"
+          flags=()
+          [[ "${{ inputs.prerelease }}" == "true" ]] && flags+=(--prerelease) || flags+=(--latest)
+          gh release create "${tag}" --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" \
+            --title "xBot ${XBOT_VERSION}" --generate-notes "${flags[@]}" \
+            "dist/xBot.dmg#xBot.dmg" \
+            "dist/releases/xBot-${XBOT_VERSION}.dmg" \
+            "dist/releases/appcast.xml"

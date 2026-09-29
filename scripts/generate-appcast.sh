@@ -37,7 +37,9 @@ if [[ -z "${SPARKLE_EDDSA_PRIVATE_KEY:-}" && -z "${SPARKLE_EDDSA_PRIVATE_KEY_FIL
 fi
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${PLIST}")"
-ARCHIVE="${RELEASES}/xBot ${VERSION}.dmg"
+# No space: GitHub renames an uploaded asset's spaces to dots, and the appcast's enclosure URL would
+# then name a file the release does not have.
+ARCHIVE="${RELEASES}/xBot-${VERSION}.dmg"
 
 mkdir -p "${RELEASES}"
 cp "${DMG}" "${ARCHIVE}"
