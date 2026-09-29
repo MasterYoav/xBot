@@ -62,6 +62,21 @@ if [ ! -s "$DATA/PG_VERSION" ]; then
   s6-setuidgid postgres "$BIN/pg_ctl" -D "$DATA" -w stop >/dev/null
 fi
 
+# A cluster with no password file beside it. "Beside the data on the same volume" holds only when the
+# volume is mounted at /var/lib/postgresql; mounted at $DATA — as the Mac app has always done, and
+# moving it now would strand every existing cluster — the file lives in the container's own layer and
+# is gone the first time the container is recreated, while the cluster keeps the password it no longer
+# has. `migrate` then fails authentication, `api` never starts, and nothing fixes it short of deleting
+# the data. So set a new one. Single-user mode needs no connection and so no password, and the
+# statement arrives on stdin, never argv. The server is not running yet: `postgres` depends on this.
+if [ -s "$DATA/PG_VERSION" ] && [ ! -s "$PW_FILE" ]; then
+  PW="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+  printf "ALTER ROLE openbot PASSWORD '%s';\n" "$PW" \
+    | s6-setuidgid postgres "$BIN/postgres" --single -D "$DATA" postgres >/dev/null
+  ( umask 077; printf '%s' "$PW" > "$PW_FILE" )
+  chown postgres:postgres "$PW_FILE"
+fi
+
 # Every boot, not only the first: hand the password-bearing URL to the services that connect over TCP
 # (`api` and `migrate`, both `with-contenv`). The password persists with the cluster; the container
 # environment is fresh each boot, so this has to run outside the first-init guard above. The file is
