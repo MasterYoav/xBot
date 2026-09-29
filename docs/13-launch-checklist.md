@@ -162,6 +162,18 @@ logging proxy in the path (12 of 12). A leftover process, a database lock, ident
 keep-alive and split request writes were each checked and ruled out. Worth one more look before
 launch, starting from the app under ordinary use rather than nine tests at once.
 
+**Two more, found starting the app on this Mac's own engine** (27 September), both leaving the
+container unhealthy with nothing on its port and no way back short of deleting the data:
+
+- **Any recreate of the container lost the database password.** The app mounts `xbot-data` at
+  `/var/lib/postgresql/data`; the password file lives one level up, so it went with the container
+  while the cluster kept the password. Every environment change recreates the container. Reproduced
+  on the old image with a clean stop and recreate; `postgres-init.sh` now sets a new password when a
+  cluster has none beside it, which also heals an install already in this state.
+- **`migrate` raced Postgres after an unclean stop.** It started before crash recovery finished and
+  failed on `57P03`; 3 of 3 SIGKILL-and-start rounds broke the old image, 0 of 3 the fixed one.
+  `migrate.sh` now waits for `pg_isready`, up to 60s.
+
 **Also close the last M2 item here:** point one agent at a second real vendor — Anthropic is already
 proven, so use OpenAI or Google — and confirm the reply comes from the vendor you picked. A model
 name the vendor does not have should come back as a named error, not a silent fall back to somebody
