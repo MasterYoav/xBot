@@ -1,8 +1,10 @@
-import type { Message } from "@ag-ui/client";
+import { type BaseEvent, EventType, type Message } from "@ag-ui/client";
 import {
   type AgentRunnerRunRequest,
   InMemoryAgentRunner,
+  ɵGLOBAL_STORE,
 } from "@copilotkit/runtime/v2";
+import { of } from "rxjs";
 import type { Database } from "../db/client";
 import { localThreads } from "../db/schema";
 import type { IntelligenceLike } from "../routines/run-turn";
@@ -50,6 +52,23 @@ export class LocalThreadRunner extends InMemoryAgentRunner {
   }
 
   override run(request: AgentRunnerRunRequest) {
+    /*
+     * A conversation that is still answering refuses the next run, and says so as an event.
+     *
+     * The vendor's runner throws "Thread already running" here. Thrown inside the SSE handler's
+     * factory, that is logged and the response — already a 200 — is closed with no events in it, so
+     * the Mac app saw a reply that was simply empty and could not tell anybody why. RUN_ERROR is the
+     * event every caller already reads as a failed turn: the app shows its sentence, and a routine or
+     * a hop, which take a lock before they get here, treat it as the refusal it is.
+     */
+    if (this.isBusy(request.threadId)) {
+      return of<BaseEvent>({
+        type: EventType.RUN_ERROR,
+        message:
+          "The agent is still answering your last message in this conversation. Wait for it to finish, then send this again.",
+        code: "thread_busy",
+      } as BaseEvent);
+    }
     const carried = request.agent.messages;
     const before = new Set(carried.map((message) => message.id));
     const shown = request.persistedInputMessages ?? carried;
@@ -66,6 +85,15 @@ export class LocalThreadRunner extends InMemoryAgentRunner {
 
   override getThreadMessages(threadId: string): Message[] {
     return [...(this.kept.get(threadId) ?? [])];
+  }
+
+  /**
+   * Whether a run would be refused. The vendor's own test, read synchronously from its store
+   * because `run` must answer synchronously, and `isRunning` is a promise.
+   */
+  private isBusy(threadId: string): boolean {
+    const store = ɵGLOBAL_STORE.peek(threadId);
+    return Boolean(store?.isRunning || store?.stopRequested);
   }
 
   private keep(threadId: string, agentId: string, messages: Message[]) {
