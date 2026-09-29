@@ -62,7 +62,10 @@ private struct FrostedGlassModifier: ViewModifier {
         if reduceTransparency {
             content.background(opaqueFallback)
         } else {
-            content.background(FrostedGlassBackground(material: material))
+            // Up under the title bar, as the opaque fallback above already goes: a `Color`
+            // background ignores the safe area by default, a representable does not, so the rail
+            // and panel stopped 38pt short of the top only when transparency was on.
+            content.background(FrostedGlassBackground(material: material).ignoresSafeArea())
         }
     }
 }

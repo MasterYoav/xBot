@@ -73,6 +73,7 @@ public struct WindowChromeConfigurator: NSViewRepresentable {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.styleMask.insert(.fullSizeContentView)
+        keepTitlebarAboveContent(in: window)
 
         switch style {
         case .main:
@@ -96,6 +97,22 @@ public struct WindowChromeConfigurator: NSViewRepresentable {
             stripToolbarItemBackgrounds(in: window.contentView)
             clearTitlebarBackground(in: window)
         }
+    }
+
+    /// The title bar above the SwiftUI content, where AppKit is meant to keep it.
+    ///
+    /// On macOS 27 the window opens with the hosting view stacked over `NSTitlebarContainerView`.
+    /// With a full-size content view the aurora then paints over the whole title bar: no traffic
+    /// lights, no toggles, no agent name — every view still laid out and not hidden, just covered.
+    /// Moving the container back to the top is all it takes, and it stays there once moved.
+    private func keepTitlebarAboveContent(in window: NSWindow) {
+        guard let frame = window.contentView?.superview,
+              let titlebar = frame.subviews.first(where: {
+                  String(describing: type(of: $0)).contains("TitlebarContainer")
+              }),
+              frame.subviews.last !== titlebar
+        else { return }
+        frame.addSubview(titlebar, positioned: .above, relativeTo: nil)
     }
 
     private func stripToolbarItemBackgrounds(in view: NSView?) {
