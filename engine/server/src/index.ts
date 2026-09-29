@@ -88,6 +88,7 @@ import {
   startWorkOfferedListener,
   type WorkOfferedListener,
 } from "./work/queue";
+import { keepStreamingRunsOpen } from "./xbot/stream-idle-timeout";
 
 /**
  * Who is asking, for a CopilotKit request.
@@ -1164,6 +1165,8 @@ const asChannelSocket = (ws: { data: SocketData }) =>
 serve<SocketData>({
   port,
   async fetch(request, server) {
+    // xBot: before anything is awaited. See xbot/stream-idle-timeout.ts.
+    keepStreamingRunsOpen(request, server);
     const url = new URL(request.url);
     const streamBotId = streamPathBotId(url.pathname);
     if (
