@@ -33,6 +33,12 @@ cp "${MAC}/Resources/Info.plist" "${APP}/Contents/Info.plist"
 
 chmod +x "${APP}/Contents/MacOS/XBot"
 
+# SwiftPM's per-target resource bundles. `Bundle.module` traps when its bundle is missing, so an app
+# without them dies at launch on the first view that loads a resource.
+for bundle in "$(dirname "${BUILD}")"/*.bundle; do
+  [[ -d "${bundle}" ]] && rsync -a "${bundle}" "${APP}/Contents/Resources/"
+done
+
 # Sparkle ships as an embedded framework when linked through SwiftPM.
 SPARKLE_FW="$(find "${MAC}/.build" -path '*/Sparkle.framework' -type d 2>/dev/null | head -1)"
 if [[ -n "${SPARKLE_FW}" ]]; then
