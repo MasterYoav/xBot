@@ -9,6 +9,7 @@ public struct AdvancedSettingsView: View {
 
     @State private var isConfirmingUninstall = false
     @State private var hasUninstalled = false
+    @State private var uninstallFailed = false
 
     public var body: some View {
         Form {
@@ -79,6 +80,17 @@ public struct AdvancedSettingsView: View {
                     )
                     .foregroundStyle(Palette.textSecondary)
                 } else {
+                    if uninstallFailed {
+                        // Said, not skipped: the alternative was announcing success over every
+                        // volume still on disk. Keys and preferences are kept, so a retry works.
+                        Text(
+                            String(
+                                localized:
+                                    "Your data couldn't be removed, because Docker didn't respond. Make sure Docker Desktop or Colima is running, then try again."
+                            )
+                        )
+                        .foregroundStyle(Palette.textSecondary)
+                    }
                     Button(String(localized: "Remove all xBot data…"), role: .destructive) {
                         isConfirmingUninstall = true
                     }
@@ -107,8 +119,9 @@ public struct AdvancedSettingsView: View {
         ) {
             Button(String(localized: "Remove everything"), role: .destructive) {
                 Task {
-                    await state.uninstall()
-                    hasUninstalled = true
+                    let removed = await state.uninstall()
+                    hasUninstalled = removed
+                    uninstallFailed = !removed
                 }
             }
             Button(String(localized: "Cancel"), role: .cancel) {}

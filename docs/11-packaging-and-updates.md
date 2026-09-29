@@ -312,6 +312,12 @@ is a bad citizen with a reputation problem.
 **Does not remove the container runtime**, because the user may have installed it for something else.
 It says so.
 
+**It wakes the runtime first**, because nothing can be deleted without a daemon, and on the day
+somebody removes an app Docker Desktop may well be quit. If the runtime will not come up, or a volume
+is still there afterwards, uninstall reports failure and removes **nothing else** — the keys and
+preferences stay, so trying again from the same button works. It used to run every removal against
+no daemon inside a `try?` and then say everything was gone.
+
 **Also ship a standalone uninstaller script** in the DMG for the user who already dragged the app to
 the Trash and then found the volumes. It is `Uninstall xBot.command`, copied from
 `scripts/uninstall-xbot.command`, and it mirrors `AppState.uninstall()` step for step.

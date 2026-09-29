@@ -122,7 +122,12 @@ public actor FakeDriver: ContainerDriver {
 
     public func createVolume(_ name: String) async throws { volumes.insert(name) }
     public func volumeExists(_ name: String) async -> Bool { volumes.contains(name) }
-    public func removeVolume(_ name: String) async throws { volumes.remove(name) }
+    /// Refused while the daemon is down, as the real one is: with no daemon there is nobody to
+    /// delete anything, and a fake that said otherwise hid exactly that from the uninstall tests.
+    public func removeVolume(_ name: String) async throws {
+        guard case .ready = await probe() else { throw RuntimeError.daemonUnavailable }
+        volumes.remove(name)
+    }
 
     /// Records the exec and writes a stand-in file, so a caller that depends on the file existing
     /// is exercised rather than only the call being counted.
