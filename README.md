@@ -67,9 +67,9 @@ process. On 27 September a throwaway engine with no CopilotKit key held a three-
 with a local Ollama model, drove its browser through the client-tool loop, remembered across turns,
 and kept every conversation intact through a restart.
 
-Still open: a second live vendor, a clean-VM first run, notarization credentials that Apple
-accepts, and the first published release. Signing, Sparkle keys and the release pipeline are in
-place.
+**xBot 1.0.0 is released:** a universal, signed and notarized DMG on
+[GitHub Releases](https://github.com/MasterYoav/xBot/releases/latest), with a Sparkle appcast for
+in-app updates. Still open: a second live vendor and a clean-VM first run.
 
 Start at [`docs/README.md`](docs/README.md). The milestone table is in
 [`docs/12-roadmap.md`](docs/12-roadmap.md), and what is left, in order, is in

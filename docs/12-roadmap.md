@@ -277,9 +277,9 @@ them — ADR-0008 means the app has nothing to link to there.
 **The ordered version of all this is [13-launch-checklist.md](13-launch-checklist.md).** What still
 needs a person, and cannot be done from here:
 
-1. A Developer ID certificate and notarization credentials, plus the CI secrets to use them. Until
-   then every build is ad-hoc signed, which is also why local GUI verification keeps meeting a
-   Keychain prompt: the code identity changes on every rebuild.
+1. ~~A Developer ID certificate and notarization credentials, plus the CI secrets to use them.~~
+   Done 29 September: xBot 1.0.0 shipped signed and notarized from `mac-release.yml`, and Gatekeeper
+   accepts the downloaded DMG and app as "Notarized Developer ID".
 2. A clean-VM run of onboarding end to end.
 3. A second live vendor key, to close the last M2 item.
 
