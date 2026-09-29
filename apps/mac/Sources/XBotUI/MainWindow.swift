@@ -51,6 +51,11 @@ public struct MainWindow: View {
             ToolbarItem(placement: .principal) {
                 TitleBarAgentTitle()
             }
+            // Pushes the panel toggle to the trailing corner, over the panel it opens. Without it
+            // `.primaryAction` sits flush against the centred title.
+            if #available(macOS 26.0, *) {
+                ToolbarSpacer(.flexible)
+            }
             ToolbarItem(placement: .primaryAction) {
                 sidebarToggle(
                     isVisible: state.isPanelVisible,
