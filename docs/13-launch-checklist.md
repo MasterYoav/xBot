@@ -154,13 +154,16 @@ That first run found three engine faults, each of which failed every conversatio
   guidance, and Anthropic accepts a system message only first. All system texts are now merged, in
   order, into one leading message (`agent-langgraph/src/history.ts`).
 
-**One open finding.** On a freshly started engine, roughly one full live run in six had a turn come
-back empty, or a request go unanswered, while all nine live tests ran at once. The engine logged
-"Thread already running" or, once, "No agents are registered", both of which should be impossible
-there. It was never seen with the conversation suite alone (5 of 5 fresh engines), nor with a
-logging proxy in the path (12 of 12). A leftover process, a database lock, identity, idle
-keep-alive and split request writes were each checked and ruled out. Worth one more look before
-launch, starting from the app under ordinary use rather than nine tests at once.
+**The intermittent fault, found and fixed** (29 September). On a freshly started engine, roughly one
+full live run in six had a turn come back empty, followed by "Thread already running". The cause was
+Bun's own `idleTimeout`, 10 seconds by default: a streaming run writes RUN_STARTED and then nothing
+until the model's first token, and a cold local model takes longer than that. The connection was
+closed under a live run, the reply was empty, and the orphaned run held the thread until it
+finished. A fake model that stays silent for 15 seconds reproduced it every time. Streaming agent
+runs are now exempt from the idle timeout (`server/src/xbot/stream-idle-timeout.ts`); with that, 6
+of 6 full live rounds on fresh engines with a cold model passed with no busy refusals. A message
+sent while a run genuinely is still going now gets RUN_ERROR with a sentence rather than an empty
+200.
 
 **Two more, found starting the app on this Mac's own engine** (27 September), both leaving the
 container unhealthy with nothing on its port and no way back short of deleting the data:
@@ -233,8 +236,8 @@ From a shell holding no credentials:
   now needs re-running against `LocalThreadRunner` rather than a CopilotKit key — see item 5.
 - On 27 September, it was: a throwaway engine in local mode with no CopilotKit key held a real
   conversation with a local Ollama model, used its computer through the client-tool loop, remembered
-  across turns, and kept every conversation intact through a restart. Item 5 has the details and
-  the one open finding.
+  across turns, and kept every conversation intact through a restart. Item 5 has the details,
+  including the intermittent empty reply found and fixed on 29 September.
 - The pinned engine is one multi-arch image (linux/amd64 and linux/arm64). On 14 September an Apple
   Silicon Mac pulled it anonymously, got arm64, was healthy in about ten seconds on a port other than
   3001, and passed the live suite: browser, files, shell, and a help request handed back. Before that
