@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { BaseEvent, Message, RunAgentInput } from "@ag-ui/client";
 import { AbstractAgent, EventType } from "@ag-ui/client";
 import { eq } from "drizzle-orm";
-import { lastValueFrom, Observable } from "rxjs";
+import { lastValueFrom, Observable, Subject } from "rxjs";
 import { createDatabase } from "../src/db/client";
 import { localThreads } from "../src/db/schema";
 import {
@@ -187,5 +187,81 @@ describe("a conversation kept locally", () => {
       { id: "u1", role: "user", content: "hello" },
       { id: `reply-${runId}`, role: "assistant", content: "heard you" },
     ]);
+  });
+});
+
+/** Says nothing until released, so a second run can arrive while it is still going. */
+class Held extends AbstractAgent {
+  private readonly gate = new Subject<void>();
+  release() {
+    this.gate.next();
+    this.gate.complete();
+  }
+  run(input: RunAgentInput) {
+    return new Observable<BaseEvent>((subscriber) => {
+      subscriber.next({
+        type: EventType.RUN_STARTED,
+        threadId: input.threadId,
+        runId: input.runId,
+      } as BaseEvent);
+      // Whichever subscription the runner holds, and however many times it subscribes.
+      const opened = this.gate.subscribe({
+        complete: () => {
+          subscriber.next({
+            type: EventType.RUN_FINISHED,
+            threadId: input.threadId,
+            runId: input.runId,
+          } as BaseEvent);
+          subscriber.complete();
+        },
+      });
+      return () => opened.unsubscribe();
+    });
+  }
+}
+
+describe("a message sent while the conversation is still answering", () => {
+  const input = (threadId: string) => ({
+    threadId,
+    runId: randomUUID(),
+    messages: [user(randomUUID(), "hello")],
+    state: {},
+    tools: [],
+    context: [],
+    forwardedProps: {},
+  });
+
+  test("is refused with a RUN_ERROR a person can read, not a silent empty stream", async () => {
+    const threadId = newThread();
+    const runner = new LocalThreadRunner(database);
+    const first = new Held();
+    first.setMessages([]);
+    const running = lastValueFrom(
+      runner.run({ threadId, agent: first, input: input(threadId) }),
+      { defaultValue: undefined },
+    );
+
+    // Thrown, the vendor's SSE handler logs it and closes a 200 with no events in it at all.
+    const second = new Echo();
+    second.setMessages([]);
+    const events: BaseEvent[] = [];
+    await new Promise<void>((resolve, reject) =>
+      runner
+        .run({ threadId, agent: second, input: input(threadId) })
+        .subscribe({
+          next: (e) => events.push(e),
+          error: reject,
+          complete: resolve,
+        }),
+    );
+
+    expect(events.map((event) => event.type)).toEqual([EventType.RUN_ERROR]);
+    expect((events[0] as { message?: string }).message).toContain(
+      "still answering",
+    );
+
+    first.release();
+    await running;
+    expect(await runner.isRunning({ threadId })).toBe(false);
   });
 });
