@@ -125,13 +125,12 @@
       </p>
       <div class="card">
         <p>
-          <strong>One exception, and we would rather you read it here than find it later.</strong> In
-          version 1, your conversation history is stored by
-          <a href="https://copilotkit.ai">CopilotKit</a>, the service xBot's engine is built on. Your
-          agents' files and browsers are not — only the transcript. Onboarding says so before you type
-          a key, and
-          <a href="https://github.com/MasterYoav/xBot/blob/master/docs/decisions/0007-wrap-openbot-keep-intelligence.md">ADR-0007</a>
-          records why and what replaces it.
+          <strong>Your conversations stay here too.</strong> The engine keeps every conversation in
+          its own database on this Mac, with no CopilotKit account and nothing to sign up for.
+          What leaves the Mac is what you send to the model provider you chose — and nothing at all
+          if that is a model running locally through Ollama.
+          <a href="https://github.com/MasterYoav/xBot/blob/master/docs/decisions/0008-local-thread-runner.md">ADR-0008</a>
+          records how.
         </p>
       </div>
 

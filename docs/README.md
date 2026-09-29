@@ -58,6 +58,7 @@ Architecture Decision Records. Each one exists because the decision looks wrong 
 | [0005](decisions/0005-distribution-outside-app-store.md) | Developer ID and a DMG, not the Mac App Store |
 | [0006](decisions/0006-naming-and-trademark.md) | Open questions about the name and the visual reference |
 | [0007](decisions/0007-wrap-openbot-keep-intelligence.md) | **Wrap OpenBot rather than re-engineer it, and keep Intelligence for v1.** Defers 0001 and re-orders the roadmap — read it before 01 or 03 |
+| [0008](decisions/0008-local-thread-runner.md) | **Conversations kept locally** by a durable wrapper around the vendor's SSE runner. Supersedes 0007's "keep Intelligence" for v1 |
 
 ## Conventions in these documents
 

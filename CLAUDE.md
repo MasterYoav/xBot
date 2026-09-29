@@ -29,8 +29,7 @@ finished. Route it through the app.
 ### Non-goals
 
 - No hosted/SaaS version of xBot. The app, the engine, the agents and their browsers run on the
-  user's machine. **In v1 the conversation transcript is the exception** — it lives in CopilotKit
-  Intelligence, and onboarding says so before the user types a key. See ADR-0007.
+  user's machine, and so are conversations: the engine keeps them itself. See ADR-0008.
 - No Mac App Store build. See `docs/decisions/0005-distribution-outside-app-store.md`.
 - No Windows or Linux client in v1. The engine is portable; the client is not.
 - No model of our own. xBot supplies no intelligence — the user brings keys or runs Ollama.
@@ -79,7 +78,7 @@ it — it usually does, and better than a first attempt would.
 - New xBot code goes in **new files**. A moved or heavily edited upstream file is a permanent merge
   conflict.
 
-### 1. v1 runs on CopilotKit Intelligence, and the seam to leave it is already built.
+### 1. v1 runs in local mode, on the vendor's own SSE runner made durable.
 
 OpenBot's `runtimeCapabilities()` in `server/src/config.ts` used to **throw on startup** unless all
 four of `INTELLIGENCE_API_URL`, `INTELLIGENCE_GATEWAY_WS_URL`, `INTELLIGENCE_API_KEY` and
@@ -87,13 +86,12 @@ four of `INTELLIGENCE_API_URL`, `INTELLIGENCE_GATEWAY_WS_URL`, `INTELLIGENCE_API
 means local history, and a partial set still throws — for upstream's original reason, that somebody
 who set two of four intended Intelligence and got it wrong.
 
-**v1 sets all four.** The local mode exists, boots, and serves, but `LocalIntelligence` is a spike
-that records which methods are reached and throws; it is not a provider yet.
+**v1 sets none.** Local mode runs `LocalThreadRunner` (`server/src/history/local-thread-runner.ts`),
+which extends CopilotKit's `InMemoryAgentRunner` and persists each thread to `local_threads`. The
+app has no field for a CopilotKit key. Recall/memory (pgvector) is still ADR-0001's, for v1.1.
 
-- ADRs: `docs/decisions/0007-...` (the decision), `docs/decisions/0001-...` (the eventual design)
-- Measured scope: `grep` says 156 references across 18 files; the **compiler** says 5 across 4.
-  Trust the compiler. Widen the `RuntimeCapabilities` union and let it tell you.
-- `COPILOTKIT_LICENSE_TOKEN` is telemetry only. The runtime validates nothing.
+- ADRs: `docs/decisions/0008-...` (what shipped), `0007-...` (the seam), `0001-...` (the fuller design)
+- `LocalThreadRunner` is single-user: SSE mode has no `identifyUser`.
 - **Never add a new direct call to the Intelligence client.** Go through the seam.
 
 ### 2. The model provider is a process-wide environment variable. We are making it per-agent.
