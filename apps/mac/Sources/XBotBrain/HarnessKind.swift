@@ -1,0 +1,72 @@
+import Foundation
+
+/// An agent CLI the person has installed and signed in to, which xBot drives on their subscription.
+public enum HarnessKind: String, Codable, CaseIterable, Sendable {
+    case claude
+    case codex
+
+    /// Product names, so not localised.
+    public var displayName: String {
+        switch self {
+        case .claude: "Claude Code"
+        case .codex: "Codex"
+        }
+    }
+
+    public var executableName: String {
+        switch self {
+        case .claude: "claude"
+        case .codex: "codex"
+        }
+    }
+
+    /// What the composer offers. `nil` first: the CLI's own default, whatever it is this week.
+    public var models: [String?] {
+        switch self {
+        case .claude: [nil, "opus", "sonnet", "haiku"]
+        case .codex: [nil]
+        }
+    }
+
+    /// Never the prompt: it goes on stdin, because a prompt starting with "-" would be read as a
+    /// flag and argv has a length limit.
+    public func arguments(for request: TurnRequest) -> [String] {
+        switch self {
+        case .claude:
+            let mode = switch request.mode {
+            case .readOnly: "default"
+            case .editFiles: "acceptEdits"
+            case .fullAccess: "bypassPermissions"
+            }
+            var arguments = [
+                "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+                "--permission-mode", mode,
+            ]
+            if let model = request.model { arguments += ["--model", model] }
+            if let resume = request.resumeID { arguments += ["--resume", resume] }
+            return arguments
+
+        case .codex:
+            let sandbox = switch request.mode {
+            case .readOnly: "read-only"
+            case .editFiles: "workspace-write"
+            case .fullAccess: "danger-full-access"
+            }
+            // `-c` rather than `-s`: `exec resume` has no `-s`, and one spelling for both is simpler.
+            var arguments = ["exec"]
+            if request.resumeID != nil { arguments.append("resume") }
+            arguments += ["--json", "--skip-git-repo-check", "-c", "sandbox_mode=\"\(sandbox)\""]
+            if let model = request.model { arguments += ["-m", model] }
+            if let resume = request.resumeID { arguments.append(resume) }
+            arguments.append("-")
+            return arguments
+        }
+    }
+
+    public func events(from line: String) -> [BrainEvent] {
+        switch self {
+        case .claude: ClaudeStream.events(from: line)
+        case .codex: CodexStream.events(from: line)
+        }
+    }
+}
