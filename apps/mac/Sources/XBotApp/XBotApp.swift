@@ -1,30 +1,60 @@
 import AppKit
 import SwiftUI
+import XBotBrain
 import XBotCore
 import XBotUI
 
 @main
 struct XBotApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let appUpdates = SparkleAppUpdateController()
+    @State private var workspace = Self.makeWorkspace()
 
     var body: some Scene {
         Window("xBot", id: "main") {
-            Text(verbatim: "xBot")
+            RootView(workspace: workspace)
+                .frame(minWidth: Metrics.minimumWindow.width, minHeight: Metrics.minimumWindow.height)
         }
+        .defaultSize(Metrics.defaultWindow)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button(String(localized: "About xBot")) { AboutPanel.show() }
             }
             CommandGroup(after: .appInfo) {
-                Button(String(localized: "Check for Updates…")) {
-                    appUpdates.checkForUpdates(userInitiated: true)
+                Button(String(localized: "Check for Updates…")) { appUpdates.checkForUpdates(userInitiated: true) }
+            }
+            CommandGroup(replacing: .newItem) {
+                Button(String(localized: "New Chat")) { workspace.newChat(in: nil) }
+                    .keyboardShortcut("n", modifiers: .command)
+                    .disabled(workspace.availableHarnesses.isEmpty)
+                Button(String(localized: "Close Tab")) {
+                    if let id = workspace.selectedChatID { workspace.close(id) }
                 }
+                .keyboardShortcut("w", modifiers: .command)
+                .disabled(workspace.selectedChatID == nil)
             }
             CommandGroup(replacing: .help) {
-                Button(String(localized: "xBot Documentation")) {
-                    NSWorkspace.shared.open(AboutPanel.documentationURL)
-                }
+                Button(String(localized: "xBot Documentation")) { NSWorkspace.shared.open(AboutPanel.documentationURL) }
             }
         }
+    }
+
+    /// The library on disk, or — if it cannot be opened — one in memory with the reason on screen,
+    /// so the app still works and says plainly that nothing will be kept.
+    @MainActor
+    private static func makeWorkspace() -> Workspace {
+        let inbox = Store.supportDirectory.appending(path: "Inbox", directoryHint: .isDirectory)
+        let discover: @Sendable () async -> [HarnessKind: any Brain] = { await HarnessLocator.installed() }
+        let workspace: Workspace
+        do {
+            workspace = Workspace(store: try Store.live(), inbox: inbox, discover: discover)
+        } catch {
+            workspace = Workspace(store: .inMemory(), inbox: inbox, discover: discover)
+            workspace.problem = String(
+                localized: "xBot couldn't open its library, so this session won't be saved. \(String(describing: error))"
+            )
+        }
+        AppDelegate.workspace = workspace
+        return workspace
     }
 }
