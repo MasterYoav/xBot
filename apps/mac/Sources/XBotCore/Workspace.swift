@@ -12,6 +12,8 @@ public final class Workspace {
     public var selectedChatID: UUID?
     /// The reply being written right now, per chat. Saved as a message when the turn ends.
     public private(set) var live: [UUID: [Part]] = [:]
+    /// True until the installed CLIs have been looked for. Nothing claims one is missing before then.
+    public private(set) var isDiscovering = true
     /// Set when xBot cannot save, so the window can say so instead of pretending.
     public var problem: String?
 
@@ -39,7 +41,9 @@ public final class Workspace {
     public var availableHarnesses: [HarnessKind] { HarnessKind.allCases.filter { brains[$0] != nil } }
 
     public func refreshHarnesses() async {
+        isDiscovering = true
         brains = await discover()
+        isDiscovering = false
     }
 
     public func chat(_ id: UUID) -> Chat? { chats.first { $0.id == id } }
@@ -52,6 +56,9 @@ public final class Workspace {
     /// reason: the composer shows Stop instead.
     public func sendBlockedReason(_ id: UUID) -> String? {
         guard let chat = chat(id) else { return nil }
+        if brains[chat.harness] == nil, isDiscovering {
+            return String(localized: "Looking for \(chat.harness.displayName)…")
+        }
         if brains[chat.harness] == nil {
             return String(localized: "\(chat.harness.displayName) isn't installed on this Mac any more.")
         }
@@ -195,7 +202,14 @@ public final class Workspace {
     private func end(_ id: UUID, turn token: UUID, stopped: Bool) {
         guard turns[id]?.token == token else { return }
         turns[id] = nil
-        var parts = live.removeValue(forKey: id) ?? []
+        // A tool with no result when the turn ends never finished; saved as running, it would spin
+        // in the transcript forever.
+        var parts = (live.removeValue(forKey: id) ?? []).map { part in
+            guard case .tool(var tool) = part, tool.output == nil else { return part }
+            tool.output = ""
+            tool.isError = true
+            return .tool(tool)
+        }
         if stopped { parts.append(.notice(String(localized: "Stopped."))) }
         if !parts.isEmpty { save(ChatMessage(chatID: id, role: .assistant, parts: parts)) }
         update(id) { $0.updatedAt = .now }

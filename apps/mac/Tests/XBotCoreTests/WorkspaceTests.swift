@@ -95,6 +95,18 @@ final class ScriptedBrain: Brain {
         w.stop(chat.id)
     }
 
+    /// A tool still running when the turn ends never finished. Saved as running, it would spin in
+    /// the transcript forever.
+    @Test func aToolCutOffByStopIsSavedAsUnfinished() async throws {
+        let w = await workspace(ScriptedBrain([.toolCall(id: "t", name: "Shell", summary: "make")], hold: true))
+        let chat = try #require(w.newChat(in: nil))
+        _ = w.send("build it", in: chat.id)
+        for _ in 0..<20 { await Task.yield() }
+        w.stop(chat.id)
+        let reply = try #require(w.messages(in: chat.id).last)
+        #expect(reply.parts.first == .tool(ToolPart(id: "t", name: "Shell", summary: "make", output: "", isError: true)))
+    }
+
     @Test func aFailureIsSavedInTheReply() async throws {
         let w = await workspace(ScriptedBrain([.failed("Not signed in to Claude Code.")]))
         let chat = try #require(w.newChat(in: nil))
@@ -112,6 +124,20 @@ final class ScriptedBrain: Brain {
         w.setHarness(.codex, for: chat.id)
         #expect(w.chat(chat.id)?.sessionID == nil)
         #expect(w.chat(chat.id)?.model == nil)
+    }
+
+    /// Finding the CLIs takes a moment at launch (the login shell is read for PATH). Until it is
+    /// done, nothing may claim a CLI is missing.
+    @Test func beforeDiscoveryNothingClaimsACLIIsMissing() async throws {
+        let store = Store.inMemory()
+        try store.save(Chat(projectID: nil, title: "Earlier", harness: .claude, mode: .editFiles))
+        let w = Workspace(store: store, inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
+        let id = try #require(w.chats.first?.id)
+        #expect(w.isDiscovering)
+        #expect(w.sendBlockedReason(id) == String(localized: "Looking for Claude Code…"))
+        await w.refreshHarnesses()
+        #expect(!w.isDiscovering)
+        #expect(w.sendBlockedReason(id) == nil)
     }
 
     @Test func noHarnessMeansNoChat() async {

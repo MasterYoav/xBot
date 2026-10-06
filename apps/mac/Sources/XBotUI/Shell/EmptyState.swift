@@ -8,7 +8,12 @@ struct EmptyState: View {
     var body: some View {
         VStack(spacing: Space.l) {
             AppMarkView()
-            if workspace.availableHarnesses.isEmpty {
+            if workspace.isDiscovering, workspace.availableHarnesses.isEmpty {
+                ProgressView().controlSize(.small)
+                Text(String(localized: "Looking for your agents…"))
+                    .bodyText()
+                    .foregroundStyle(Palette.textSecondary)
+            } else if workspace.availableHarnesses.isEmpty {
                 Text(String(localized: "xBot works through an AI agent you already have."))
                     .sectionTitle()
                 Text(String(localized: "Install Claude Code or Codex and sign in, then come back. xBot will find it."))
