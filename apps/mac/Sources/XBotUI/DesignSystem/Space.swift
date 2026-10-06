@@ -20,16 +20,13 @@ public enum Radius {
 }
 
 public enum Metrics {
-    /// The rail. Fixed, per docs/09-ui-spec.md.
-    public static let railWidth: CGFloat = 68
-    public static let panelWidth: ClosedRange<CGFloat> = 320...420
+    public static let sidebarWidth: ClosedRange<CGFloat> = 220...360
+    public static let sidebarIdealWidth: CGFloat = 260
+    /// A transcript line longer than this is hard to read; wider windows add margin, not width.
+    public static let readingWidth: CGFloat = 760
     public static let minimumWindow = CGSize(width: 900, height: 600)
-    /// Onboarding is a fixed-size window — no resize, no minimise (docs/06-onboarding.md).
-    public static let onboardingWindow = CGSize(width: 520, height: 640)
-    /// Room for conversation once rail and panel are both open.
-    public static let conversationMinimumWidth: CGFloat = 360
-    /// Unified toolbar height reference.
+    public static let defaultWindow = CGSize(width: 1280, height: 820)
     public static let titleBarHeight: CGFloat = 52
-    /// A bubble never spans the conversation. ~70%, per the spec and the reference.
-    public static let bubbleMaximumWidthFraction: CGFloat = 0.7
+    public static let tabWidth: CGFloat = 200
+    public static let toolOutputMaxHeight: CGFloat = 240
 }

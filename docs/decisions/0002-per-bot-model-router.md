@@ -1,5 +1,7 @@
 # ADR-0002 — Resolve the model per agent at request time, not per process at boot
 
+> **Superseded by [ADR-0009](0009-native-harness-redesign.md)** — the engine this decided about was removed; a chat now carries its own harness and model. Kept as history.
+
 **Status:** Accepted
 **Date:** 2026-09
 **Related:** [04-model-providers.md](../04-model-providers.md), [12-roadmap.md](../12-roadmap.md) M2

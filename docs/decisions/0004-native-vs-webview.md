@@ -1,5 +1,7 @@
 # ADR-0004 — Native SwiftUI for the product surface, embedded web for admin
 
+> **Narrowed by [ADR-0009](0009-native-harness-redesign.md)** — the embedded web admin went with the engine; everything is native.
+
 **Status:** Accepted
 **Date:** 2026-09
 **Related:** [05-mac-app.md](../05-mac-app.md), [09-ui-spec.md](../09-ui-spec.md)

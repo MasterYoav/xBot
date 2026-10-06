@@ -1,5 +1,10 @@
 # Vision
 
+> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
+> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
+> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
+> Until then, where it disagrees with the code, the code and the spec win.
+
 ## The product in one paragraph
 
 xBot is a native macOS app for creating, managing, and talking to AI agents that run on your own

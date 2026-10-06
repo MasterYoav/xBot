@@ -1,147 +1,60 @@
 import AppKit
 import SwiftUI
+import XBotBrain
 import XBotCore
-import XBotEngine
-import XBotOnboarding
-import XBotRuntime
 import XBotUI
 
 @main
 struct XBotApp: App {
-    @NSApplicationDelegateAdaptor(QuitHandler.self) private var quitHandler
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let appUpdates = SparkleAppUpdateController()
-    @State private var state: AppState
-    @State private var onboardingCoordinator: OnboardingCoordinator
-    @State private var showOnboarding = Self.initialShowOnboarding
-
-    init() {
-        Task { @MainActor in AppIconConfigurator.apply() }
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["XBOT_USE_RUNTIME"] != "1" {
-            _state = State(wrappedValue: AppState(engine: StubEngineClient()))
-            _onboardingCoordinator = State(wrappedValue: OnboardingCoordinator())
-            return
-        }
-        #endif
-        let runtime = EngineBootstrap.runtimeController()
-        let environment = EngineBootstrap.environmentFactory()
-        let production = Self.productionState(
-            runtime: runtime,
-            environment: environment,
-            appUpdates: appUpdates
-        )
-        QuitHandler.state = production
-        _state = State(wrappedValue: production)
-        _onboardingCoordinator = State(
-            wrappedValue: OnboardingCoordinator(runtime: runtime, environmentFactory: environment)
-        )
-    }
-
-    private static func productionState(
-        runtime: RuntimeController,
-        environment: @escaping @Sendable (UInt16, String) -> [String: String],
-        appUpdates: SparkleAppUpdateController
-    ) -> AppState {
-        return AppState(
-            runtime: runtime,
-            environment: environment,
-            engineFactory: { endpoint in
-                /*
-                 * Read when the engine is actually reachable, not while the app is starting.
-                 *
-                 * This used to run in `init`, before any scene existed. The first Keychain read
-                 * after a build's signing identity changes puts up a system password prompt, and
-                 * because it happened during `init` the window was not created until somebody
-                 * answered it — the app looked like it had failed to launch. A signed release
-                 * prompts once rather than every build, but launch is the wrong place for it
-                 * either way: nothing on screen can explain a prompt that is blocking the screen.
-                 *
-                 * Here it happens when the runtime reports `.running`, by which point there is a
-                 * window to show the prompt over.
-                 */
-                let token = (try? EngineTokenStore.token()) ?? ""
-                return HTTPEngineClient(baseURL: endpoint.baseURL, token: token)
-            },
-            appUpdates: appUpdates,
-            startsEngineOnLaunch: { OnboardingVersion.isComplete },
-            modelKeys: {
-                try ModelKeySync.desired(
-                    connectedProviderIDs: ProviderConnectionStore.shared.connectedProviderIDs,
-                    custom: CustomProviderStore.shared.all,
-                    key: { try ProviderKeyStore.key(for: $0) }
-                )
-            },
-            modelKeyFingerprint: {
-                ModelKeySync.fingerprint(of: $0, keyEncryptionKey: try KeyEncryptionKeyStore.key())
-            }
-        )
-    }
+    @State private var workspace = Self.makeWorkspace()
 
     var body: some Scene {
-        Window("", id: "main") {
-            AppShellView(
-                state: state,
-                coordinator: onboardingCoordinator,
-                showOnboarding: $showOnboarding
-            )
+        Window("xBot", id: "main") {
+            RootView(workspace: workspace)
+                .frame(minWidth: Metrics.minimumWindow.width, minHeight: Metrics.minimumWindow.height)
         }
-        .defaultSize(showOnboarding ? Metrics.onboardingWindow : Metrics.minimumWindow)
-        .windowResizability(showOnboarding ? .contentSize : .automatic)
-        .windowToolbarStyle(.unified)
+        .defaultSize(Metrics.defaultWindow)
         .commands {
-            // Replacing the standard item rather than adding one, so there is a single About and it
-            // is where every Mac app keeps it.
             CommandGroup(replacing: .appInfo) {
                 Button(String(localized: "About xBot")) { AboutPanel.show() }
             }
-
-            /*
-             * ⌘, with no `Settings` scene to hang it on.
-             *
-             * Settings moved into the main window, which was the right call and took the menu item
-             * with it — SwiftUI only draws one for a `Settings` scene. So the shortcut every Mac
-             * user reaches for first did nothing at all, and the only way to the pane was a gear at
-             * the bottom of the rail. This puts the item back where it belongs and points it at the
-             * window we already have.
-             */
-            CommandGroup(replacing: .appSettings) {
-                Button(String(localized: "Settings…")) { state.isShowingSettings = true }
-                    .keyboardShortcut(",", modifiers: .command)
+            CommandGroup(after: .appInfo) {
+                Button(String(localized: "Check for Updates…")) { appUpdates.checkForUpdates(userInitiated: true) }
             }
-
-            /*
-             * The Help menu, which was a dead end.
-             *
-             * SwiftUI draws "xBot Help" by default and it opens Help Viewer, which looks for a help
-             * book this app has never had and tells the person help is not available. A menu item
-             * that exists only to say no is the same failure as a button that does nothing, and it
-             * sits in the one menu somebody opens because they are already stuck.
-             */
-            CommandGroup(replacing: .help) {
-                Button(String(localized: "xBot Documentation")) {
-                    NSWorkspace.shared.open(AboutPanel.documentationURL)
+            CommandGroup(replacing: .newItem) {
+                Button(String(localized: "New Chat")) { workspace.newChat(in: nil) }
+                    .keyboardShortcut("n", modifiers: .command)
+                    .disabled(workspace.availableHarnesses.isEmpty)
+                Button(String(localized: "Close Tab")) {
+                    if let id = workspace.selectedChatID { workspace.close(id) }
                 }
+                .keyboardShortcut("w", modifiers: .command)
+                .disabled(workspace.selectedChatID == nil)
+            }
+            CommandGroup(replacing: .help) {
+                Button(String(localized: "xBot Documentation")) { NSWorkspace.shared.open(AboutPanel.documentationURL) }
             }
         }
-
-        Window(String(localized: "Engine Admin"), id: "plugins-admin") {
-            PluginsAdminView()
-                .environment(state)
-        }
-        .defaultSize(width: 960, height: 720)
-
-        // No `Settings` scene. Settings live in the main window — see `AppState.isShowingSettings`.
-        // A separate floating panel put them somewhere the person had to go and find, and it hid
-        // the rail, so which agent was selected stopped being visible while its model was changed.
     }
 
-    /// Stub debug builds skip onboarding so the main window is reachable without Docker.
-    private static var initialShowOnboarding: Bool {
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["XBOT_USE_RUNTIME"] != "1" {
-            return false
+    /// The library on disk, or — if it cannot be opened — one in memory with the reason on screen,
+    /// so the app still works and says plainly that nothing will be kept.
+    @MainActor
+    private static func makeWorkspace() -> Workspace {
+        let inbox = Store.supportDirectory.appending(path: "Inbox", directoryHint: .isDirectory)
+        let discover: @Sendable () async -> [HarnessKind: any Brain] = { await HarnessLocator.installed() }
+        let workspace: Workspace
+        do {
+            workspace = Workspace(store: try Store.live(), inbox: inbox, discover: discover)
+        } catch {
+            workspace = Workspace(store: .inMemory(), inbox: inbox, discover: discover)
+            workspace.problem = String(
+                localized: "xBot couldn't open its library, so this session won't be saved. \(String(describing: error))"
+            )
         }
-        #endif
-        return !OnboardingVersion.isComplete
+        AppDelegate.workspace = workspace
+        return workspace
     }
 }

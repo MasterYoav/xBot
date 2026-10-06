@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","cwd":"/private/tmp/work","session_id":"a5984ed8-b509-4f00-9d68-025be0f5f129"}
+{"type":"assistant","message":{"model":"claude-opus-5-5","id":"msg_1","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Read","input":{"file_path":"/private/tmp/work/a.txt"}}]},"parent_tool_use_id":null,"session_id":"a5984ed8-b509-4f00-9d68-025be0f5f129"}
+{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01","type":"tool_result","content":"1\thello\n2\t"}]},"parent_tool_use_id":null,"session_id":"a5984ed8-b509-4f00-9d68-025be0f5f129"}
+{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}
+{"type":"assistant","message":{"model":"claude-opus-5-5","id":"msg_2","type":"message","role":"assistant","content":[{"type":"text","text":"done"}]},"parent_tool_use_id":null,"session_id":"a5984ed8-b509-4f00-9d68-025be0f5f129"}
+{"type":"result","subtype":"success","is_error":false,"result":"done","session_id":"a5984ed8-b509-4f00-9d68-025be0f5f129","num_turns":2}

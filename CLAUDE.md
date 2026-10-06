@@ -6,103 +6,76 @@ Instructions for Claude Code working in this repository. Read this before touchi
 
 ## What this project is
 
-**xBot** is a native macOS application that gives anyone — a developer who lives in the terminal
-and someone who has never opened one — a way to create, manage, and talk to AI agents that run
-entirely on their own Mac.
+**xBot** is a native macOS app for working with AI agents — for a developer who lives in the
+terminal and for someone who has never opened one.
 
-It is two things fused:
+It drives the agent CLIs a person already has and pays for (Claude Code, Codex; more to come) and
+puts a native experience around them: projects, chats as tabs, and — being built — notes, bots with
+a soul and a memory, a native model loop for people with an API key instead of a CLI, and **a
+computer of its own for any bot that needs one**: a Linux VM on Apple's Containerization, with a
+shell, files and a browser you can watch and take over.
 
-1. **An engine**, forked from [OpenBot](https://github.com/CopilotKit/openbot) (MIT, CopilotKit).
-   Agents, per-agent containerised computers, a browser each agent drives, an action-policy
-   gateway, an append-only audit trail.
-2. **A native SwiftUI client**, which owns the entire user-facing experience: onboarding, the
-   container lifecycle, the chat surface, settings, and updates.
+The design follows [MonoCode](https://github.com/hardbeat920/monocode). xBot 1.x was built on
+OpenBot in Docker; that was removed in the redesign.
 
 ### The one-sentence constraint
 
 > **A user of xBot never opens a terminal, never edits a text file, and never reads a log to use
 > the product.**
 
-If a change you are making would require the user to do any of those three things, it is not
-finished. Route it through the app.
+If a change would require the user to do any of those three things, it is not finished. Route it
+through the app.
 
 ### Non-goals
 
-- No hosted/SaaS version of xBot. The app, the engine, the agents and their browsers run on the
-  user's machine, and so are conversations: the engine keeps them itself. See ADR-0008.
+- No hosted/SaaS version. Everything runs on the user's Mac; conversations stay there.
+- No services: no Docker, no background daemon, no database server, no listening port.
 - No Mac App Store build. See `docs/decisions/0005-distribution-outside-app-store.md`.
-- No Windows or Linux client in v1. The engine is portable; the client is not.
-- No model of our own. xBot supplies no intelligence — the user brings keys or runs Ollama.
+- No Windows or Linux client, and no Intel Macs or macOS before 26.
+- No model of our own. The user brings a CLI subscription, a key, or Ollama.
 
 ---
 
 ## Read these before you plan anything
 
-Documentation lives in `docs/`. Read in this order the first time:
-
 | File | Why |
 | --- | --- |
-| `docs/01-vision.md` | What we are building and for whom |
-| `docs/02-architecture.md` | The whole system, service by service |
-| `docs/03-openbot-fork.md` | What we inherit, what we change, what is broken for our purposes |
-| `docs/04-model-providers.md` | The provider router — the biggest engine change |
-| `docs/05-mac-app.md` | Swift target layout, module boundaries |
-| `docs/06-onboarding.md` | First-run flow, screen by screen |
-| `docs/07-container-runtime.md` | How the app drives Docker/container without the user knowing |
+| `docs/decisions/0009-native-harness-redesign.md` | Why the app is what it is now |
+| `docs/superpowers/specs/2026-10-06-xbot-redesign-design.md` | The whole design, and the build order |
+| `docs/02-architecture.md` | What runs, how a message becomes a reply |
+| `docs/05-mac-app.md` | Modules and tests |
 | `docs/08-design-system.md` | Tokens, motion, materials — non-negotiable |
-| `docs/09-ui-spec.md` | Screen-by-screen spec |
-| `docs/10-security.md` | Keychain, secrets, what never gets logged |
-| `docs/11-packaging-and-updates.md` | DMG, signing, notarization, Sparkle |
-| `docs/12-roadmap.md` | Milestones and what "done" means for each |
-| `docs/decisions/` | ADRs. Every one is load-bearing. Read them. |
+| `docs/superpowers/plans/` | The plan for each sub-project, as built |
 
-**Do not start an implementation task without reading the ADR that covers it.** The ADRs record
-decisions that look wrong out of context and are right in context. Reversing one silently will cost
-a week.
+Docs marked "Describes xBot 1.x" at the top are history until their sub-project rewrites them.
+**Read the ADR that covers a task before implementing it.**
 
 ---
 
-## Three things about the engine you must internalise
+## Things about the brains you must internalise
 
-These shape most of the work. All are documented at length in `docs/03-openbot-fork.md`; the
-summary is here because getting them wrong is expensive.
+### 1. A harness turn is one process, prompt on stdin.
 
-### 0. We wrap OpenBot. We do not re-engineer it.
+`HarnessBrain` starts the CLI per turn in the chat's folder, writes the prompt to stdin and closes
+it, and resumes the CLI's own session id. **Never put the prompt in argv**: one starting with `-` is
+read as a flag, and argv has a length limit.
 
-**This is the most important line in this file.** Where the engine already does something, your job
-is to surface it well. Before writing anything into `engine/`, check whether upstream already does
-it — it usually does, and better than a first attempt would.
+### 2. A turn's stream ends exactly once.
 
-- ADR: `docs/decisions/0007-wrap-openbot-keep-intelligence.md`
-- The value we add is the native client. The engine is driven, not rewritten.
-- New xBot code goes in **new files**. A moved or heavily edited upstream file is a permanent merge
-  conflict.
+Every `Brain.run` stream ends with one `.done` or `.failed`. A CLI that exits without saying which
+has failed, and its stderr is the reason. Cancelling the consumer kills the process.
 
-### 1. v1 runs in local mode, on the vendor's own SSE runner made durable.
+### 3. Parsers are tested against real output.
 
-OpenBot's `runtimeCapabilities()` in `server/src/config.ts` used to **throw on startup** unless all
-four of `INTELLIGENCE_API_URL`, `INTELLIGENCE_GATEWAY_WS_URL`, `INTELLIGENCE_API_KEY` and
-`COPILOTKIT_LICENSE_TOKEN` were set. It now selects a mode: all four means Intelligence, **none**
-means local history, and a partial set still throws — for upstream's original reason, that somebody
-who set two of four intended Intelligence and got it wrong.
+CLI stream formats belong to their vendors and change without notice. Fixtures in
+`Tests/XBotBrainTests/Fixtures` are recorded from real runs (with personal paths removed). When a
+format changes, record a new fixture; do not hand-write one from documentation.
 
-**v1 sets none.** Local mode runs `LocalThreadRunner` (`server/src/history/local-thread-runner.ts`),
-which extends CopilotKit's `InMemoryAgentRunner` and persists each thread to `local_threads`. The
-app has no field for a CopilotKit key. Recall/memory (pgvector) is still ADR-0001's, for v1.1.
+### 4. A GUI app does not have the user's PATH.
 
-- ADRs: `docs/decisions/0008-...` (what shipped), `0007-...` (the seam), `0001-...` (the fuller design)
-- `LocalThreadRunner` is single-user: SSE mode has no `identifyUser`.
-- **Never add a new direct call to the Intelligence client.** Go through the seam.
-
-### 2. The model provider is a process-wide environment variable. We are making it per-agent.
-
-Upstream reads `BOT_PROVIDER` once at process start in `agent-langgraph/src/index.ts`, supports
-exactly `openai | anthropic | google`, and requires a container restart to change. Our users pick a
-model per agent, from a settings pane, and expect it to take effect on the next message.
-
-- ADR: `docs/decisions/0002-per-bot-model-router.md`
-- **Never read a provider or model name from `process.env` in request-handling code.** Resolve it
-  from the agent record via the model router.
+`HarnessLocator` reads `PATH` from the login shell (with a timeout and markers, because shell
+startup files print things), adds the usual install folders, and strips Claude Code's own
+`CLAUDECODE*` variables so a nested `claude` will start.
 
 ---
 
@@ -110,28 +83,17 @@ model per agent, from a settings pane, and expect it to take effect on the next 
 
 ```
 /
-├── apps/
-│   └── mac/                  Swift package + Xcode project. The native client.
-│       ├── Sources/
-│       │   ├── XBotApp/          @main, window/scene, app lifecycle
-│       │   ├── XBotUI/           SwiftUI views, design system, components
-│       │   ├── XBotCore/         Models, state, persistence
-│       │   ├── XBotEngine/       API client, SSE/AG-UI stream, screen polling
-│       │   ├── XBotRuntime/      Container runtime driver, health, image pulls
-│       │   └── XBotOnboarding/   First-run flow
-│       └── Tests/
-├── engine/                   The OpenBot fork. Upstream layout preserved.
-│   ├── server/
-│   ├── app/                  Upstream React app. Kept for admin surfaces only.
-│   ├── agent-bot/
-│   ├── agent-runtime/        (was agent-langgraph) multi-provider agent
-│   ├── agent-computer/
-│   ├── supervisor/
-│   └── docker-compose.yml
-├── docs/
-├── scripts/
-├── CLAUDE.md
-└── README.md
+├── apps/mac/                 Swift package. The app.
+│   ├── Sources/
+│   │   ├── XBotApp/          @main, menus, Sparkle, quit handling
+│   │   ├── XBotUI/           SwiftUI views and the design system
+│   │   ├── XBotCore/         Models, SQLite store, Workspace
+│   │   └── XBotBrain/        Brains: harness CLIs, stream parsers, locator (Foundation only)
+│   └── Tests/
+├── docs/                     Design, ADRs, specs and plans
+├── scripts/                  Icon, bundling, signing, DMG, appcast, uninstaller
+├── site/                     The website
+└── CLAUDE.md
 ```
 
 ---
@@ -142,43 +104,36 @@ model per agent, from a settings pane, and expect it to take effect on the next 
 
 - **Plan first, in writing.** For anything larger than a single file, produce a short plan and get
   it agreed. Use the `superpowers:writing-plans` skill if available.
-- **Check `docs/12-roadmap.md`** for which milestone the task belongs to. Work that jumps a
-  milestone usually means the milestone was wrong — say so rather than silently reordering.
+- **Check the build order in the redesign spec** for which sub-project the task belongs to. Work that
+  jumps a sub-project usually means the order was wrong — say so rather than silently reordering.
 - **Use `superpowers:brainstorming` before any new feature.** Requirements before implementation.
 
 ### While you write code
 
-- **Test-driven where there is logic to test.** The model router, the policy evaluation, the
-  container state machine, and the credential store all have real logic — write the test first.
-  UI views do not need unit tests; snapshot and interaction tests are planned for M7+.
+- **Test-driven where there is logic to test.** The stream parsers, the process runner, the store,
+  the workspace, and later the policy gate, the native loop and the machine state machine all have
+  real logic — write the test first.
+  UI views do not need unit tests.
 - **Small, focused changes.** One concern per commit.
-- **Preserve upstream comments in `engine/`.** OpenBot's source comments explain *why* a security
-  boundary is where it is. Deleting one to tidy up has, upstream, previously reintroduced a
-  vulnerability. If you disagree with a comment, change the code and rewrite the comment to explain
-  the new reasoning — do not just remove it.
-- **Match upstream conventions inside `engine/`**, our own inside `apps/mac/`. Do not import Swift
-  house style into TypeScript or vice versa.
+- **Comments explain why.** Many in this codebase record a bug that was found the hard way. If you
+  disagree with one, change the code and rewrite the comment to explain the new reasoning — do not
+  just remove it.
 
 ### Before you claim it works
 
 Use `superpowers:verification-before-completion`. Concretely:
 
 ```sh
-# Engine. The suite needs a real pgvector database; dev-db.sh starts one on 55432,
-# because a Homebrew Postgres usually already owns 5432 and the engine then connects
-# to the wrong database. Use test:ci, not test — it enforces a test-count floor, so an
-# import-time failure that skips a whole file cannot pass as green.
-eval "$(scripts/dev-db.sh)"
-cd engine && bun run format:check && bun run lint && bun run typecheck && bun run test:ci
-
-# Mac app. On a fresh clone the icon must be compiled first: Package.swift declares xBot.icns
-# and Assets.car as resources and .gitignore excludes them, so `swift build` fails with
-# "missing inputs" until this has run. It needs Xcode 26 — xBot.icon is Icon Composer's format.
+# On a fresh clone the icon must be compiled first: Package.swift declares xBot.icns and Assets.car
+# as resources and .gitignore excludes them, so `swift build` fails with "missing inputs" until this
+# has run. It needs Xcode 26 — xBot.icon is Icon Composer's format.
 scripts/generate-app-icon.sh
-# --build-tests, not plain build: `swift build` does NOT compile the test targets, so a change
-# that breaks only the tests looks green. This has produced a "verified" claim that measured
-# nothing.
+# --build-tests, not plain build: `swift build` does NOT compile the test targets, so a change that
+# breaks only the tests looks green. This has produced a "verified" claim that measured nothing.
 cd apps/mac && swift build --build-tests && swift test
+# After a Claude Code or Codex update, or any change to a stream parser: a real turn and a resumed
+# turn through each installed CLI. Costs a few tokens on your own subscription.
+XBOT_LIVE_HARNESS=1 swift test --filter LiveHarnessTests
 ```
 
 **Never say "done", "fixed", or "passing" without having run the command and read the output.**
@@ -199,11 +154,11 @@ inject the storage rather than serialise the suites, so **run a suspect suite te
 
 - **Swift 6 language mode, strict concurrency.** Actors for anything touching the runtime or the
   network. `@MainActor` on view models.
-- **Observation (`@Observable`), not `ObservableObject`.** macOS 14+ is the floor.
+- **Observation (`@Observable`), not `ObservableObject`.** macOS 26 is the floor.
 - **No third-party UI frameworks.** SwiftUI and AppKit interop only. Sparkle is the one exception,
   for updates.
 - **Views are dumb.** A view renders state and sends intents. Business logic lives in
-  `XBotCore`/`XBotEngine`. If a view has a `URLSession` in it, that is a bug.
+  `XBotCore`/`XBotBrain`. If a view has a `URLSession` or a `Process` in it, that is a bug.
 - **Every string the user reads goes through `String(localized:)`.** Even in v1 when English is
   the only language. Retrofitting localisation is miserable.
 - **Design tokens only.** Never a raw hex value, a raw point size, or a raw duration in a view.
@@ -230,36 +185,29 @@ Treat these as invariants. A change that breaks one is wrong even if it passes C
 
 1. **No terminal, ever.** No user-facing instruction anywhere in the product says "run", "open
    Terminal", "edit", or "paste this".
-2. **Keys live in the macOS Keychain.** Never in `UserDefaults`, never in a plist, never in a file
-   the user could open, never in a log line, never in an error message shown on screen, never in a
-   crash report.
-3. **The audit trail is append-only.** Nothing in the app deletes an audit row. Retention is a
-   server setting.
-4. **A secret's value is never echoed.** Upstream records that a secret was supplied and its
-   character count. Keep that.
-5. **The container's ports stay on loopback.** `127.0.0.1` bindings only. The agent's browser holds
-   real logins.
-6. **Destructive actions are confirmed once, and are undoable where possible.** Deleting an agent
-   deletes its container and its browser profile — that is not undoable, so it is the rare case that
-   earns a confirmation dialog. Almost nothing else does.
-7. **The app degrades honestly.** If the engine is down, say so and offer the one button that fixes
-   it. Never show an empty state that implies everything is fine.
+2. **Keys live in the macOS Keychain.** Never in SQLite, `UserDefaults`, a plist, a file the user
+   could open, a log line, an error shown on screen, or a crash report.
+3. **The audit trail is append-only** (when it lands with the tool server). Nothing in the app
+   deletes an audit row.
+4. **A secret's value is never echoed.** Record that it was supplied and its length.
+5. **No listening ports.** The tool relay uses a Unix socket (0600), a bot's VM uses vsock.
+6. **Destructive actions are confirmed once.** Deleting a chat or a bot (which deletes its
+   computer) earns a confirmation; almost nothing else does.
+7. **The app degrades honestly.** No CLI installed, a CLI signed out, a folder that moved, a
+   library that will not open — say so, in a sentence, with the one button that fixes it. Never an
+   empty state that implies everything is fine.
+8. **A reply that has started is never lost.** Stop, failure and quit all save what arrived.
 
 ---
 
 ## Licensing and attribution
 
-The engine is a fork of OpenBot, **MIT licensed, © 2026 CopilotKit**.
-
-- `engine/LICENSE` stays. Do not remove or rewrite the copyright line.
-- `NOTICE` at the repo root credits OpenBot and CopilotKit. Keep it current.
-- The About window credits OpenBot with a link. This is a requirement, not a courtesy.
-- When you pull upstream changes, record them in `CHANGELOG.md` under a `From upstream` heading so
-  the divergence stays legible.
-
-**Naming:** see `docs/decisions/0006-naming-and-trademark.md` before using the name "xBot" or any
-Grok/X-derived asset in shipped code, marketing copy, or icons. There is unresolved trademark risk
-recorded there. Do not resolve it yourself in a commit message.
+- `NOTICE` credits MonoCode (the design) and OpenBot by CopilotKit (xBot 1.x's engine). Keep both.
+- The About window carries the same credits with live links; `AboutCreditTests` holds it to that.
+- **Naming:** see `docs/decisions/0006-naming-and-trademark.md` before using the name "xBot" or any
+  Grok/X-derived asset in shipped code, marketing copy, or icons. There is unresolved trademark risk
+  recorded there. Do not resolve it yourself in a commit message.
+- **Never commit `sparkle-private.key`.** Whoever holds it can sign updates every install accepts.
 
 ---
 

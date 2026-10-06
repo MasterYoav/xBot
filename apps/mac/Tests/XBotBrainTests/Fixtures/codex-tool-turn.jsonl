@@ -1,0 +1,8 @@
+{"type":"thread.started","thread_id":"01a11205-6008-78f2-91ed-0b83eef8ca4c"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Codex is ignoring 2 unrecognized configuration settings."}}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"I’ll read `a.txt` with a shell command."}}
+{"type":"item.started","item":{"id":"item_4","type":"command_execution","command":"/bin/zsh -lc 'cat a.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_4","type":"command_execution","command":"/bin/zsh -lc 'cat a.txt'","aggregated_output":"hello\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"done"}}
+{"type":"turn.completed","usage":{"input_tokens":39746,"output_tokens":56}}

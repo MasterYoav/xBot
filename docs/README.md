@@ -6,44 +6,20 @@ last section of [`CLAUDE.md`](../CLAUDE.md).
 
 ## Reading order
 
-Read [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) first. It re-orders the project
-after the engine was actually run, and several documents here were written before that and are
-annotated rather than rewritten.
+xBot was redesigned in October 2026: a native app that drives the agent CLIs people already have,
+with no Docker and no services. Read [ADR-0009](decisions/0009-native-harness-redesign.md), then the
+[redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md), then:
 
-Then 01 → 03 in order. They establish the problem, the shape of the answer, and the constraints
-everything else works around. After that, read by area.
+1. **[Architecture](02-architecture.md)** — what runs, and how a message becomes a reply.
+2. **[The Mac app](05-mac-app.md)** — modules, ownership, tests.
+3. **[Design system](08-design-system.md)** — tokens, typography, motion, materials. Derived from
+   Apple's *Designing Fluid Interfaces*. Still current.
 
-### Foundations
-
-1. **[Vision](01-vision.md)** — the product, the user, the promise, the non-goals.
-2. **[Architecture](02-architecture.md)** — every service, every port, how a message becomes an
-   action.
-3. **[The OpenBot fork](03-openbot-fork.md)** — what we inherit for free, what is actively wrong
-   for our purposes, and how much work each fix is. **The most important document here.**
-
-### Engine
-
-4. **[Model providers](04-model-providers.md)** — the router that turns a process-wide environment
-   variable into per-agent choice, and how each vendor plugs in.
-7. **[Container runtime](07-container-runtime.md)** — Docker, Colima, or Apple's Containerization
-   framework, and the state machine the app drives it with.
-10. **[Security](10-security.md)** — the Keychain, the credential vault, isolation, and the
-    things that must never be written to disk.
-
-### Client
-
-5. **[The Mac app](05-mac-app.md)** — Swift packages, module boundaries, state ownership.
-6. **[Onboarding](06-onboarding.md)** — first run, screen by screen, including every failure.
-8. **[Design system](08-design-system.md)** — tokens, typography, motion, materials. Derived from
-   Apple's *Designing Fluid Interfaces* and the eight design principles.
-9. **[UI specification](09-ui-spec.md)** — the rail, the conversation, the panel, settings.
-
-### Delivery
-
-11. **[Packaging and updates](11-packaging-and-updates.md)** — DMG, Developer ID, notarization,
-    Sparkle.
-12. **[Roadmap](12-roadmap.md)** — milestones, and what "done" means for each.
-13. **[Engine environment mapping](env-mapping.md)** — how app settings become the container's env vars.
+The rest describe xBot 1.x and say so at the top. Each is rewritten in the sub-project that
+touches it: [vision](01-vision.md), [model providers](04-model-providers.md),
+[onboarding](06-onboarding.md), [UI specification](09-ui-spec.md), [security](10-security.md),
+[packaging and updates](11-packaging-and-updates.md), [roadmap](12-roadmap.md),
+[launch checklist](13-launch-checklist.md).
 
 ## Decisions
 
@@ -59,13 +35,13 @@ Architecture Decision Records. Each one exists because the decision looks wrong 
 | [0006](decisions/0006-naming-and-trademark.md) | Open questions about the name and the visual reference |
 | [0007](decisions/0007-wrap-openbot-keep-intelligence.md) | **Wrap OpenBot rather than re-engineer it, and keep Intelligence for v1.** Defers 0001 and re-orders the roadmap — read it before 01 or 03 |
 | [0008](decisions/0008-local-thread-runner.md) | **Conversations kept locally** by a durable wrapper around the vendor's SSE runner. Supersedes 0007's "keep Intelligence" for v1 |
+| [0009](decisions/0009-native-harness-redesign.md) | **A native app that drives the agents people already have.** No Docker, no services; a bot's computer is an Apple Containerization VM. Supersedes 0001, 0002, 0003, 0007, 0008 |
 
 ## Conventions in these documents
 
-- **"The engine"** is the forked OpenBot stack running in containers.
-- **"The app"** is the native macOS client.
-- **"An agent"** is what upstream calls a *coworker* or a *Bot*. We use *agent* in code and
-  documentation. The user-facing word is decided in [09-ui-spec.md](09-ui-spec.md).
-- **"The computer"** is the container holding one agent's browser, files, and shell. Upstream's
-  term; kept, because it is a good one.
+- **"A harness"** is an agent CLI the person has installed and signed in to (Claude Code, Codex),
+  which xBot drives on their subscription.
+- **"A brain"** is whatever answers a turn: a harness, or later the native loop.
+- **"A bot"** is a persona with a soul, a memory and optionally a computer (sub-project 3 onward).
+- **"The computer"** is a bot's own Linux VM. Kept from 1.x, because it is a good word.
 - A line marked **⚠️** is a known risk with no settled answer yet.
