@@ -14,8 +14,6 @@
 	<string>dev.xbot.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 xBot contributors. Engine © 2026 CopilotKit, MIT.</string>
 	<key>CFBundleName</key>
 	<string>xBot</string>
 	<key>CFBundlePackageType</key>
@@ -25,8 +23,10 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>14.0</string>
+	<string>26.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 xBot contributors. Engine © 2026 CopilotKit, MIT.</string>
 </dict>
 </plist>

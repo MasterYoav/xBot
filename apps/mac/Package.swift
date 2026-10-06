@@ -1,25 +1,20 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
-// Dependencies point one way only. See docs/05-mac-app.md.
+// Dependencies point one way only:
 //
-//   XBotApp ── XBotOnboarding ─┐
-//      │                       │
-//      ├── XBotUI ── XBotCore ─┴── XBotEngine   (Foundation only)
-//      │                        └─ XBotRuntime  (Foundation only)
+//   XBotApp ── XBotUI ── XBotCore ── XBotBrain   (Foundation only)
 //
-// XBotEngine and XBotRuntime never import SwiftUI. That is what lets the client develop against a
-// stub API while the engine runs, or does not run, somewhere else.
+// XBotBrain never imports SwiftUI. It spawns agent CLIs and parses what they print, and it is tested
+// against recorded output without a window.
 
-// Swift 6 language mode, everywhere, from the first file. This app coordinates a container runtime,
-// a network client and a streaming parser; a data race between those reproduces once a fortnight and
-// costs a day each time. Retrofitting strict concurrency onto a written app is much worse than
-// starting inside it — the compiler's demands here produce the design we want anyway.
+// Swift 6 language mode, everywhere. This app runs child processes, a database and a UI at once.
 let strict: [SwiftSetting] = [.swiftLanguageMode(.v6)]
 
 let package = Package(
     name: "XBot",
-    platforms: [.macOS(.v14)],
+    // macOS 26: Apple's Containerization framework, which gives a bot its own machine, needs it.
+    platforms: [.macOS(.v26)],
     products: [
         .executable(name: "XBot", targets: ["XBotApp"]),
     ],
@@ -27,18 +22,12 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
     ],
     targets: [
-        .target(name: "XBotEngine", swiftSettings: strict),
-        .target(name: "XBotRuntime", dependencies: ["XBotEngine"], swiftSettings: strict),
-        .target(name: "XBotCore", dependencies: ["XBotEngine", "XBotRuntime"], swiftSettings: strict),
+        .target(name: "XBotBrain", swiftSettings: strict),
+        .target(name: "XBotCore", dependencies: ["XBotBrain"], swiftSettings: strict),
         .target(
             name: "XBotUI",
             dependencies: ["XBotCore"],
             resources: [.copy("Resources/xBot.icns")],
-            swiftSettings: strict
-        ),
-        .target(
-            name: "XBotOnboarding",
-            dependencies: ["XBotUI", "XBotCore", "XBotEngine", "XBotRuntime"],
             swiftSettings: strict
         ),
         .executableTarget(
@@ -46,22 +35,22 @@ let package = Package(
             dependencies: [
                 "XBotUI",
                 "XBotCore",
-                "XBotOnboarding",
-                "XBotRuntime",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             resources: [
                 .copy("Resources/Assets.car"),
                 .copy("Resources/xBot.icns"),
-                .copy("Resources/engine-manifest-fallback.json"),
             ],
             swiftSettings: strict
         ),
 
-        .testTarget(name: "XBotEngineTests", dependencies: ["XBotEngine"], swiftSettings: strict),
-        .testTarget(name: "XBotRuntimeTests", dependencies: ["XBotRuntime"], swiftSettings: strict),
+        .testTarget(
+            name: "XBotBrainTests",
+            dependencies: ["XBotBrain"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: strict
+        ),
         .testTarget(name: "XBotCoreTests", dependencies: ["XBotCore"], swiftSettings: strict),
         .testTarget(name: "XBotUITests", dependencies: ["XBotUI"], swiftSettings: strict),
-        .testTarget(name: "XBotOnboardingTests", dependencies: ["XBotOnboarding"], swiftSettings: strict),
     ]
 )
