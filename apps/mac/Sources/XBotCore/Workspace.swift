@@ -17,7 +17,9 @@ public final class Workspace {
 
     private var brains: [HarnessKind: any Brain] = [:]
     private var transcripts: [UUID: [ChatMessage]] = [:]
-    private var turns: [UUID: Task<Void, Never>] = [:]
+    /// The running turn per chat. The token is how a turn's own task recognises it: a stopped
+    /// turn's task unwinds after the next one may have started, and must leave that one alone.
+    private var turns: [UUID: (token: UUID, task: Task<Void, Never>)] = [:]
     private let store: Store
     private let inbox: URL
     private let discover: @Sendable () async -> [HarnessKind: any Brain]
@@ -150,19 +152,21 @@ public final class Workspace {
             mode: chat.mode, resumeID: chat.sessionID
         )
         live[id] = []
-        turns[id] = Task { [weak self] in
+        let token = UUID()
+        let task = Task { [weak self] in
             for await event in brain.run(request) {
-                self?.receive(event, in: id)
+                self?.receive(event, in: id, turn: token)
             }
-            self?.end(id, stopped: false)
+            self?.end(id, turn: token, stopped: false)
         }
+        turns[id] = (token, task)
         return true
     }
 
     public func stop(_ id: UUID) {
-        let task = turns[id]
-        end(id, stopped: true)
-        task?.cancel()
+        guard let turn = turns[id] else { return }
+        end(id, turn: turn.token, stopped: true)
+        turn.task.cancel()
     }
 
     /// Saves every reply in progress and stops its CLI. Called when the app quits.
@@ -178,8 +182,8 @@ public final class Workspace {
 
     // MARK: Private
 
-    private func receive(_ event: BrainEvent, in id: UUID) {
-        guard turns[id] != nil else { return }
+    private func receive(_ event: BrainEvent, in id: UUID, turn token: UUID) {
+        guard turns[id]?.token == token else { return }
         if case .session(let session) = event {
             update(id) { $0.sessionID = session }
             return
@@ -188,8 +192,9 @@ public final class Workspace {
     }
 
     /// Ends a turn once: whichever of stop and the stream finishing comes first saves the reply.
-    private func end(_ id: UUID, stopped: Bool) {
-        guard turns.removeValue(forKey: id) != nil else { return }
+    private func end(_ id: UUID, turn token: UUID, stopped: Bool) {
+        guard turns[id]?.token == token else { return }
+        turns[id] = nil
         var parts = live.removeValue(forKey: id) ?? []
         if stopped { parts.append(.notice(String(localized: "Stopped."))) }
         if !parts.isEmpty { save(ChatMessage(chatID: id, role: .assistant, parts: parts)) }

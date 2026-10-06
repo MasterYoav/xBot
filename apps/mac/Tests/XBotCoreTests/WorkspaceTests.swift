@@ -80,6 +80,21 @@ final class ScriptedBrain: Brain {
         #expect(reply.parts == [.text("Half an ans"), .notice(String(localized: "Stopped."))])
     }
 
+    /// Stop, then send again at once: the stopped turn's task still unwinds afterwards, and must not
+    /// end — or write into — the turn that replaced it.
+    @Test func aStoppedTurnDoesNotEndTheNextOne() async throws {
+        let w = await workspace(ScriptedBrain([.textDelta("partial")], hold: true))
+        let chat = try #require(w.newChat(in: nil))
+        _ = w.send("first", in: chat.id)
+        for _ in 0..<20 { await Task.yield() }
+        w.stop(chat.id)
+        #expect(w.send("second", in: chat.id))
+        for _ in 0..<50 { await Task.yield() }
+        #expect(w.isRunning(chat.id))
+        #expect(w.messages(in: chat.id).map(\.role) == [.user, .assistant, .user])
+        w.stop(chat.id)
+    }
+
     @Test func aFailureIsSavedInTheReply() async throws {
         let w = await workspace(ScriptedBrain([.failed("Not signed in to Claude Code.")]))
         let chat = try #require(w.newChat(in: nil))
