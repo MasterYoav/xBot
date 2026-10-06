@@ -78,6 +78,10 @@ public struct HarnessBrain: Brain {
         // The prompt goes on stdin, never argv. Written off this thread so a huge prompt cannot
         // block the caller while the CLI is busy printing.
         let writer = input.fileHandleForWriting
+        // A CLI that exits without reading its prompt closes the pipe under us, and writing to it
+        // raises SIGPIPE, whose default action ends the whole app. With this the write just fails,
+        // and the turn reports the CLI's own complaint from stderr.
+        _ = fcntl(writer.fileDescriptor, F_SETNOSIGPIPE, 1)
         let prompt = Data(request.prompt.utf8)
         Task.detached {
             try? writer.write(contentsOf: prompt)
@@ -87,13 +91,22 @@ public struct HarnessBrain: Brain {
         let kind = self.kind
         Task.detached {
             var ended = false
-            do {
-                for try await line in output.fileHandleForReading.bytes.lines {
-                    for event in kind.events(from: line) where !ended {
-                        continuation.yield(event)
-                        ended = event.isTerminal
-                    }
+            func emit(_ line: [UInt8]) {
+                for event in kind.events(from: String(decoding: line, as: UTF8.self)) where !ended {
+                    continuation.yield(event)
+                    ended = event.isTerminal
                 }
+            }
+            do {
+                // Split on "\n" bytes ourselves. `bytes.lines` also breaks at U+2028 and U+2029,
+                // which JSON may carry raw inside a string, and half a JSON line is no line at all.
+                var line: [UInt8] = []
+                for try await byte in output.fileHandleForReading.bytes {
+                    guard byte == UInt8(ascii: "\n") else { line.append(byte); continue }
+                    emit(line)
+                    line.removeAll(keepingCapacity: true)
+                }
+                emit(line)
             } catch {}
             var status: Int32 = 0
             for await code in exit.stream { status = code }

@@ -57,6 +57,39 @@ func collect(_ stream: AsyncStream<BrainEvent>) async -> [BrainEvent] {
         #expect(reason.contains("not logged in"))
     }
 
+    /// Writing to a pipe nobody reads raises SIGPIPE, whose default action ends the whole app. A CLI
+    /// that dies on startup without reading its prompt must cost a failed turn, not xBot.
+    @Test func aCLIThatNeverReadsItsPromptDoesNotTakeTheAppDown() async throws {
+        let cli = try fakeCLI("echo 'unknown option' >&2; exit 2")
+        let brain = HarnessBrain(kind: .claude, executable: cli.url, environment: [:])
+        let prompt = String(repeating: "x", count: 1_000_000)
+        let events = await collect(brain.run(TurnRequest(prompt: prompt, directory: tmp, mode: .readOnly)))
+        guard case .failed(let reason) = events.last else { Issue.record("expected failure"); return }
+        #expect(reason.contains("unknown option"))
+    }
+
+    /// JSON may carry U+2028 and U+2029 raw inside a string (Node's JSON.stringify and serde both
+    /// do), and Foundation's line splitter breaks lines at them. Only "\n" ends a JSON line.
+    @Test func lineSeparatorsInsideJSONDoNotSplitTheLine() async throws {
+        let cli = try fakeCLI("""
+        cat > /dev/null
+        printf '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"a\\342\\200\\250b"}},"parent_tool_use_id":null}\\n'
+        echo '{"type":"result","subtype":"success","is_error":false}'
+        """)
+        let brain = HarnessBrain(kind: .claude, executable: cli.url, environment: [:])
+        let events = await collect(brain.run(TurnRequest(prompt: "x", directory: tmp, mode: .readOnly)))
+        #expect(events == [.textDelta("a\u{2028}b"), .done])
+    }
+
+    @Test func aLastLineWithoutANewlineStillCounts() async throws {
+        let cli = try fakeCLI("""
+        cat > /dev/null
+        printf '{"type":"result","subtype":"success","is_error":false}'
+        """)
+        let brain = HarnessBrain(kind: .claude, executable: cli.url, environment: [:])
+        #expect(await collect(brain.run(TurnRequest(prompt: "x", directory: tmp, mode: .readOnly))) == [.done])
+    }
+
     @Test func missingFolderFailsWithoutSpawning() async throws {
         let cli = try fakeCLI("touch \"$OUT/ran\"")
         let gone = tmp.appending(path: "xbot-missing-\(UUID().uuidString)")
