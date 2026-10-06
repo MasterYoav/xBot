@@ -5,10 +5,9 @@
 # yields, because the alternative is gigabytes of orphaned volumes with no way to remove them. The
 # in-app path (Settings → Advanced → Uninstall) does the same, and is what everybody else should use.
 #
-# Mirrors AppState.uninstall() and RuntimeController.uninstall(). Change one, change the other.
-#
-# Like the app, it leaves the container runtime alone — Docker or Colima may be in use for something
-# else.
+# xBot 1.x ran its engine in Docker. Somebody who used it still has that container and its volumes,
+# so they are removed when Docker is available. The runtime itself is left alone — Docker or Colima
+# may be in use for something else. Everything the current app keeps is in one folder, removed last.
 set -uo pipefail
 
 SUPPORT="${HOME}/Library/Application Support/xBot/runtime"
@@ -16,7 +15,8 @@ SUPPORT="${HOME}/Library/Application Support/xBot/runtime"
 cat <<'EOF'
 This removes everything xBot stored on this Mac:
 
-  - your conversations and your agents
+  - your chats and your list of projects (the project folders themselves stay)
+  - xBot 1.x's engine and agents, if they are still here
   - the websites your agents are signed in to
   - the keys xBot saved in your Keychain
   - xBot's preferences
@@ -73,6 +73,11 @@ echo "Removed xBot's Keychain items."
 
 # The pre-upgrade dump is a plain-SQL copy of the database, kept outside the volume on purpose.
 rm -f "${SUPPORT}/engine-pre-upgrade.sql" "${SUPPORT}/restore.log"
+
+# The app's library: chats, projects list, the Inbox folder. The literal path, never a variable that
+# could be empty.
+rm -rf "${HOME}/Library/Application Support/xBot"
+echo "Removed xBot's chats."
 
 defaults delete dev.xbot.app >/dev/null 2>&1
 echo "Removed xBot's preferences."

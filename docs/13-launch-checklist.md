@@ -1,5 +1,10 @@
 # Launch checklist
 
+> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
+> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
+> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
+> Until then, where it disagrees with the code, the code and the spec win.
+
 Everything between here and a `.dmg` a stranger can download and use.
 
 `docs/12-roadmap.md` says what each milestone means and what is done. This says what to *do*, in

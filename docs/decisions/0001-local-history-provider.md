@@ -1,5 +1,7 @@
 # ADR-0001 — Replace the mandatory hosted history service with a local provider
 
+> **Superseded by [ADR-0009](0009-native-harness-redesign.md)** — the engine this decided about was removed. Kept as history.
+
 **Status:** Accepted
 **Date:** 2026-09
 **Supersedes:** nothing

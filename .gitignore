@@ -27,3 +27,6 @@ Icon?
 # Tool caches
 .impeccable/
 .tokensave
+
+# Sparkle signing key. Never commit it: whoever holds it can sign updates every install accepts.
+sparkle-private.key

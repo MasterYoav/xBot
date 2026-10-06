@@ -6,8 +6,8 @@ Local release flow until CI signing credentials exist. See `docs/11-packaging-an
 # 1. Official icon (Icon Composer → Assets.car + xBot.icns)
 scripts/generate-app-icon.sh
 
-# 2. Universal release binary
-cd apps/mac && swift build -c release --arch arm64 --arch x86_64 && cd ../..
+# 2. Release binary (Apple silicon only: the bots' machines need Apple's Containerization)
+cd apps/mac && swift build -c release --arch arm64 && cd ../..
 
 # 3. .app bundle
 scripts/bundle-mac-app.sh
@@ -15,28 +15,18 @@ scripts/bundle-mac-app.sh
 # 4. DMG (unsigned stub)
 scripts/create-dmg.sh
 
-# 5. Run against real engine
-cd apps/mac && XBOT_USE_RUNTIME=1 "$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/XBot"
-```
-
-Engine image (pulled during onboarding, not bundled in the DMG):
-
-```sh
-scripts/build-engine-image.sh          # tags xbot/engine:1 locally
-scripts/check-engine-health.sh         # probes /health
-scripts/generate-engine-manifest.sh    # manifest JSON for updates pipeline
 ```
 
 ## M6 manual test (clean VM)
 
-Before each release candidate, on a snapshot with **no Homebrew, no Docker, no dev tools**:
+Before each release candidate, on a snapshot with **no Homebrew and no dev tools**, with Claude Code
+installed and signed in:
 
 1. Install from DMG → drag to Applications → launch
-2. Complete all five onboarding steps with only an API key typed
-3. Send one message, confirm streaming reply
-4. Open panel → Screen, confirm screenshot poll
-5. Take control → release control
-6. Copy diagnostics from a forced failure — confirm no keys in clipboard
+2. New Chat, send one message, confirm the reply streams
+3. Add a project folder, ask for a change, confirm the tool rows and the edit
+4. ⌘. mid-reply, confirm "Stopped." and the partial reply survive a relaunch
+5. Rerun `XBOT_LIVE_HARNESS=1 swift test --filter Live` after any CLI update
 
 # Sparkle updates
 

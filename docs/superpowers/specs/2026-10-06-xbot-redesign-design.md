@@ -1,6 +1,6 @@
 # xBot redesign: native bots, each with an optional computer
 
-Date: 2026-10-06 · Status: approved in brainstorming, awaiting spec review
+Date: 2026-10-06 · Status: approved; sub-project 1a built (see the build order)
 
 ## Intent
 
@@ -71,7 +71,8 @@ Docker. The only extra processes are each machine-enabled bot's VM (while awake)
 
 **Data model.**
 
-- `Project` — security-scoped folder bookmark; `isGitRepo` derived.
+- `Project` — the folder's path. The app is not sandboxed (it spawns CLIs, which a sandbox forbids), so a
+  path is enough; no security-scoped bookmark.
 - `Bot` — name, avatar, soul, memory, `brain: .harness(cli, model, effort) | .native(provider, model)`,
   `machine: MachineConfig?` (`shareProject: off | readOnly | readWrite`).
 - `Chat` — optional project (none = Inbox), one bot, optional worktree, folder, title.
@@ -221,14 +222,16 @@ the only hard requirement is macOS 26 on Apple silicon, enforced by the deployme
 
 ## Build order (each its own plan)
 
-1. **Shell + projects + harness chats** — store, sidebar, tabs/panes, composer, `HarnessBrain`
-   (Claude Code, Codex), checkpoints, worktrees, Changes inspector.
+1. **Shell + projects + harness chats.** *1a, built:* store, sidebar, tabs, composer, `HarnessBrain`
+   (Claude Code, Codex), and the deletion of the old engine and modules — moved here from step 7,
+   because the old types collided with the new ones and nothing new used them. *1b:* split panes,
+   checkpoints, worktrees, Changes inspector.
 2. **Notes** — store, editor, `notes.*` tools, `xbot-mcp` relay.
 3. **Bots** — soul, memory, habits, Quick Composer, onboarding rewrite.
 4. **Native brain** — Anthropic, OpenAI, Google, Ollama tool loop.
 5. **Machine** — Containerization driver, image, `xbot-agentd`, `shell.*`, `files.*`.
 6. **Browser + live screen** — CDP, screencast inspector, take over.
-7. **Cleanup + licensing** — delete engine and old modules, docs and ADRs, Pro license gate.
+7. **Licensing** — the Pro license gate.
 
 ## Testing
 

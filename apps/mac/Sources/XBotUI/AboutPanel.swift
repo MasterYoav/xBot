@@ -1,12 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// The About window, which exists because the licence and CLAUDE.md both require it.
+/// The About window, and the credits that travel with the app.
 ///
-/// "The About window credits OpenBot with a link. This is a requirement, not a courtesy." The
-/// engine is a derivative work of OpenBot, MIT licensed, © 2026 CopilotKit; `NOTICE` at the
-/// repository root has said so all along, and a person who downloads a `.dmg` never sees the
-/// repository. The credit has to travel with the thing that ships.
+/// xBot's design follows MonoCode, and xBot 1.x ran on OpenBot's engine (MIT, © 2026 CopilotKit).
+/// `NOTICE` at the repository root says both, but a person who downloads a `.dmg` never sees the
+/// repository, so the credits have to travel with the thing that ships.
 ///
 /// It is the system panel rather than a window of our own. AppKit already draws the icon, the name,
 /// the version and the copyright line correctly, in every language and at every text size, and
@@ -32,46 +31,27 @@ public enum AboutPanel {
         let body = NSMutableAttributedString()
         let font = NSFont.systemFont(ofSize: 11)
 
-        body.append(
-            NSAttributedString(
-                string: String(
-                    localized: "Your own AI coworkers, on your own Mac.\n\nxBot's engine is a fork of "
-                ),
-                attributes: [.font: font, .foregroundColor: NSColor.labelColor]
-            )
-        )
-        body.append(
-            NSAttributedString(
-                string: "OpenBot",
-                attributes: [
-                    .font: font,
-                    .link: URL(string: "https://github.com/CopilotKit/openbot")!,
-                ]
-            )
-        )
-        body.append(
-            NSAttributedString(
-                string: String(localized: " by "),
-                attributes: [.font: font, .foregroundColor: NSColor.labelColor]
-            )
-        )
-        body.append(
-            NSAttributedString(
-                string: "CopilotKit",
-                attributes: [
-                    .font: font,
-                    .link: URL(string: "https://copilotkit.ai")!,
-                ]
-            )
-        )
-        body.append(
-            NSAttributedString(
-                string: String(
-                    localized: ", used under the MIT licence. Copyright © 2026 CopilotKit."
-                ),
-                attributes: [.font: font, .foregroundColor: NSColor.labelColor]
-            )
-        )
+        let text: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+        func link(_ title: String, _ url: String) -> NSAttributedString {
+            NSAttributedString(string: title, attributes: [.font: font, .link: URL(string: url)!])
+        }
+
+        body.append(NSAttributedString(
+            string: String(localized: "Your own AI coworkers, on your own Mac.\n\nDesigned after "),
+            attributes: text
+        ))
+        body.append(link("MonoCode", "https://github.com/hardbeat920/monocode"))
+        body.append(NSAttributedString(
+            string: String(localized: ". xBot 1.x was built on "),
+            attributes: text
+        ))
+        body.append(link("OpenBot", "https://github.com/CopilotKit/openbot"))
+        body.append(NSAttributedString(string: String(localized: " by "), attributes: text))
+        body.append(link("CopilotKit", "https://copilotkit.ai"))
+        body.append(NSAttributedString(
+            string: String(localized: ", used under the MIT licence."),
+            attributes: text
+        ))
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center

@@ -1,23 +1,34 @@
 xBot
 Copyright (c) 2026 xBot contributors
 
-This product includes software developed by CopilotKit.
+--------------------------------------------------------------------------------
+
+xBot's design follows MonoCode.
+
+    MonoCode
+    https://github.com/hardbeat920/monocode
+    Licensed under the MIT License.
+
+xBot takes MonoCode's ideas and experience — projects, chats as tabs, notes,
+persistent personas, driving the agent CLIs a person already has — and
+reimplements them natively in Swift. It contains no MonoCode code.
 
 --------------------------------------------------------------------------------
 
-xBot's engine is a derivative work of OpenBot.
+xBot 1.x was built on OpenBot.
 
     OpenBot
     https://github.com/CopilotKit/openbot
     Copyright (c) 2026 CopilotKit
     Licensed under the MIT License.
 
-The full text of the MIT License as it applies to OpenBot is reproduced in
-engine/LICENSE. Modifications made by the xBot project are recorded in
-CHANGELOG.md and are described in docs/03-openbot-fork.md.
+xBot 1.x shipped a derivative of OpenBot as its engine. That engine was removed
+in the redesign recorded in docs/decisions/0009-native-harness-redesign.md;
+see CHANGELOG.md. The credit stays as the history of the product.
 
 --------------------------------------------------------------------------------
 
-xBot is not affiliated with, endorsed by, or sponsored by CopilotKit, xAI,
-X Corp., Anthropic, OpenAI, Google, or any other model provider. Provider names
-and logos are used nominatively to identify the services a user may connect.
+xBot is not affiliated with, endorsed by, or sponsored by MonoCode, CopilotKit,
+xAI, X Corp., Anthropic, OpenAI, Google, or any other model provider. Product
+and provider names are used nominatively to identify the tools a user may
+connect.

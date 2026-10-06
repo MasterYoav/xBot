@@ -2,32 +2,34 @@ import AppKit
 import Testing
 @testable import XBotUI
 
-/// The attribution the engine's licence requires, and CLAUDE.md calls "a requirement, not a
-/// courtesy".
+/// The credits that travel with the app. A person who downloads a `.dmg` never sees `NOTICE`.
 ///
 /// A test for a string looks tautological until you ask how it would go missing: not by somebody
-/// deciding to drop the credit, but by a refactor of the About panel that nobody thought was about
-/// licences. `NOTICE` covers the repository; a person who downloads a `.dmg` never sees the
-/// repository, so the credit has to travel with the thing that ships.
+/// deciding to drop a credit, but by a refactor of the About panel that nobody thought was about
+/// credits.
 @Suite
 struct AboutCreditTests {
-    @Test func theAboutPanelCreditsOpenBotAndCopilotKit() {
+    /// The design xBot follows.
+    @Test func theAboutPanelCreditsMonoCodeWithALink() {
+        #expect(AboutPanel.credits.string.contains("MonoCode"))
+        #expect(links().contains { $0.absoluteString.contains("hardbeat920/monocode") })
+    }
+
+    /// xBot 1.x shipped OpenBot's engine; the credit stays with the product that grew out of it.
+    @Test func theAboutPanelStillCreditsOpenBotAndCopilotKit() {
         let credits = AboutPanel.credits.string
         #expect(credits.contains("OpenBot"))
         #expect(credits.contains("CopilotKit"))
-        #expect(credits.contains("MIT"))
-        #expect(credits.contains("2026"))
+        #expect(links().contains { $0.absoluteString.contains("CopilotKit/openbot") })
     }
 
-    /// With the link live. A URL somebody has to retype is not a link, and "credits OpenBot with a
-    /// link" is how the requirement is worded.
-    @Test func openBotIsALinkAndNotJustAWord() {
+    private func links() -> [URL] {
         var found: [URL] = []
         let whole = NSRange(location: 0, length: AboutPanel.credits.length)
         AboutPanel.credits.enumerateAttribute(.link, in: whole) { value, _, _ in
             if let url = value as? URL { found.append(url) }
         }
-        #expect(found.contains { $0.absoluteString.contains("CopilotKit/openbot") })
+        return found
     }
 }
 

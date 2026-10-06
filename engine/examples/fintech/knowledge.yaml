@@ -1,5 +1,0 @@
-sources:
-  - type: google-drive
-    roots: [Policies, Compliance]
-  - type: microsoft-onedrive
-    roots: [Risk, Operations]

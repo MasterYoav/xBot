@@ -1,5 +1,7 @@
 # ADR-0007 — Wrap OpenBot rather than re-engineer it, and keep Intelligence for v1
 
+> **Superseded by [ADR-0009](0009-native-harness-redesign.md)** — OpenBot is no longer wrapped. Kept as history.
+
 **Status:** Accepted, and partially superseded by [ADR-0008](0008-local-thread-runner.md).
 **Date:** 2026-09
 **Supersedes:** nothing. **Defers** [ADR-0001](0001-local-history-provider.md) — it stays accepted

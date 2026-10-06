@@ -1,5 +1,7 @@
 # ADR-0008 — A durable local thread runner, narrower than ADR-0001's HistoryProvider
 
+> **Superseded by [ADR-0009](0009-native-harness-redesign.md)** — conversations live in the app's SQLite store. Kept as history.
+
 **Status:** Accepted
 **Date:** 2026-09
 **Supersedes:** nothing. **Partially resolves** [ADR-0001](0001-local-history-provider.md) — the

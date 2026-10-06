@@ -1,5 +1,7 @@
 # ADR-0003 — Which container runtime the app drives
 
+> **Superseded by [ADR-0009](0009-native-harness-redesign.md)** — there is no engine container; a bot's optional computer uses Apple Containerization. Kept as history.
+
 **Status:** Accepted, with a scheduled review
 **Date:** 2026-09
 **Related:** [07-container-runtime.md](../07-container-runtime.md), [06-onboarding.md](../06-onboarding.md)

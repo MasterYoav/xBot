@@ -1,5 +1,10 @@
 # Onboarding
 
+> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
+> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
+> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
+> Until then, where it disagrees with the code, the code and the spec win.
+
 The single most important surface in the product. Everything xBot claims — that it is local, that it
 is easy, that you never touch a terminal — is either proved or disproved in the first four minutes.
 
