@@ -55,4 +55,14 @@ import Testing
         #expect(w.sendDraft())
         #expect(w.draft.mode == .readOnly)
     }
+
+    @Test func settingADefaultToWhatItIsLeavesTheDraftAlone() async {
+        let w = await workspace()
+        w.defaultHarness = .claude
+        w.draft.model = "opus"
+        w.draft.mode = .fullAccess
+        w.defaultHarness = .claude
+        w.defaultMode = w.defaultMode
+        #expect(w.draft.model == "opus" && w.draft.mode == .fullAccess)
+    }
 }

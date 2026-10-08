@@ -29,6 +29,8 @@ struct InspectorView: View {
                         guard !Task.isCancelled else { break }
                         await git.fetch()
                     }
+                    // Another project took this one's place: its watcher stops with it.
+                    git.stopWatching()
                 }
                 .onDisappear { git.stopWatching() }
             } else {

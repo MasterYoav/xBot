@@ -139,6 +139,45 @@ struct TempRepo {
         #expect(FileManager.default.fileExists(atPath: repo.work.appending(path: "theirs.txt").path))
     }
 
+    @Test func syncFetchesFirst() async throws {
+        let repo = try TempRepo.make()
+        let git = ProjectGit(directory: repo.work, tool: tool)
+        await git.refresh()
+        try repo.pushFromElsewhere("theirs.txt")
+        try repo.write("mine.txt", "mine\n")
+        #expect(await git.commit("Mine"))
+        #expect(git.status?.state == .toPush(1))
+        await git.sync()
+        // It could not have known about "theirs" without fetching: now it does, and asks for a merge.
+        #expect(git.needsMerge)
+        #expect(git.status?.state == .diverged(ahead: 1, behind: 1))
+    }
+
+    @Test func aWatcherRefreshLeavesThePullRequestAlone() async throws {
+        let repo = try TempRepo.make()
+        try repo.sh("remote", "set-url", "origin", "https://github.com/o/r.git")
+        let log = repo.root.appending(path: "gh.log")
+        let gh = repo.root.appending(path: "gh")
+        try "#!/bin/sh\necho called >> '\(log.path)'\nexit 1\n".write(to: gh, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gh.path)
+        let git = ProjectGit(directory: repo.work, tool: GitTool(git: tool.git, gh: gh, environment: tool.environment))
+        await git.refresh(pullRequest: false)
+        #expect(!FileManager.default.fileExists(atPath: log.path))
+        await git.refresh()
+        #expect(FileManager.default.fileExists(atPath: log.path))
+    }
+
+    @Test func refreshesThatOverlapRunOneAfterAnother() async throws {
+        let repo = try TempRepo.make()
+        let git = ProjectGit(directory: repo.work, tool: tool)
+        async let one: Void = git.refresh()
+        try repo.write("late.txt", "x\n")
+        async let two: Void = git.refresh()
+        _ = await (one, two)
+        // Whatever the timing, the last word is a refresh that started after the file was written.
+        #expect(git.status?.files.map(\.path) == ["late.txt"])
+    }
+
     @Test func divergedSyncAsksForAMerge() async throws {
         let repo = try TempRepo.make()
         try repo.pushFromElsewhere("theirs.txt")

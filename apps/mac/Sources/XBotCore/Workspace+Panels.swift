@@ -108,6 +108,7 @@ extension Workspace {
     public var defaultHarness: HarnessKind? {
         get { defaults.string(forKey: "default.harness").flatMap(HarnessKind.init(rawValue:)) }
         set {
+            guard newValue != defaultHarness else { return }
             defaults.set(newValue?.rawValue, forKey: "default.harness")
             draft.harness = newValue
             draft.model = nil
@@ -118,6 +119,7 @@ extension Workspace {
     public var defaultEffort: Effort? {
         get { defaults.string(forKey: "default.effort").flatMap(Effort.init(rawValue:)) }
         set {
+            guard newValue != defaultEffort else { return }
             defaults.set(newValue?.rawValue, forKey: "default.effort")
             draft.effort = newValue
         }
@@ -126,6 +128,8 @@ extension Workspace {
     public var defaultMode: PermissionMode {
         get { defaults.string(forKey: "default.mode").flatMap(PermissionMode.init(rawValue:)) ?? .editFiles }
         set {
+            // Unchanged (Settings opening, say): the draft in progress keeps its own choices.
+            guard newValue != defaultMode else { return }
             defaults.set(newValue.rawValue, forKey: "default.mode")
             draft.mode = newValue
         }

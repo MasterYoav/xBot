@@ -20,13 +20,40 @@ public final class ProjectGit {
     /// Bumped by every refresh, so the explorer knows to read its folders and colours again.
     public private(set) var generation = 0
     @ObservationIgnored private var watcher: FolderWatcher?
+    @ObservationIgnored private var refreshing: Task<Void, Never>?
+    @ObservationIgnored private var again = false
+    @ObservationIgnored private var wantsPullRequest = false
 
     public init(directory: URL, tool: GitTool) {
         self.directory = directory
         self.tool = tool
     }
 
-    public func refresh() async {
+    /// Reads the state again. Overlapping calls do not race: one pass runs at a time, and a call
+    /// that arrives during a pass waits for a pass that starts after it. The folder watcher leaves
+    /// the pull request alone — asking GitHub on every saved file would be a network call a second.
+    public func refresh(pullRequest: Bool = true) async {
+        wantsPullRequest = wantsPullRequest || pullRequest
+        if let running = refreshing {
+            again = true
+            await running.value
+            return
+        }
+        let task = Task { @MainActor in
+            repeat {
+                again = false
+                let withPullRequest = wantsPullRequest
+                wantsPullRequest = false
+                await readState(pullRequest: withPullRequest)
+            } while again
+            // Cleared here, in the same step that saw `again` false, so no call can slip between.
+            refreshing = nil
+        }
+        refreshing = task
+        await task.value
+    }
+
+    private func readState(pullRequest: Bool) async {
         guard await tool.git(["rev-parse", "--is-inside-work-tree"], in: directory).succeeded else {
             isRepository = false
             status = nil
@@ -46,7 +73,7 @@ public final class ProjectGit {
         let numstat = await tool.git(["diff", "--numstat", "HEAD"], in: directory)
         totals = numstat.succeeded ? DiffTotals.parse(numstat: numstat.output) : DiffTotals()
         generation += 1
-        await refreshPullRequest()
+        if pullRequest { await refreshPullRequest() }
     }
 
     /// The branch's pull request through gh, when gh is installed and signed in; otherwise none.
@@ -78,6 +105,8 @@ public final class ProjectGit {
     /// Pull (fast-forward only), then push. A pull that cannot fast-forward stops there and sets
     /// `needsMerge`.
     public func sync() async {
+        // What the remote has now, not at the last fetch: otherwise the push is simply refused.
+        guard await perform(["fetch", "--quiet"]) else { return }
         if (status?.behind ?? 0) > 0 {
             isBusy = true
             let pulled = await tool.git(["pull", "--ff-only", "--quiet"], in: directory)
@@ -154,7 +183,7 @@ public final class ProjectGit {
     public func startWatching() {
         guard watcher == nil else { return }
         watcher = FolderWatcher(directory) { [weak self] in
-            Task { await self?.refresh() }
+            Task { await self?.refresh(pullRequest: false) }
         }
     }
 
