@@ -1,6 +1,6 @@
 # Plan mode: review a plan, then watch it run
 
-Date: 2026-10-08 · Status: approved in brainstorming, awaiting spec review
+Date: 2026-10-08 · Status: approved and built (plan `docs/superpowers/plans/2026-10-08-plan-mode.md`)
 
 ## Intent
 

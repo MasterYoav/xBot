@@ -14,6 +14,12 @@ xBot is now a native app that drives the agent CLIs you already have. See
 - Everything saved locally in one SQLite file; a reply interrupted by Stop or by quitting keeps
   what had arrived.
 
+- Plan mode: turn on **Plan** in the composer and the agent first investigates without changing
+  anything and proposes steps. Edit, reorder, remove or add steps, then **Run plan** (⌘↩) and
+  watch each one run: progress, the step in progress and its tools, how long each took, failures
+  with their reason, and steps the agent adds to finish the job. **Review plan first** off runs the
+  plan straight away. Stop and Resume work mid-plan.
+
 ### Removed
 - The OpenBot engine, Docker and Colima, Postgres, the CopilotKit runner, the engine image and its
   update pipeline, onboarding, settings and the web admin. Onboarding, bots, notes, the native model
