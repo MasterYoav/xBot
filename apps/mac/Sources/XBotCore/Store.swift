@@ -168,6 +168,18 @@ public final class Store {
         try db.execute("UPDATE messages SET parts = ? WHERE id = ?", [.text(parts), .text(message.id.uuidString)])
     }
 
+    /// Plans that were run, not just proposed, across every chat.
+    public func planRuns() throws -> Int {
+        try db.rows("SELECT parts FROM messages WHERE role = 'assistant' AND parts LIKE '%\"plan\"%'").reduce(0) { count, r in
+            guard let json = r[0].string,
+                  let parts = try? decoder.decode([Part].self, from: Data(json.utf8)) else { return count }
+            let ran = parts.contains { part in
+                if case .plan(let plan) = part { plan.startedAt != nil } else { false }
+            }
+            return count + (ran ? 1 : 0)
+        }
+    }
+
     // MARK: Usage
 
     public func usage() throws -> [HarnessKind: AgentUsage] {

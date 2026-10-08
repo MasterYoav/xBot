@@ -101,4 +101,15 @@ import XBotBrain
         // Opening again does not try to add the columns twice.
         _ = try Store(database: Database(url: url))
     }
+
+    @Test func planRunsCountsPlansThatRan() throws {
+        let store = Store.inMemory()
+        let chat = Chat(projectID: nil, title: "t", harness: .claude, mode: .editFiles)
+        try store.save(chat)
+        var ran = Plan(prompt: "p", status: .finished)
+        ran.startedAt = .now
+        try store.append(ChatMessage(chatID: chat.id, role: .assistant, parts: [.plan(ran)]))
+        try store.append(ChatMessage(chatID: chat.id, role: .assistant, parts: [.plan(Plan(prompt: "q", status: .review))]))
+        #expect(try store.planRuns() == 1)
+    }
 }
