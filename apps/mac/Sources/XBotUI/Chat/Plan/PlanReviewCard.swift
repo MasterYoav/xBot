@@ -23,7 +23,7 @@ struct PlanReviewCard: View {
         VStack(alignment: .leading, spacing: Space.m) {
             Text(String(localized: "Here's my plan. Change anything you like, then run it.")).bodyText()
             VStack(alignment: .leading, spacing: Space.xxs) {
-                Text(String(localized: "Review the plan")).bodyEmphasis()
+                Text(String(localized: "Review the plan")).emphasisText()
                 Text(String(localized: "Edit, reorder or remove steps before the agent starts. Move a step with ⌥↑ and ⌥↓."))
                     .captionText()
                     .foregroundStyle(Palette.textSecondary)
@@ -53,7 +53,7 @@ struct PlanReviewCard: View {
                     .captionText()
                     .padding(.horizontal, Space.m)
                     .padding(.vertical, Space.xs)
-                    .foregroundStyle(Palette.windowBackground)
+                    .foregroundStyle(Palette.window)
                     .background(Palette.textPrimary, in: Capsule())
                 }
                 .buttonStyle(XBotButtonStyle())
@@ -104,7 +104,7 @@ struct PlanReviewCard: View {
         }
         .padding(.horizontal, Space.s)
         .padding(.vertical, Space.xs)
-        .background(highlighted ? Palette.elevatedSurface : .clear,
+        .background(highlighted ? Palette.raised : .clear,
                     in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
         .onHover { hovered = $0 ? id : (hovered == id ? nil : hovered) }
     }

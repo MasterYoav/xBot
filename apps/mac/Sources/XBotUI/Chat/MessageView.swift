@@ -12,10 +12,10 @@ struct MessageView: View {
             Text(userText)
                 .bodyText()
                 .textSelection(.enabled)
-                .foregroundStyle(Palette.bubbleOutgoingText)
+                .foregroundStyle(Palette.textPrimary)
                 .padding(.horizontal, Space.m)
                 .padding(.vertical, Space.s)
-                .background(Palette.bubbleOutgoing, in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
+                .background(Palette.raised, in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             VStack(alignment: .leading, spacing: Space.s) {
@@ -31,7 +31,7 @@ struct MessageView: View {
                     case .failure(let reason):
                         Label(reason, systemImage: "exclamationmark.triangle")
                             .captionText()
-                            .foregroundStyle(Palette.stateFailed)
+                            .foregroundStyle(Palette.failure)
                             .textSelection(.enabled)
                     }
                 }
@@ -77,7 +77,7 @@ private struct ToolRow: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Button { expanded.toggle() } label: {
                 HStack(spacing: Space.s) {
-                    Image(systemName: icon).foregroundStyle(tool.isError ? Palette.stateFailed : Palette.textSecondary)
+                    Image(systemName: icon).foregroundStyle(tool.isError ? Palette.failure : Palette.textSecondary)
                     Text(tool.name).captionText().bold()
                     Text(tool.summary).captionText().foregroundStyle(Palette.textSecondary).lineLimit(1)
                     if tool.output == nil { ProgressView().controlSize(.mini) }
@@ -94,7 +94,7 @@ private struct ToolRow: View {
                 }
                 .frame(maxHeight: Metrics.toolOutputMaxHeight)
                 .padding(Space.s)
-                .background(Palette.codeBackground, in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
+                .background(Palette.inset, in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
             }
         }
         .motion(Motion.quick, value: expanded)

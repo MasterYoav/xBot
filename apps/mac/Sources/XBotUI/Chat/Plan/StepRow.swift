@@ -24,7 +24,7 @@ struct StepRow: View {
                 }
             }
             if let note = step.note, step.status == .failed {
-                Text(note).captionText().foregroundStyle(Palette.stateFailed).padding(.leading, Metrics.stepIndent + Space.s)
+                Text(note).captionText().foregroundStyle(Palette.failure).padding(.leading, Metrics.stepIndent + Space.s)
             }
             if step.status == .stopped {
                 Text(String(localized: "Stopped")).captionText().foregroundStyle(Palette.textTertiary)
@@ -50,7 +50,7 @@ struct StepRow: View {
         case .done:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.textPrimary)
         case .failed:
-            Image(systemName: "xmark").foregroundStyle(Palette.stateFailed)
+            Image(systemName: "xmark").foregroundStyle(Palette.failure)
         case .stopped:
             Image(systemName: "stop.circle").foregroundStyle(Palette.textTertiary)
         }
@@ -59,7 +59,7 @@ struct StepRow: View {
     @ViewBuilder private var title: some View {
         switch step.status {
         case .running:
-            Text(step.active).bodyText().foregroundStyle(Palette.accent)
+            Text(step.active).bodyText().foregroundStyle(Palette.running)
         case .done:
             Text(step.title).bodyText().strikethrough().foregroundStyle(Palette.textTertiary)
         case .pending:
@@ -98,11 +98,11 @@ struct ToolLine: View {
                 ProgressView().controlSize(.mini)
             } else {
                 Image(systemName: tool.isError ? "exclamationmark.circle" : ToolLabel.symbol(tool.name))
-                    .foregroundStyle(tool.isError ? Palette.stateFailed : Palette.textTertiary)
+                    .foregroundStyle(tool.isError ? Palette.failure : Palette.textTertiary)
             }
             Text(ToolLabel.verb(tool.name, running: running)).captionText()
-                .foregroundStyle(running ? Palette.accent : Palette.textSecondary)
-            Text(tool.summary).font(Typography.mono).foregroundStyle(running ? Palette.accent : Palette.textSecondary)
+                .foregroundStyle(running ? Palette.running : Palette.textSecondary)
+            Text(tool.summary).font(Typography.mono).foregroundStyle(running ? Palette.running : Palette.textSecondary)
                 .lineLimit(1).truncationMode(.middle)
             Spacer()
             if let size = tool.size { Text(size).captionText().foregroundStyle(Palette.textTertiary) }

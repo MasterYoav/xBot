@@ -21,10 +21,10 @@ public struct RootView: View {
                 if let problem = workspace.problem {
                     Text(problem)
                         .captionText()
-                        .foregroundStyle(Palette.stateFailed)
+                        .foregroundStyle(Palette.failure)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(Space.s)
-                        .background(Palette.panelBackground)
+                        .background(Palette.inset)
                 }
                 if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
                     ChatTabs(workspace: workspace)
@@ -33,7 +33,7 @@ public struct RootView: View {
                     EmptyState(workspace: workspace, addProject: { addingProject = true })
                 }
             }
-            .background(Palette.windowBackground)
+            .background(Palette.window)
         }
         .fileImporter(isPresented: $addingProject, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result {

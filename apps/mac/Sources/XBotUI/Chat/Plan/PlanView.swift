@@ -17,7 +17,7 @@ struct PlanView: View {
             case .stopped where plan.problem != nil && plan.steps.isEmpty:
                 VStack(alignment: .leading, spacing: Space.s) {
                     Label(plan.problem ?? "", systemImage: "exclamationmark.triangle")
-                        .captionText().foregroundStyle(Palette.stateFailed)
+                        .captionText().foregroundStyle(Palette.failure)
                     if !plan.reply.isEmpty {
                         Text(MessageMarkdown.inline(plan.reply)).bodyText().textSelection(.enabled)
                     }
@@ -45,7 +45,7 @@ private struct PlanningCard: View {
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(spacing: Space.s) {
                 ProgressView().controlSize(.small)
-                Text(String(localized: "Planning…")).bodyEmphasis()
+                Text(String(localized: "Planning…")).emphasisText()
             }
             ForEach(plan.investigation, id: \.id) { ToolLine(tool: $0) }
                 .padding(.leading, Metrics.stepIndent)

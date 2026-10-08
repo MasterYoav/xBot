@@ -15,7 +15,7 @@ struct ChatTabs: View {
             .padding(.horizontal, Space.s)
             .padding(.vertical, Space.xs)
         }
-        .background(Palette.panelBackground)
+        .background(Palette.inset)
         .overlay(alignment: .bottom) { Divider() }
     }
 
@@ -32,9 +32,9 @@ struct ChatTabs: View {
         }
         .padding(.horizontal, Space.s)
         .padding(.vertical, Space.xs)
-        .frame(width: Metrics.tabWidth)
+        .frame(width: Metrics.tabMaxWidth)
         .background(
-            selected ? Palette.elevatedSurface : .clear,
+            selected ? Palette.raised : .clear,
             in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
         )
         .contentShape(Rectangle())

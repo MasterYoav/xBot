@@ -22,7 +22,7 @@ struct PlanStatusBar: View {
             }
             .padding(.horizontal, Space.m)
             .padding(.vertical, Space.xs)
-            .background(Palette.elevatedSurface, in: Capsule())
+            .background(Palette.raised, in: Capsule())
             .frame(maxWidth: Metrics.readingWidth, alignment: .leading)
             .padding(.horizontal, Space.l)
         }

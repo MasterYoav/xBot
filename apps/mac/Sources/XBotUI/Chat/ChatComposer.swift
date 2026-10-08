@@ -80,8 +80,8 @@ struct ChatComposer: View {
             .menuStyle(.borderlessButton)
         }
         .padding(Space.m)
-        .background(Palette.elevatedSurface, in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radius.large, style: .continuous).strokeBorder(Palette.separator))
+        .background(Palette.raised, in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.large, style: .continuous).strokeBorder(Palette.hairline))
         .padding(Space.l)
         .frame(maxWidth: Metrics.readingWidth)
         .onAppear { focused = true }

@@ -15,7 +15,7 @@ struct EmptyState: View {
                     .foregroundStyle(Palette.textSecondary)
             } else if workspace.availableHarnesses.isEmpty {
                 Text(String(localized: "xBot works through an AI agent you already have."))
-                    .sectionTitle()
+                    .titleText()
                 Text(String(localized: "Install Claude Code or Codex and sign in, then come back. xBot will find it."))
                     .bodyText()
                     .foregroundStyle(Palette.textSecondary)
@@ -27,7 +27,7 @@ struct EmptyState: View {
                 Button(String(localized: "Look Again")) { Task { await workspace.refreshHarnesses() } }
                     .buttonStyle(.borderedProminent)
             } else {
-                Text(String(localized: "What are we working on?")).sectionTitle()
+                Text(String(localized: "What are we working on?")).titleText()
                 HStack(spacing: Space.m) {
                     Button(String(localized: "New Chat")) { workspace.newChat(in: nil) }
                         .buttonStyle(.borderedProminent)

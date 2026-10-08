@@ -32,7 +32,7 @@ struct TasksCard: View {
 
     private var header: some View {
         HStack(spacing: Space.s) {
-            Text(String(localized: "Tasks")).bodyEmphasis()
+            Text(String(localized: "Tasks")).emphasisText()
             Text(counts).captionText().foregroundStyle(Palette.textSecondary)
             Spacer()
             if let start = plan.startedAt {
@@ -54,9 +54,9 @@ struct TasksCard: View {
     private var progress: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                Capsule().fill(Palette.separator)
+                Capsule().fill(Palette.hairline)
                 Capsule()
-                    .fill(plan.failedCount > 0 ? Palette.stateFailed : Palette.textPrimary)
+                    .fill(plan.failedCount > 0 ? Palette.failure : Palette.textPrimary)
                     .frame(width: geometry.size.width * fraction)
             }
         }
@@ -103,7 +103,7 @@ struct TasksCard: View {
             if run.highlighted {
                 rows
                     .padding(Space.s)
-                    .background(Palette.elevatedSurface,
+                    .background(Palette.raised,
                                 in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
                     .padding(.horizontal, -Space.s)
             } else {
