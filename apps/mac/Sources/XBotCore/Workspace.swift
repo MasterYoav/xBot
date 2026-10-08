@@ -17,12 +17,14 @@ public final class Workspace {
     /// Set when xBot cannot save, so the window can say so instead of pretending.
     public var problem: String?
 
-    private var brains: [HarnessKind: any Brain] = [:]
-    private var transcripts: [UUID: [ChatMessage]] = [:]
+    var brains: [HarnessKind: any Brain] = [:]
+    var transcripts: [UUID: [ChatMessage]] = [:]
     /// The running turn per chat. The token is how a turn's own task recognises it: a stopped
     /// turn's task unwinds after the next one may have started, and must leave that one alone.
-    private var turns: [UUID: (token: UUID, task: Task<Void, Never>)] = [:]
-    private let store: Store
+    var turns: [UUID: (token: UUID, task: Task<Void, Never>)] = [:]
+    let store: Store
+    /// Chat → the message holding its plan, while a plan turn runs.
+    var planTurns: [UUID: UUID] = [:]
     private let inbox: URL
     private let discover: @Sendable () async -> [HarnessKind: any Brain]
 
@@ -154,20 +156,34 @@ public final class Workspace {
         chat.updatedAt = .now
         replace(chat)
 
+        if chat.planMode {
+            startPlanning(prompt, chat: chat, brain: brain)
+            return true
+        }
+
         let request = TurnRequest(
             prompt: prompt, directory: directory(for: chat), model: chat.model,
             mode: chat.mode, resumeID: chat.sessionID
         )
         live[id] = []
+        launch(id) { workspace, token in
+            for await event in brain.run(request) {
+                workspace.receive(event, in: id, turn: token)
+            }
+        }
+        return true
+    }
+
+    /// Runs `body` as the chat's turn. The token is how the body's own steps recognise it is still
+    /// the current turn after it awaits.
+    func launch(_ id: UUID, _ body: @escaping @MainActor (Workspace, UUID) async -> Void) {
         let token = UUID()
         let task = Task { [weak self] in
-            for await event in brain.run(request) {
-                self?.receive(event, in: id, turn: token)
-            }
-            self?.end(id, turn: token, stopped: false)
+            guard let self else { return }
+            await body(self, token)
+            self.end(id, turn: token, stopped: false)
         }
         turns[id] = (token, task)
-        return true
     }
 
     public func stop(_ id: UUID) {
@@ -199,9 +215,14 @@ public final class Workspace {
     }
 
     /// Ends a turn once: whichever of stop and the stream finishing comes first saves the reply.
-    private func end(_ id: UUID, turn token: UUID, stopped: Bool) {
+    func end(_ id: UUID, turn token: UUID, stopped: Bool) {
         guard turns[id]?.token == token else { return }
         turns[id] = nil
+        if let messageID = planTurns.removeValue(forKey: id) {
+            if stopped { haltPlan(messageID, in: id) }
+            update(id) { $0.updatedAt = .now }
+            return
+        }
         // A tool with no result when the turn ends never finished; saved as running, it would spin
         // in the transcript forever.
         var parts = (live.removeValue(forKey: id) ?? []).map { part in
@@ -215,7 +236,7 @@ public final class Workspace {
         update(id) { $0.updatedAt = .now }
     }
 
-    private func directory(for chat: Chat) -> URL {
+    func directory(for chat: Chat) -> URL {
         if let projectID = chat.projectID, let project = projects.first(where: { $0.id == projectID }) {
             return project.url
         }
@@ -223,12 +244,12 @@ public final class Workspace {
         return inbox
     }
 
-    private func save(_ message: ChatMessage) {
+    func save(_ message: ChatMessage) {
         attempt { try store.append(message) }
         transcripts[message.chatID, default: []].append(message)
     }
 
-    private func update(_ id: UUID, _ change: (inout Chat) -> Void) {
+    func update(_ id: UUID, _ change: (inout Chat) -> Void) {
         guard var chat = chat(id) else { return }
         change(&chat)
         replace(chat)
@@ -247,7 +268,7 @@ public final class Workspace {
 
     /// Runs a store call; a failure becomes `problem` rather than a crash or a silent loss.
     @discardableResult
-    private func attempt<T>(_ body: () throws -> T) -> T? {
+    func attempt<T>(_ body: () throws -> T) -> T? {
         do { return try body() } catch {
             problem = String(localized: "xBot couldn't save to its library: \(String(describing: error))")
             return nil
