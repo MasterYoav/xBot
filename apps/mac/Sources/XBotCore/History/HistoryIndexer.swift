@@ -91,10 +91,13 @@ public actor HistoryIndexer {
         var tally = HistoryTally()
         var pending = Data()
         let newline = UInt8(ascii: "\n")
-        while let chunk = try? handle.read(upToCount: 4 << 20), !chunk.isEmpty {
+        // JSONSerialization's objects and FileHandle's reads are autoreleased; without a pool per
+        // chunk a first pass over a gigabyte of logs held them all (2.6 GB at peak).
+        while autoreleasepool(invoking: { () -> Bool in
+            guard let chunk = try? handle.read(upToCount: 4 << 20), !chunk.isEmpty else { return false }
             pending.append(chunk)
             // Only whole lines: a line still being written waits for the next pass.
-            guard let last = pending.lastIndex(of: newline) else { continue }
+            guard let last = pending.lastIndex(of: newline) else { return true }
             for line in pending[pending.startIndex..<last].split(separator: newline) {
                 let text = String(decoding: line, as: UTF8.self)
                 if agent == .claude {
@@ -105,7 +108,8 @@ public actor HistoryIndexer {
             }
             offset += UInt64(last - pending.startIndex + 1)
             pending = Data(pending[(last + 1)...])
-        }
+            return true
+        }) {}
         save(tally, agent: agent, path: path, offset: offset, carry: carry)
     }
 
