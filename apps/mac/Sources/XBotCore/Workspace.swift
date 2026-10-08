@@ -25,6 +25,9 @@ public final class Workspace {
     public var draft = ChatDraft()
     /// Bumped to ask the sidebar's search field for focus (⌘K).
     public internal(set) var searchFocusRequest = 0
+    /// "@path" waiting to be put into the composer on screen, and the request that asks for it.
+    public internal(set) var pendingMention: String?
+    public internal(set) var mentionRequest = 0
     /// Bumped to ask the composer for focus (a suggestion was chosen).
     public internal(set) var composerFocusRequest = 0
 

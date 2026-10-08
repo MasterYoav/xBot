@@ -77,3 +77,14 @@ extension Workspace {
         composerFocusRequest += 1
     }
 }
+
+// MARK: Mentions
+
+extension Workspace {
+    /// Puts "@path" into the composer on screen: Home's, or the open chat's.
+    public func mention(_ url: URL) {
+        guard let project = contextProject else { return }
+        pendingMention = FileTree.mention(url, in: project.url)
+        mentionRequest += 1
+    }
+}

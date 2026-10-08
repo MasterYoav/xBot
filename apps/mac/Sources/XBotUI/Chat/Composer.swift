@@ -48,6 +48,17 @@ struct Composer: View {
         .motion(Motion.quick, value: focused)
         .onAppear { focused = true }
         .onChange(of: workspace.composerFocusRequest) { focused = true }
+        // A file mentioned from the explorer, or dropped on the composer: "@path " at the end.
+        .onChange(of: workspace.mentionRequest) {
+            guard let mention = workspace.pendingMention else { return }
+            let current = text.wrappedValue
+            text.wrappedValue = current + (current.isEmpty || current.hasSuffix(" ") ? "" : " ") + mention + " "
+            focused = true
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            urls.forEach(workspace.mention)
+            return !urls.isEmpty
+        }
     }
 
     // MARK: Pieces
