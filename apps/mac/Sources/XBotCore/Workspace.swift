@@ -41,6 +41,10 @@ public final class Workspace {
     let codexUsage: @Sendable () -> RateLimits?
     /// Where the person's defaults for new chats are kept.
     @ObservationIgnored let defaults: UserDefaults
+    /// git, if this Mac has it.
+    @ObservationIgnored let gitTool: GitTool?
+    /// Each project's git, made when first asked for.
+    @ObservationIgnored var gitModels: [UUID: ProjectGit] = [:]
     /// Each agent's limits as it last reported them.
     public internal(set) var usage: [HarnessKind: AgentUsage] = [:]
     /// The models each agent offers, read when the agents are found.
@@ -52,8 +56,10 @@ public final class Workspace {
         discover: @escaping @Sendable () async -> [HarnessKind: any Brain],
         codexModels: @escaping @Sendable () -> [ModelOption] = { CodexModels.read() },
         codexUsage: @escaping @Sendable () -> RateLimits? = { CodexUsage.latest() },
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        gitTool: GitTool? = GitTool.find()
     ) {
+        self.gitTool = gitTool
         self.store = store
         self.inbox = inbox
         self.discover = discover

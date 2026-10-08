@@ -46,7 +46,20 @@ public struct GitTool: Sendable, Equatable {
         return await run(gh, arguments, in: directory, input: nil)
     }
 
+    /// The process runs on a GCD thread, not Swift's cooperative pool: reading its pipes blocks,
+    /// and a few blocked cooperative threads are enough to starve everything else.
     private func run(_ executable: URL, _ arguments: [String], in directory: URL, input: String?) async -> ProcessResult {
+        let environment = environment
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: Self.runBlocking(executable, arguments, directory, environment, input))
+            }
+        }
+    }
+
+    private static func runBlocking(
+        _ executable: URL, _ arguments: [String], _ directory: URL, _ environment: [String: String], _ input: String?
+    ) -> ProcessResult {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -59,23 +72,35 @@ public struct GitTool: Sendable, Equatable {
         do { try process.run() } catch {
             return ProcessResult(status: -1, output: "", error: error.localizedDescription)
         }
+        let group = DispatchGroup()
         if let input {
-            // Written from its own task: a long input and a long output would otherwise wait on each other.
+            // Written on its own thread: a long input and a long output would otherwise wait on each other.
             let writer = stdin.fileHandleForWriting
-            Task.detached {
+            group.enter()
+            DispatchQueue.global().async {
                 writer.write(Data(input.utf8))
                 try? writer.close()
+                group.leave()
             }
         }
-        async let output = Task.detached { out.fileHandleForReading.readDataToEndOfFile() }.value
-        async let error = Task.detached { err.fileHandleForReading.readDataToEndOfFile() }.value
-        let (o, e) = await (output, error)
-        // Both pipes are at end of file, so the process has exited or is about to.
+        let errors = Collected()
+        group.enter()
+        DispatchQueue.global().async {
+            errors.data = err.fileHandleForReading.readDataToEndOfFile()
+            group.leave()
+        }
+        let output = out.fileHandleForReading.readDataToEndOfFile()
+        group.wait()
         process.waitUntilExit()
         return ProcessResult(
             status: process.terminationStatus,
-            output: String(decoding: o, as: UTF8.self),
-            error: String(decoding: e, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            output: String(decoding: output, as: UTF8.self),
+            error: String(decoding: errors.data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+
+    /// stderr, read on another thread; read back only after that thread has left the group.
+    private final class Collected: @unchecked Sendable {
+        var data = Data()
     }
 }

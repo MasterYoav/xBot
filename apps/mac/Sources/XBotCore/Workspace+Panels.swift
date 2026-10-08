@@ -40,3 +40,18 @@ extension Workspace {
     /// Claude Code's plan, from its account summary.
     public var claudePlan: String? { ClaudeAccount.plan() }
 }
+
+// MARK: Git
+
+extension Workspace {
+    public var gitInstalled: Bool { gitTool != nil }
+
+    /// The project's git, made once and kept. Nil when git is not installed.
+    public func git(for project: Project) -> ProjectGit? {
+        guard let gitTool else { return nil }
+        if let model = gitModels[project.id] { return model }
+        let model = ProjectGit(directory: project.url, tool: gitTool)
+        gitModels[project.id] = model
+        return model
+    }
+}

@@ -7,10 +7,16 @@ import Testing
         center.show("one")
         center.show("two")
         #expect(center.current?.text == "one")
-        try await Task.sleep(for: .milliseconds(70))
+        try await until { center.current?.text == "two" }
         #expect(center.current?.text == "two")
-        try await Task.sleep(for: .milliseconds(70))
+        try await until { center.current == nil }
         #expect(center.current == nil)
+    }
+
+    /// Waits for a condition, up to two seconds: a busy machine (the git tests spawn processes
+    /// beside this one) can delay a 40 ms timer well past a fixed sleep.
+    private func until(_ condition: () -> Bool) async throws {
+        for _ in 0..<200 where !condition() { try await Task.sleep(for: .milliseconds(10)) }
     }
 
     @Test func anActionRunsOnceAndMovesOn() {
