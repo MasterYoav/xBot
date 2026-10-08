@@ -1,6 +1,6 @@
 # Workspace panels: Git and Explorer, the account menu, usage, profile and settings
 
-Date: 2026-10-08 · Status: approved in brainstorming, awaiting spec review
+Date: 2026-10-08 · Status: approved and built (plan `docs/superpowers/plans/2026-10-08-workspace-panels.md`)
 
 ## Intent
 
