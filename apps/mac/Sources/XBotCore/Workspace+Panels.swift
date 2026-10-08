@@ -55,3 +55,25 @@ extension Workspace {
         return model
     }
 }
+
+// MARK: Pages
+
+public enum Page: Equatable, Sendable {
+    case main, profile
+    case diff(projectID: UUID, file: GitFile)
+}
+
+extension Workspace {
+    public func showDiff(_ file: GitFile, in project: Project) { page = .diff(projectID: project.id, file: file) }
+
+    public static var mergeRequest: String {
+        String(localized: "Pull the latest changes from the remote and merge them with mine. Resolve any conflicts, run the tests, then tell me what you did.")
+    }
+
+    /// "Ask the agent to merge": sent to the open chat, or put in Home's composer.
+    public func askToMerge() {
+        if let id = selectedChatID, send(Self.mergeRequest, in: id) { return }
+        draft.text = Self.mergeRequest
+        composerFocusRequest += 1
+    }
+}

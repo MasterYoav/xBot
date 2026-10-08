@@ -10,6 +10,8 @@ public final class Workspace {
     public internal(set) var chats: [Chat] = []
     public private(set) var openChatIDs: [UUID] = []
     public var selectedChatID: UUID?
+    /// What the main area shows instead of Home or the chat: the profile, or a file's diff.
+    public var page: Page = .main
     /// The reply being written right now, per chat. Saved as a message when the turn ends.
     public private(set) var live: [UUID: [Part]] = [:]
     /// True until the installed CLIs have been looked for. Nothing claims one is missing before then.
@@ -139,6 +141,7 @@ public final class Workspace {
         if transcripts[id] == nil { transcripts[id] = attempt { try store.messages(in: id) } ?? [] }
         if !openChatIDs.contains(id) { openChatIDs.append(id) }
         selectedChatID = id
+        page = .main
     }
 
     /// Closes the tab. A running turn keeps going; the chat is still in the sidebar.

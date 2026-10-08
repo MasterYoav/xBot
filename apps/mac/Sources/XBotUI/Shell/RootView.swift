@@ -38,10 +38,20 @@ public struct RootView: View {
                             .background(Palette.failureTint)
                     }
                     Group {
-                        if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
-                            ChatView(workspace: workspace, chat: chat, composer: composer).id(chat.id)
-                        } else {
-                            HomeView(workspace: workspace, composer: composer, addProject: { addingProject = true })
+                        switch workspace.page {
+                        case .diff(let projectID, let file):
+                            if let project = workspace.projects.first(where: { $0.id == projectID }),
+                               let git = workspace.git(for: project) {
+                                DiffView(workspace: workspace, git: git, file: file)
+                            }
+                        case .profile:
+                            ProfileView(workspace: workspace)
+                        case .main:
+                            if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
+                                ChatView(workspace: workspace, chat: chat, composer: composer).id(chat.id)
+                            } else {
+                                HomeView(workspace: workspace, composer: composer, addProject: { addingProject = true })
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

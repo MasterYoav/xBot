@@ -71,7 +71,10 @@ extension Workspace {
 
     public var runningChatIDs: Set<UUID> { Set(turns.keys) }
 
-    public func goHome() { selectedChatID = nil }
+    public func goHome() {
+        selectedChatID = nil
+        page = .main
+    }
 
     /// Home, aimed at a project (nil: the Inbox).
     public func startDraft(in projectID: UUID?) {

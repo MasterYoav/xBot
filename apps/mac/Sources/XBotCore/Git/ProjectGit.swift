@@ -35,7 +35,7 @@ public final class ProjectGit {
             return
         }
         isRepository = true
-        let result = await tool.git(["status", "--porcelain=v2", "--branch", "-z"], in: directory)
+        let result = await tool.git(["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"], in: directory)
         guard result.succeeded else {
             problem = result.error
             return

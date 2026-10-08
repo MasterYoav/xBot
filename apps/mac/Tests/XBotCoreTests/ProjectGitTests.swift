@@ -67,6 +67,16 @@ struct TempRepo {
         #expect(git.isRepository)
     }
 
+    @Test func filesInANewFolderAreListedOneByOne() async throws {
+        let repo = try TempRepo.make()
+        try FileManager.default.createDirectory(at: repo.work.appending(path: "new"), withIntermediateDirectories: true)
+        try repo.write("new/one.txt", "1\n")
+        try repo.write("new/two.txt", "2\n")
+        let git = ProjectGit(directory: repo.work, tool: tool)
+        await git.refresh()
+        #expect(git.status?.files.map(\.path) == ["new/one.txt", "new/two.txt"])
+    }
+
     @Test func notARepository() async throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "plain-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
