@@ -13,7 +13,7 @@ import XBotBrain
         ] { parts.apply(event) }
         #expect(parts == [
             .text("Let me look."),
-            .tool(ToolPart(id: "t", name: "Read", summary: "a.txt", output: "hello", isError: false)),
+            .tool(ToolPart(id: "t", name: "Read", summary: "a.txt", output: "hello", isError: false, size: "1 line")),
             .text("It says hello."),
         ])
     }

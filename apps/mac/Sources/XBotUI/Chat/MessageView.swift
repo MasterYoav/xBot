@@ -25,6 +25,9 @@ struct MessageView: View {
                     case .tool(let tool): ToolRow(tool: tool)
                     case .notice(let text):
                         Text(text).captionText().foregroundStyle(Palette.textTertiary)
+                    case .plan:
+                        // Drawn by PlanView; ChatView routes plan messages there.
+                        EmptyView()
                     case .failure(let reason):
                         Label(reason, systemImage: "exclamationmark.triangle")
                             .captionText()
