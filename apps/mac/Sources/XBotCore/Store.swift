@@ -26,6 +26,26 @@ public final class Store {
               role TEXT NOT NULL, parts TEXT NOT NULL, created_at REAL NOT NULL)
             """)
         try db.execute("CREATE INDEX IF NOT EXISTS messages_by_chat ON messages(chat_id)")
+        try migrate()
+    }
+
+    /// Schema changes since the first release of the redesigned app, each applied once, in order,
+    /// counted in SQLite's `user_version`.
+    private func migrate() throws {
+        let version = Int(try db.rows("PRAGMA user_version").first.map { row -> Double in
+            if case .real(let n) = row[0] { n } else { 0 }
+        } ?? 0)
+        if version < 1 {
+            // Plan mode (2026-10-08). The chat's two switches.
+            let columns = try db.rows("PRAGMA table_info(chats)").compactMap { $0[1].string }
+            if !columns.contains("plan_mode") {
+                try db.execute("ALTER TABLE chats ADD COLUMN plan_mode INTEGER NOT NULL DEFAULT 0")
+            }
+            if !columns.contains("review_plan") {
+                try db.execute("ALTER TABLE chats ADD COLUMN review_plan INTEGER NOT NULL DEFAULT 1")
+            }
+            try db.execute("PRAGMA user_version = 1")
+        }
     }
 
     /// `~/Library/Application Support/xBot/xbot.sqlite`.
@@ -66,7 +86,8 @@ public final class Store {
 
     public func chats() throws -> [Chat] {
         try db.rows("""
-            SELECT id, project_id, title, harness, model, mode, session_id, created_at, updated_at
+            SELECT id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
+              plan_mode, review_plan
             FROM chats ORDER BY updated_at DESC
             """).compactMap { r in
             // A row from a newer xBot with a harness this one does not know is skipped, not fatal.
@@ -75,7 +96,8 @@ public final class Store {
                   let mode = r[5].string.flatMap(PermissionMode.init(rawValue:)) else { return nil }
             return Chat(
                 id: id, projectID: r[1].uuid, title: title, harness: harness, model: r[4].string,
-                mode: mode, sessionID: r[6].string, createdAt: r[7].date, updatedAt: r[8].date
+                mode: mode, sessionID: r[6].string, planMode: r[9].bool, reviewPlan: r[10].bool,
+                createdAt: r[7].date, updatedAt: r[8].date
             )
         }
     }
@@ -84,15 +106,18 @@ public final class Store {
     /// cascade would take the chat's messages with it.
     public func save(_ chat: Chat) throws {
         try db.execute("""
-            INSERT INTO chats (id, project_id, title, harness, model, mode, session_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO chats (id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
+              plan_mode, review_plan)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET project_id = excluded.project_id, title = excluded.title,
               harness = excluded.harness, model = excluded.model, mode = excluded.mode,
-              session_id = excluded.session_id, updated_at = excluded.updated_at
+              session_id = excluded.session_id, updated_at = excluded.updated_at,
+              plan_mode = excluded.plan_mode, review_plan = excluded.review_plan
             """, [
                 .text(chat.id.uuidString), (chat.projectID?.uuidString).sql, .text(chat.title),
                 .text(chat.harness.rawValue), chat.model.sql, .text(chat.mode.rawValue),
                 chat.sessionID.sql, .date(chat.createdAt), .date(chat.updatedAt),
+                .bool(chat.planMode), .bool(chat.reviewPlan),
             ])
     }
 
@@ -121,5 +146,11 @@ public final class Store {
             [.text(message.id.uuidString), .text(message.chatID.uuidString), .text(message.role.rawValue),
              .text(parts), .date(message.createdAt)]
         )
+    }
+
+    /// A message whose parts changed — a plan, as it runs. Same row, same place in the chat.
+    public func replace(_ message: ChatMessage) throws {
+        let parts = String(decoding: try encoder.encode(message.parts), as: UTF8.self)
+        try db.execute("UPDATE messages SET parts = ? WHERE id = ?", [.text(parts), .text(message.id.uuidString)])
     }
 }

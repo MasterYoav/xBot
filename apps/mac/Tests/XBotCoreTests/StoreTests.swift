@@ -61,4 +61,44 @@ import XBotBrain
         let reopened = try Store(database: Database(url: url))
         #expect(try reopened.chats().map(\.id) == [c.id])
     }
+
+    @Test func planSettingsRoundTrip() throws {
+        var c = chat(); c.planMode = true; c.reviewPlan = false
+        try store.save(c)
+        let saved = try #require(try store.chats().first)
+        #expect(saved.planMode && !saved.reviewPlan)
+    }
+
+    @Test func aMessageIsReplacedInPlace() throws {
+        let c = chat(); try store.save(c)
+        let first = ChatMessage(chatID: c.id, role: .user, parts: [.text("go")])
+        var plan = ChatMessage(chatID: c.id, role: .assistant, parts: [.plan(Plan(prompt: "go", status: .drafting))])
+        let last = ChatMessage(chatID: c.id, role: .user, parts: [.text("later")])
+        try store.append(first); try store.append(plan); try store.append(last)
+        plan.parts = [.plan(Plan(prompt: "go", status: .review))]
+        try store.replace(plan)
+        #expect(try store.messages(in: c.id) == [first, plan, last])
+    }
+
+    /// The installed app has a library from before plan mode: its chats table lacks the new columns.
+    @Test func aLibraryFromBeforePlanModeMigrates() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString)/x.sqlite")
+        let id = UUID()
+        do {
+            let old = try Database(url: url)
+            try old.execute("""
+                CREATE TABLE chats (
+                  id TEXT PRIMARY KEY, project_id TEXT, title TEXT NOT NULL, harness TEXT NOT NULL,
+                  model TEXT, mode TEXT NOT NULL, session_id TEXT, created_at REAL NOT NULL,
+                  updated_at REAL NOT NULL)
+                """)
+            try old.execute("INSERT INTO chats VALUES (?, NULL, 'Old', 'claude', NULL, 'editFiles', 's', 0, 0)",
+                            [.text(id.uuidString)])
+        }
+        let migrated = try Store(database: Database(url: url))
+        let chat = try #require(try migrated.chats().first)
+        #expect(chat.id == id && chat.sessionID == "s" && !chat.planMode && chat.reviewPlan)
+        // Opening again does not try to add the columns twice.
+        _ = try Store(database: Database(url: url))
+    }
 }
