@@ -166,3 +166,11 @@ extension Workspace {
         )
     }
 }
+
+extension Workspace {
+    /// The project the window is about: the open chat's, or Home's draft's.
+    public var contextProject: Project? {
+        let id = selectedChatID.flatMap { chat($0)?.projectID } ?? (isHome ? draft.projectID : nil)
+        return id.flatMap { id in projects.first { $0.id == id } }
+    }
+}

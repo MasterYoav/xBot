@@ -6,6 +6,7 @@ public struct RootView: View {
     @Bindable private var workspace: Workspace
     @State private var addingProject = false
     @State private var columns: NavigationSplitViewVisibility = .all
+    @AppStorage("inspectorShown") private var inspectorShown = false
     @Namespace private var composer
 
     public init(workspace: Workspace) { self.workspace = workspace }
@@ -21,30 +22,45 @@ public struct RootView: View {
                 .toolbar(removing: .sidebarToggle)
                 .toolbar(removing: .title)
         } detail: {
-            VStack(spacing: 0) {
-                TopBar(workspace: workspace, sidebarVisible: columns != .detailOnly,
-                       showSidebar: { withAnimation(Motion.panel) { columns = .all } })
-                if let problem = workspace.problem {
-                    Label(problem, systemImage: "exclamationmark.triangle")
-                        .captionText()
-                        .foregroundStyle(Palette.failure)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, Space.m)
-                        .padding(.vertical, Space.s)
-                        .background(Palette.failureTint)
-                }
-                ZStack {
-                    Backdrop(workspace.isHome ? .home : .chat)
-                    if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
-                        ChatView(workspace: workspace, chat: chat, composer: composer).id(chat.id)
-                    } else {
-                        HomeView(workspace: workspace, composer: composer, addProject: { addingProject = true })
+            ZStack(alignment: .top) {
+                Backdrop(workspace.isHome ? .home : .chat)
+                VStack(spacing: 0) {
+                    TopBar(workspace: workspace, sidebarVisible: columns != .detailOnly,
+                           showSidebar: { withAnimation(Motion.panel) { columns = .all } },
+                           inspectorShown: $inspectorShown, inspectorAvailable: workspace.contextProject != nil)
+                    if let problem = workspace.problem {
+                        Label(problem, systemImage: "exclamationmark.triangle")
+                            .captionText()
+                            .foregroundStyle(Palette.failure)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Space.m)
+                            .padding(.vertical, Space.s)
+                            .background(Palette.failureTint)
                     }
+                    Group {
+                        if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
+                            ChatView(workspace: workspace, chat: chat, composer: composer).id(chat.id)
+                        } else {
+                            HomeView(workspace: workspace, composer: composer, addProject: { addingProject = true })
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .background(Palette.window)
             .ignoresSafeArea(.container, edges: .top)
+            .inspector(isPresented: Binding(
+                get: { inspectorShown && workspace.contextProject != nil },
+                set: { inspectorShown = $0 }
+            )) {
+                if let project = workspace.contextProject {
+                    InspectorView(workspace: workspace, project: project)
+                        .inspectorColumnWidth(
+                            min: Metrics.inspectorWidth.lowerBound, ideal: Metrics.inspectorIdealWidth,
+                            max: Metrics.inspectorWidth.upperBound
+                        )
+                }
+            }
         }
         .overlay(alignment: .bottom) { ToastHost(center: workspace.toasts) }
         .fileImporter(isPresented: $addingProject, allowedContentTypes: [.folder]) { result in

@@ -23,6 +23,9 @@ public enum Radius {
 public enum Metrics {
     public static let sidebarWidth: ClosedRange<CGFloat> = 220...340
     public static let sidebarIdealWidth: CGFloat = 260
+    /// The right-hand column: files and changes.
+    public static let inspectorWidth: ClosedRange<CGFloat> = 260...420
+    public static let inspectorIdealWidth: CGFloat = 300
     /// The title bar row: the traffic lights, the tab strip. Measured from the running window
     /// (`unifiedCompact`): a 32pt title bar with the lights centred at 16.
     public static let titleBar: CGFloat = 32

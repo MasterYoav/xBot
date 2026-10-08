@@ -1,13 +1,16 @@
 import SwiftUI
 import XBotCore
 
-/// The tab strip, Terminal-style: full-height segments in the title bar row, the selected one the
-/// colour of the content below it, each with its ⌘-number; "+" for a new chat. With the sidebar
-/// hidden, the traffic lights sit here and a button brings the sidebar back.
+/// The tab strip in the title bar row, with nothing behind it: the backdrop runs up under the tabs.
+/// The selected tab is a soft translucent segment; each has its ⌘-number; "+" for a new chat; the
+/// right end toggles files and changes. With the sidebar hidden, the traffic lights sit here and a
+/// button brings the sidebar back.
 struct TopBar: View {
     let workspace: Workspace
     let sidebarVisible: Bool
     let showSidebar: () -> Void
+    @Binding var inspectorShown: Bool
+    let inspectorAvailable: Bool
 
     var body: some View {
         HStack(spacing: 0) {
@@ -29,27 +32,16 @@ struct TopBar: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .gesture(WindowDragGesture())
-            if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
-                MonoLabel(context(for: chat)).padding(.trailing, Space.m)
-            }
+            IconButton(
+                "sidebar.right",
+                help: inspectorAvailable
+                    ? String(localized: "Files and changes (⌥⌘0)")
+                    : String(localized: "Choose a project to see its files and changes.")
+            ) { inspectorShown.toggle() }
+            .disabled(!inspectorAvailable)
+            .padding(.trailing, Space.s)
         }
         .frame(height: Metrics.titleBar)
-        // The hairline sits behind the tabs, so the selected tab — the content's colour — runs
-        // straight into the content below it.
-        .background(alignment: .bottom) {
-            ZStack(alignment: .bottom) {
-                Palette.tabStrip
-                Rectangle().fill(Palette.hairline).frame(height: 1)
-            }
-        }
-    }
-
-    /// "XBOT › MASTER", or "INBOX".
-    private func context(for chat: Chat) -> String {
-        guard let project = workspace.projects.first(where: { $0.id == chat.projectID }) else {
-            return String(localized: "Inbox")
-        }
-        return [project.name, workspace.branch(for: project.id)].compactMap { $0 }.joined(separator: " › ")
     }
 
     private struct Tab: View {
@@ -85,8 +77,12 @@ struct TopBar: View {
             }
             .padding(.horizontal, Space.s)
             .frame(minWidth: Metrics.tabMinWidth, maxWidth: Metrics.tabMaxWidth, maxHeight: .infinity)
-            .background(selected ? Palette.window : (hovering ? Palette.hover : .clear))
-            .overlay(alignment: .trailing) { Rectangle().fill(Palette.hairline).frame(width: 1) }
+            .background(
+                RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                    .fill(selected ? Palette.tabSelected : (hovering ? Palette.hover : .clear))
+            )
+            .padding(.vertical, Space.xs)
+            .padding(.horizontal, Space.xxs)
             .contentShape(Rectangle())
             .onTapGesture { workspace.open(chat.id) }
             .onHover { hovering = $0 }

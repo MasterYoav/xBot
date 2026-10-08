@@ -14,8 +14,8 @@ public enum Palette {
     public static let hairline = dynamic(0x000000, 0xFFFFFF, alpha: (0.08, 0.08))
     public static let hover = dynamic(0x000000, 0xFFFFFF, alpha: (0.04, 0.05))
 
-    /// The tab strip, like a title bar: a step lighter than the content in dark, darker in light.
-    public static let tabStrip = dynamic(0xEBEBE9, 0x2A2A2A)
+    /// The selected tab: a soft translucent segment over the backdrop.
+    public static let tabSelected = dynamic(0xFFFFFF, 0xFFFFFF, alpha: (0.6, 0.1))
 
     // Text
     public static let textPrimary = dynamic(0x1A1A1A, 0xECECEC)
