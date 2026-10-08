@@ -31,13 +31,15 @@ public struct Chat: Identifiable, Equatable, Sendable {
     public var planMode: Bool
     /// With plan mode: wait for the person to review the plan before running it.
     public var reviewPlan: Bool
+    /// How hard the agent thinks. Nil: the agent's own default.
+    public var effort: Effort?
     public var createdAt: Date
     public var updatedAt: Date
 
     public init(
         id: UUID = UUID(), projectID: UUID?, title: String, harness: HarnessKind, model: String? = nil,
         mode: PermissionMode, sessionID: String? = nil, planMode: Bool = false, reviewPlan: Bool = true,
-        createdAt: Date = .now, updatedAt: Date = .now
+        effort: Effort? = nil, createdAt: Date = .now, updatedAt: Date = .now
     ) {
         self.id = id
         self.projectID = projectID
@@ -48,6 +50,7 @@ public struct Chat: Identifiable, Equatable, Sendable {
         self.sessionID = sessionID
         self.planMode = planMode
         self.reviewPlan = reviewPlan
+        self.effort = effort
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

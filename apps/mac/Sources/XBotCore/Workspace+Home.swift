@@ -10,6 +10,8 @@ public struct ChatDraft: Equatable, Sendable {
     public var mode: PermissionMode = .editFiles
     public var planMode = false
     public var reviewPlan = true
+    /// Nil: the agent's own default.
+    public var effort: Effort?
 
     public init() {}
 }
@@ -98,7 +100,7 @@ extension Workspace {
         let chat = Chat(
             projectID: projectID, title: String(localized: "New chat"), harness: harness,
             model: draft.harness == harness ? draft.model : nil, mode: draft.mode,
-            planMode: draft.planMode, reviewPlan: draft.reviewPlan
+            planMode: draft.planMode, reviewPlan: draft.reviewPlan, effort: draft.effort
         )
         attempt { try store.save(chat) }
         chats.insert(chat, at: 0)

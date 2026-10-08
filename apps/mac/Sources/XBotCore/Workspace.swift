@@ -36,15 +36,20 @@ public final class Workspace {
     var planTurns: [UUID: UUID] = [:]
     private let inbox: URL
     private let discover: @Sendable () async -> [HarnessKind: any Brain]
+    private let loadCodexModels: @Sendable () -> [ModelOption]
+    /// The models each agent offers, read when the agents are found.
+    public private(set) var modelOptions: [HarnessKind: [ModelOption]] = [:]
 
     public init(
         store: Store,
         inbox: URL,
-        discover: @escaping @Sendable () async -> [HarnessKind: any Brain]
+        discover: @escaping @Sendable () async -> [HarnessKind: any Brain],
+        codexModels: @escaping @Sendable () -> [ModelOption] = { CodexModels.read() }
     ) {
         self.store = store
         self.inbox = inbox
         self.discover = discover
+        self.loadCodexModels = codexModels
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
     }
@@ -54,6 +59,7 @@ public final class Workspace {
     public func refreshHarnesses() async {
         isDiscovering = true
         brains = await discover()
+        modelOptions = [.claude: Self.claudeModels, .codex: loadCodexModels()]
         isDiscovering = false
     }
 
@@ -155,6 +161,33 @@ public final class Workspace {
 
     public func setMode(_ mode: PermissionMode, for id: UUID) { update(id) { $0.mode = mode } }
 
+    public func setEffort(_ effort: Effort?, for id: UUID) { update(id) { $0.effort = effort } }
+
+    /// Claude Code's models by the aliases its CLI takes; any can go to Galaxy (it switches to Opus).
+    static let claudeModels: [ModelOption] = [
+        ModelOption(id: "opus", name: "Opus", efforts: Effort.allCases),
+        ModelOption(id: "sonnet", name: "Sonnet", efforts: Effort.allCases),
+        ModelOption(id: "haiku", name: "Haiku", efforts: Effort.allCases),
+    ]
+
+    public func models(for kind: HarnessKind) -> [ModelOption] { modelOptions[kind] ?? [] }
+
+    /// The level the slider marks "Recommended": the model's own default where the agent says
+    /// (Codex), otherwise Medium (Claude Code does not report one).
+    public func recommendedEffort(for kind: HarnessKind, model: String?) -> Effort {
+        let options = models(for: kind)
+        return options.first { $0.id == model }?.recommended
+            ?? (model == nil ? nil : options.first?.recommended)
+            ?? .medium
+    }
+
+    /// The model a turn runs on: the chat's, unless Galaxy needs a Codex model that reasons further.
+    func turnModel(for chat: Chat) -> String? {
+        chat.harness == .codex
+            ? CodexModels.model(for: chat.effort, chosen: chat.model, in: models(for: .codex))
+            : chat.model
+    }
+
     // MARK: Turns
 
     /// Starts a turn. False, with nothing changed, when the chat is busy or cannot send — so the
@@ -177,8 +210,8 @@ public final class Workspace {
         }
 
         let request = TurnRequest(
-            prompt: prompt, directory: directory(for: chat), model: chat.model,
-            mode: chat.mode, resumeID: chat.sessionID
+            prompt: prompt, directory: directory(for: chat), model: turnModel(for: chat),
+            mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort
         )
         live[id] = []
         launch(id) { workspace, token in

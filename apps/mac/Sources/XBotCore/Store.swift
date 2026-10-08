@@ -46,6 +46,12 @@ public final class Store {
             }
             try db.execute("PRAGMA user_version = 1")
         }
+        if version < 2 {
+            // Reasoning effort (2026-10-08). Nil: the agent's own default.
+            let columns = try db.rows("PRAGMA table_info(chats)").compactMap { $0[1].string }
+            if !columns.contains("effort") { try db.execute("ALTER TABLE chats ADD COLUMN effort TEXT") }
+            try db.execute("PRAGMA user_version = 2")
+        }
     }
 
     /// `~/Library/Application Support/xBot/xbot.sqlite`.
@@ -87,7 +93,7 @@ public final class Store {
     public func chats() throws -> [Chat] {
         try db.rows("""
             SELECT id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan
+              plan_mode, review_plan, effort
             FROM chats ORDER BY updated_at DESC
             """).compactMap { r in
             // A row from a newer xBot with a harness this one does not know is skipped, not fatal.
@@ -97,6 +103,7 @@ public final class Store {
             return Chat(
                 id: id, projectID: r[1].uuid, title: title, harness: harness, model: r[4].string,
                 mode: mode, sessionID: r[6].string, planMode: r[9].bool, reviewPlan: r[10].bool,
+                effort: r[11].string.flatMap(Effort.init(rawValue:)),
                 createdAt: r[7].date, updatedAt: r[8].date
             )
         }
@@ -107,17 +114,17 @@ public final class Store {
     public func save(_ chat: Chat) throws {
         try db.execute("""
             INSERT INTO chats (id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              plan_mode, review_plan, effort)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET project_id = excluded.project_id, title = excluded.title,
               harness = excluded.harness, model = excluded.model, mode = excluded.mode,
               session_id = excluded.session_id, updated_at = excluded.updated_at,
-              plan_mode = excluded.plan_mode, review_plan = excluded.review_plan
+              plan_mode = excluded.plan_mode, review_plan = excluded.review_plan, effort = excluded.effort
             """, [
                 .text(chat.id.uuidString), (chat.projectID?.uuidString).sql, .text(chat.title),
                 .text(chat.harness.rawValue), chat.model.sql, .text(chat.mode.rawValue),
                 chat.sessionID.sql, .date(chat.createdAt), .date(chat.updatedAt),
-                .bool(chat.planMode), .bool(chat.reviewPlan),
+                .bool(chat.planMode), .bool(chat.reviewPlan), (chat.effort?.rawValue).sql,
             ])
     }
 
