@@ -29,4 +29,7 @@ public enum Metrics {
     public static let titleBarHeight: CGFloat = 52
     public static let tabWidth: CGFloat = 200
     public static let toolOutputMaxHeight: CGFloat = 240
+    /// A plan step's tool rows sit under its title, past the status icon.
+    public static let stepIndent: CGFloat = 22
+    public static let progressHeight: CGFloat = 3
 }

@@ -11,7 +11,7 @@ struct ChatComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            TextField(String(localized: "Ask, build, plan…"), text: $text, axis: .vertical)
+            TextField(placeholder, text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .bodyText()
                 .lineLimit(1...8)
@@ -24,6 +24,7 @@ struct ChatComposer: View {
                     }
                 }
                 .fixedSize()
+                .disabled(workspace.isRunning(chat.id))
                 if chat.harness.models.count > 1 {
                     Menu(chat.model ?? String(localized: "Default model")) {
                         ForEach(chat.harness.models, id: \.self) { model in
@@ -42,6 +43,22 @@ struct ChatComposer: View {
                     Label(chat.mode.title, systemImage: chat.mode.symbol)
                 }
                 .fixedSize()
+                Toggle(isOn: Binding(get: { chat.planMode }, set: { workspace.setPlanMode($0, for: chat.id) })) {
+                    Label(String(localized: "Plan"), systemImage: "list.bullet.clipboard")
+                }
+                .toggleStyle(.button)
+                .fixedSize()
+                .help(String(localized: "Plan first: review the steps, then watch them run"))
+                if chat.planMode {
+                    Toggle(isOn: Binding(
+                        get: { chat.reviewPlan }, set: { workspace.setReviewPlan($0, for: chat.id) }
+                    )) {
+                        Text(String(localized: "Review plan first")).captionText()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .fixedSize()
+                }
                 Spacer()
                 if let reason = workspace.sendBlockedReason(chat.id) {
                     Text(reason).captionText().foregroundStyle(Palette.textSecondary)
@@ -68,6 +85,13 @@ struct ChatComposer: View {
         .padding(Space.l)
         .frame(maxWidth: Metrics.readingWidth)
         .onAppear { focused = true }
+    }
+
+    private var placeholder: String {
+        guard chat.planMode else { return String(localized: "Ask, build, plan…") }
+        return chat.reviewPlan
+            ? String(localized: "Describe the change. You'll review the plan first.")
+            : String(localized: "Describe the change. The plan runs straight away.")
     }
 
     private func send() {

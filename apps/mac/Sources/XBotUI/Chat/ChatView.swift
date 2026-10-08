@@ -10,7 +10,11 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.xl) {
                     ForEach(workspace.messages(in: chat.id)) { message in
-                        MessageView(role: message.role, parts: message.parts)
+                        if let plan = message.plan {
+                            PlanView(workspace: workspace, chatID: chat.id, messageID: message.id, plan: plan)
+                        } else {
+                            MessageView(role: message.role, parts: message.parts)
+                        }
                     }
                     if let live = workspace.live[chat.id] {
                         MessageView(role: .assistant, parts: live, isLive: true)
@@ -21,6 +25,7 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity)
             }
             .defaultScrollAnchor(.bottom)
+            PlanStatusBar(workspace: workspace, chatID: chat.id)
             ChatComposer(workspace: workspace, chat: chat)
         }
         .navigationTitle(chat.title)

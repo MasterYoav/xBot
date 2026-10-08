@@ -32,6 +32,9 @@ public enum Palette {
     public static let stateStopped = dynamic(light: 0x9A7080, dark: 0x807080)
     public static let stateFailed = dynamic(light: 0xD04A52, dark: 0xF08A8C)
     public static let attention = dynamic(light: 0xF08A8C, dark: 0xF0A0A2)
+    /// The step running now, as in the plan-mode recording: blue, to read as "in progress", not as
+    /// a brand flourish.
+    public static let accent = dynamic(light: 0x2C6FD1, dark: 0x4C90EE)
 
     // Code — syntax colour for a fenced block in a reply. Hue only; the weight stays regular,
     // because a snippet in a bubble is a few lines and bolding half of them makes it louder than
