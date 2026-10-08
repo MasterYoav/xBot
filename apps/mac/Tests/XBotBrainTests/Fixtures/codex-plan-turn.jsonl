@@ -1,0 +1,7 @@
+{"type":"thread.started","thread_id":"c1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"I'll inspect the search code."}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"/bin/zsh -lc 'cat search.js'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/bin/zsh -lc 'cat search.js'","aggregated_output":"export function search(q) {}\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"{\"summary\":\"Cancel stale requests.\",\"steps\":[{\"title\":\"Track the request in flight\",\"active\":\"Tracking the request in flight\"}]}"}}
+{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}

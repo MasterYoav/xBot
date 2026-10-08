@@ -99,7 +99,7 @@ extension Array where Element == Part {
             if case .text(let text) = last { self[count - 1] = .text(text + delta) } else { append(.text(delta)) }
         case .text(let text):
             append(.text(text))
-        case .toolCall(let id, let name, let summary):
+        case .toolCall(let id, let name, let summary, _):
             append(.tool(ToolPart(id: id, name: name, summary: summary, output: nil, isError: false)))
         case .toolResult(let id, let output, let isError):
             if let index = lastIndex(where: { if case .tool(let tool) = $0 { tool.id == id } else { false } }),
@@ -112,7 +112,7 @@ extension Array where Element == Part {
             append(.notice(text))
         case .failed(let reason):
             append(.failure(reason))
-        case .session, .done:
+        case .session, .done, .structured:
             break
         }
     }

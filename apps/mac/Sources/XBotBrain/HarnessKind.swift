@@ -29,14 +29,15 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
     }
 
     /// Never the prompt: it goes on stdin, because a prompt starting with "-" would be read as a
-    /// flag and argv has a length limit.
-    public func arguments(for request: TurnRequest) -> [String] {
+    /// flag and argv has a length limit. Codex reads a schema from a file, which the caller writes.
+    public func arguments(for request: TurnRequest, schemaFile: URL? = nil) -> [String] {
         switch self {
         case .claude:
-            let mode = switch request.mode {
-            case .readOnly: "default"
-            case .editFiles: "acceptEdits"
-            case .fullAccess: "bypassPermissions"
+            let mode = switch (request.planning, request.mode) {
+            case (true, _): "plan"
+            case (false, .readOnly): "default"
+            case (false, .editFiles): "acceptEdits"
+            case (false, .fullAccess): "bypassPermissions"
             }
             var arguments = [
                 "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
@@ -44,19 +45,21 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             ]
             if let model = request.model { arguments += ["--model", model] }
             if let resume = request.resumeID { arguments += ["--resume", resume] }
+            if let schema = request.schema { arguments += ["--json-schema", schema] }
             return arguments
 
         case .codex:
-            let sandbox = switch request.mode {
-            case .readOnly: "read-only"
-            case .editFiles: "workspace-write"
-            case .fullAccess: "danger-full-access"
+            let sandbox = switch (request.planning, request.mode) {
+            case (true, _), (false, .readOnly): "read-only"
+            case (false, .editFiles): "workspace-write"
+            case (false, .fullAccess): "danger-full-access"
             }
             // `-c` rather than `-s`: `exec resume` has no `-s`, and one spelling for both is simpler.
             var arguments = ["exec"]
             if request.resumeID != nil { arguments.append("resume") }
             arguments += ["--json", "--skip-git-repo-check", "-c", "sandbox_mode=\"\(sandbox)\""]
             if let model = request.model { arguments += ["-m", model] }
+            if let schemaFile { arguments += ["--output-schema", schemaFile.path] }
             if let resume = request.resumeID { arguments.append(resume) }
             arguments.append("-")
             return arguments

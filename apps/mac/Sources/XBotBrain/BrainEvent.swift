@@ -11,8 +11,11 @@ public enum BrainEvent: Equatable, Sendable {
     case textDelta(String)
     /// A whole block of reply text that arrives at once.
     case text(String)
-    case toolCall(id: String, name: String, summary: String)
+    /// `size`, when the call itself says how big it is: "+3" lines for a file written.
+    case toolCall(id: String, name: String, summary: String, size: String? = nil)
     case toolResult(id: String, output: String, isError: Bool)
+    /// The final answer, as JSON text, when the request carried a `schema`.
+    case structured(String)
     /// Something the harness said that is not part of the reply, such as a config warning.
     case notice(String)
     case done
@@ -42,19 +45,27 @@ public struct TurnRequest: Equatable, Sendable {
     public var model: String?
     public var mode: PermissionMode
     public var resumeID: String?
+    /// A JSON Schema the final answer must follow. It arrives as `.structured`.
+    public var schema: String?
+    /// Investigate only. Forces the CLI's read-only mode whatever `mode` says.
+    public var planning: Bool
 
     public init(
         prompt: String,
         directory: URL,
         model: String? = nil,
         mode: PermissionMode,
-        resumeID: String? = nil
+        resumeID: String? = nil,
+        schema: String? = nil,
+        planning: Bool = false
     ) {
         self.prompt = prompt
         self.directory = directory
         self.model = model
         self.mode = mode
         self.resumeID = resumeID
+        self.schema = schema
+        self.planning = planning
     }
 }
 

@@ -29,9 +29,23 @@ public struct HarnessBrain: Brain {
             return stream
         }
 
+        // Codex reads its schema from a file; one per turn, removed when the turn ends.
+        var schemaFile: URL?
+        if kind == .codex, let schema = request.schema {
+            let file = FileManager.default.temporaryDirectory.appending(path: "xbot-schema-\(UUID().uuidString).json")
+            do {
+                try Data(schema.utf8).write(to: file)
+                schemaFile = file
+            } catch {
+                continuation.yield(.failed(String(localized: "xBot couldn't prepare this turn: \(error.localizedDescription)")))
+                continuation.finish()
+                return stream
+            }
+        }
+
         let process = Process()
         process.executableURL = executable
-        process.arguments = kind.arguments(for: request)
+        process.arguments = kind.arguments(for: request, schemaFile: schemaFile)
         process.currentDirectoryURL = request.directory
         process.environment = environment
         let input = Pipe(), output = Pipe(), errors = Pipe()
@@ -64,6 +78,7 @@ public struct HarnessBrain: Brain {
             continuation.yield(.failed(String(
                 localized: "\(kind.displayName) could not start: \(error.localizedDescription)"
             )))
+            if let schemaFile { try? FileManager.default.removeItem(at: schemaFile) }
             continuation.finish()
             return stream
         }
@@ -89,12 +104,16 @@ public struct HarnessBrain: Brain {
         }
 
         let kind = self.kind
+        let finishedSchema = schemaFile
         Task.detached {
             var ended = false
+            var tail: SchemaTail? = finishedSchema == nil ? nil : SchemaTail()
             func emit(_ line: [UInt8]) {
-                for event in kind.events(from: String(decoding: line, as: UTF8.self)) where !ended {
-                    continuation.yield(event)
-                    ended = event.isTerminal
+                for parsed in kind.events(from: String(decoding: line, as: UTF8.self)) {
+                    for event in tail?.process(parsed) ?? [parsed] where !ended {
+                        continuation.yield(event)
+                        ended = event.isTerminal
+                    }
                 }
             }
             do {
@@ -111,6 +130,7 @@ public struct HarnessBrain: Brain {
             var status: Int32 = 0
             for await code in exit.stream { status = code }
             _ = await stderrReader.result
+            if let finishedSchema { try? FileManager.default.removeItem(at: finishedSchema) }
             if !ended {
                 let said = stderr.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 continuation.yield(.failed(said.isEmpty
