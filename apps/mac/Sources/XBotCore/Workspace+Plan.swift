@@ -106,7 +106,7 @@ extension Workspace {
         _ brain: any Brain, _ request: TurnRequest, chatID: UUID, messageID: UUID, token: UUID
     ) async {
         var answer: String?
-        for await event in brain.run(request) {
+        for await event in events(brain, request, harness: self.chat(chatID)?.harness ?? .claude) {
             guard turns[chatID]?.token == token else { return }
             switch event {
             case .session(let session): update(chatID) { $0.sessionID = session }
@@ -114,7 +114,7 @@ extension Workspace {
             case .textDelta(let text), .text(let text): mutatePlan(messageID, in: chatID) { $0.reply += text }
             case .failed(let reason): mutatePlan(messageID, in: chatID) { $0.problem = reason }
             case .toolCall, .toolResult: mutatePlan(messageID, in: chatID) { $0.investigation.apply(event, at: .now) }
-            case .notice, .done: break
+            case .notice, .done, .limits: break
             }
         }
         guard turns[chatID]?.token == token else { return }
@@ -151,7 +151,7 @@ extension Workspace {
             )
             var answer: String?
             var failure: String?
-            for await event in brain.run(request) {
+            for await event in events(brain, request, harness: chat.harness) {
                 guard turns[chatID]?.token == token else { return }
                 switch event {
                 case .session(let session): update(chatID) { $0.sessionID = session }
@@ -198,7 +198,7 @@ extension Workspace {
         var closing = ""
         let request = TurnRequest(prompt: Self.closingPrompt, directory: directory(for: chat), model: turnModel(for: chat),
                                   mode: .readOnly, resumeID: chat.sessionID, effort: chat.effort)
-        for await event in brain.run(request) {
+        for await event in events(brain, request, harness: chat.harness) {
             guard turns[chatID]?.token == token else { return }
             switch event {
             case .session(let session): update(chatID) { $0.sessionID = session }

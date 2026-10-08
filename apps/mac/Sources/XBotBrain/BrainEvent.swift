@@ -16,6 +16,8 @@ public enum BrainEvent: Equatable, Sendable {
     case toolResult(id: String, output: String, isError: Bool)
     /// The final answer, as JSON text, when the request carried a `schema`.
     case structured(String)
+    /// The agent's subscription limits, as it reported them during the turn.
+    case limits(RateLimits)
     /// Something the harness said that is not part of the reply, such as a config warning.
     case notice(String)
     case done

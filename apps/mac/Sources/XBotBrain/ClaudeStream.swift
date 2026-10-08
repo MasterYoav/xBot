@@ -51,6 +51,19 @@ enum ClaudeStream {
                 )
             }
 
+        case "rate_limit_event":
+            guard let info = object["rate_limit_info"] as? [String: Any],
+                  let windows = info["unifiedWindows"] as? [String: Any] else { return [] }
+            func window(_ key: String) -> RateWindow? {
+                guard let w = windows[key] as? [String: Any],
+                      let used = (w["utilization"] as? NSNumber)?.doubleValue,
+                      let reset = (w["resetsAt"] as? NSNumber)?.doubleValue else { return nil }
+                // A fraction; kept to a tenth of a percent so 0.55 is 55, not 55.000000000000007.
+                return RateWindow(usedPercent: (used * 1000).rounded() / 10, resetsAt: Date(timeIntervalSince1970: reset))
+            }
+            let limits = RateLimits(fiveHour: window("five_hour"), weekly: window("seven_day"))
+            return limits.fiveHour == nil && limits.weekly == nil ? [] : [.limits(limits)]
+
         case "result":
             if object["is_error"] as? Bool == true || object["subtype"] as? String != "success" {
                 let reason = (object["errors"] as? [String])?.joined(separator: "\n")

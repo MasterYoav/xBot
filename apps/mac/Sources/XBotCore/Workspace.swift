@@ -37,6 +37,12 @@ public final class Workspace {
     private let inbox: URL
     private let discover: @Sendable () async -> [HarnessKind: any Brain]
     private let loadCodexModels: @Sendable () -> [ModelOption]
+    /// Codex's limits, read from its newest session log.
+    let codexUsage: @Sendable () -> RateLimits?
+    /// Where the person's defaults for new chats are kept.
+    @ObservationIgnored let defaults: UserDefaults
+    /// Each agent's limits as it last reported them.
+    public internal(set) var usage: [HarnessKind: AgentUsage] = [:]
     /// The models each agent offers, read when the agents are found.
     public private(set) var modelOptions: [HarnessKind: [ModelOption]] = [:]
 
@@ -44,14 +50,19 @@ public final class Workspace {
         store: Store,
         inbox: URL,
         discover: @escaping @Sendable () async -> [HarnessKind: any Brain],
-        codexModels: @escaping @Sendable () -> [ModelOption] = { CodexModels.read() }
+        codexModels: @escaping @Sendable () -> [ModelOption] = { CodexModels.read() },
+        codexUsage: @escaping @Sendable () -> RateLimits? = { CodexUsage.latest() },
+        defaults: UserDefaults = .standard
     ) {
         self.store = store
         self.inbox = inbox
         self.discover = discover
         self.loadCodexModels = codexModels
+        self.codexUsage = codexUsage
+        self.defaults = defaults
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
+        usage = attempt { try store.usage() } ?? [:]
     }
 
     public var availableHarnesses: [HarnessKind] { HarnessKind.allCases.filter { brains[$0] != nil } }
@@ -214,8 +225,9 @@ public final class Workspace {
             mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort
         )
         live[id] = []
+        let harness = chat.harness
         launch(id) { workspace, token in
-            for await event in brain.run(request) {
+            for await event in workspace.events(brain, request, harness: harness) {
                 workspace.receive(event, in: id, turn: token)
             }
         }

@@ -139,7 +139,7 @@ extension Array where Element == Part {
             append(.notice(text))
         case .failed(let reason):
             append(.failure(reason))
-        case .session, .done, .structured:
+        case .session, .done, .structured, .limits:
             break
         }
     }

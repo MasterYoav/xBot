@@ -52,6 +52,13 @@ public final class Store {
             if !columns.contains("effort") { try db.execute("ALTER TABLE chats ADD COLUMN effort TEXT") }
             try db.execute("PRAGMA user_version = 2")
         }
+        if version < 3 {
+            // Usage (2026-10-08): each agent's limits as last reported, so the menu has them after a relaunch.
+            try db.execute("""
+                CREATE TABLE IF NOT EXISTS usage (agent TEXT PRIMARY KEY, limits TEXT NOT NULL, updated_at REAL NOT NULL)
+                """)
+            try db.execute("PRAGMA user_version = 3")
+        }
     }
 
     /// `~/Library/Application Support/xBot/xbot.sqlite`.
@@ -159,5 +166,25 @@ public final class Store {
     public func replace(_ message: ChatMessage) throws {
         let parts = String(decoding: try encoder.encode(message.parts), as: UTF8.self)
         try db.execute("UPDATE messages SET parts = ? WHERE id = ?", [.text(parts), .text(message.id.uuidString)])
+    }
+
+    // MARK: Usage
+
+    public func usage() throws -> [HarnessKind: AgentUsage] {
+        var result: [HarnessKind: AgentUsage] = [:]
+        for r in try db.rows("SELECT agent, limits, updated_at FROM usage") {
+            guard let agent = r[0].string.flatMap(HarnessKind.init(rawValue:)), let json = r[1].string,
+                  let limits = try? decoder.decode(RateLimits.self, from: Data(json.utf8)) else { continue }
+            result[agent] = AgentUsage(agent: agent, limits: limits, updatedAt: r[2].date)
+        }
+        return result
+    }
+
+    public func save(_ usage: AgentUsage) throws {
+        let json = String(decoding: try encoder.encode(usage.limits), as: UTF8.self)
+        try db.execute("""
+            INSERT INTO usage (agent, limits, updated_at) VALUES (?, ?, ?)
+            ON CONFLICT(agent) DO UPDATE SET limits = excluded.limits, updated_at = excluded.updated_at
+            """, [.text(usage.agent.rawValue), .text(json), .date(usage.updatedAt)])
     }
 }
