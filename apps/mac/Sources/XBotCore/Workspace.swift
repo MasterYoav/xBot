@@ -7,7 +7,7 @@ import XBotBrain
 @Observable
 public final class Workspace {
     public private(set) var projects: [Project] = []
-    public private(set) var chats: [Chat] = []
+    public internal(set) var chats: [Chat] = []
     public private(set) var openChatIDs: [UUID] = []
     public var selectedChatID: UUID?
     /// The reply being written right now, per chat. Saved as a message when the turn ends.
@@ -16,6 +16,15 @@ public final class Workspace {
     public private(set) var isDiscovering = true
     /// Set when xBot cannot save, so the window can say so instead of pretending.
     public var problem: String?
+
+    /// Small messages at the bottom of the window.
+    public let toasts = ToastCenter()
+    /// What Home's composer holds before a chat exists.
+    public var draft = ChatDraft()
+    /// Bumped to ask the sidebar's search field for focus (⌘K).
+    public internal(set) var searchFocusRequest = 0
+    /// Bumped to ask the composer for focus (a suggestion was chosen).
+    public internal(set) var composerFocusRequest = 0
 
     var brains: [HarnessKind: any Brain] = [:]
     var transcripts: [UUID: [ChatMessage]] = [:]
@@ -124,11 +133,17 @@ public final class Workspace {
         update(id) { $0.title = trimmed }
     }
 
-    public func deleteChat(_ id: UUID) {
+    /// Removes the chat and its messages, and returns them so the removal can be undone.
+    @discardableResult
+    public func deleteChat(_ id: UUID) -> DeletedChat? {
+        guard let chat = chat(id) else { return nil }
         stop(id)
+        let messages = transcripts[id] ?? attempt { try store.messages(in: id) } ?? []
+        let wasOpen = openChatIDs.contains(id)
         attempt { try store.deleteChat(id) }
         chats.removeAll { $0.id == id }
         forget(id)
+        return DeletedChat(chat: chat, messages: messages, wasOpen: wasOpen)
     }
 
     public func setHarness(_ kind: HarnessKind, for id: UUID) {

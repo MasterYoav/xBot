@@ -214,6 +214,8 @@ extension Workspace {
             plan.status = .finished
             plan.endedAt = .now
         }
+        let count = storedPlan(messageID, in: chatID)?.steps.count ?? 0
+        toasts.show(String(localized: "Plan finished · \(count) steps"), systemImage: "checkmark")
     }
 
     /// Stop, or quit, while a plan turn ran.
