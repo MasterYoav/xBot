@@ -82,6 +82,12 @@ extension Workspace {
 
     public func requestSearchFocus() { searchFocusRequest += 1 }
 
+    /// ⌘1…⌘9: the open tab at that position; nothing when there is none.
+    public func openTab(at index: Int) {
+        guard openChatIDs.indices.contains(index) else { return }
+        open(openChatIDs[index])
+    }
+
     /// The agent a new chat would use: the draft's choice if installed, else the most recent, else
     /// the first found.
     public var draftHarness: HarnessKind? {

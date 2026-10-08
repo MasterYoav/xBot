@@ -187,3 +187,23 @@ Unit tests for the logic the UI adds:
 
 Views: offscreen renders of Home, a chat with tools and code, the review and Tasks cards, and the
 sidebar, in light and dark, compared with the references; then the person checks the real app.
+
+## Revisions after the first look (2026-10-08)
+
+- **Title bar.** `.windowStyle(.hiddenTitleBar)` with `.windowToolbarStyle(.unifiedCompact(showsTitle: false))`;
+  the toolbar is no longer hidden (hiding it hid the traffic lights). Measured from the running window:
+  a 32pt title bar with the lights centred at 16 — `Metrics.titleBar`. Both columns ignore the top
+  safe area. The sidebar's first row is the traffic lights, then hide-sidebar and new-chat; the
+  "xBot" header row is gone.
+- **Tabs, Terminal-style.** Full-height segments in the title bar row on `Palette.tabStrip`, the
+  selected one the content's colour with no hairline under it; × on hover, title, ⌘-number;
+  "+" for a new chat; ⌘1…⌘9 switch tabs. With the sidebar hidden the tab strip leaves room for the
+  lights and offers show-sidebar.
+- **Effort.** An Effort chip (brain + level) opens a slider card: Low, Medium, High, Extra, Max,
+  Galaxy; "Recommended" under the agent's default (Codex's per-model default from
+  `~/.codex/models_cache.json`; Medium for Claude Code). Claude Code: `--effort low|medium|high|xhigh|max`,
+  Galaxy = max on Opus. Codex: `model_reasoning_effort` up to `ultra`, Galaxy = ultra on a model that
+  supports it. Saved per chat (`chats.effort`, library version 2) and per Home draft. Codex's model
+  menu lists its cached models.
+- **Backdrop.** A sunset image behind the content from the top, fading out by about the middle:
+  full on Home, 38% behind a chat, dimmed in dark mode, absent under Reduce Transparency.

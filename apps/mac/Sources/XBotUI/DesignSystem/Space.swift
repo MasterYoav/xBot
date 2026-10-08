@@ -23,8 +23,12 @@ public enum Radius {
 public enum Metrics {
     public static let sidebarWidth: ClosedRange<CGFloat> = 220...340
     public static let sidebarIdealWidth: CGFloat = 260
-    /// Room for the traffic lights above the sidebar's header.
-    public static let titleBarInset: CGFloat = 38
+    /// The title bar row: the traffic lights, the tab strip. Measured from the running window
+    /// (`unifiedCompact`): a 32pt title bar with the lights centred at 16.
+    public static let titleBar: CGFloat = 32
+    /// Room the traffic lights take at the left of the title bar row.
+    public static let trafficLights: CGFloat = 78
+    public static let tabMinWidth: CGFloat = 110
     public static let topBar: CGFloat = 44
     public static let row: CGFloat = 28
     public static let iconButton: CGFloat = 28
@@ -33,7 +37,7 @@ public enum Metrics {
     public static let composerWidth: CGFloat = 680
     /// A transcript line longer than this is hard to read; wider windows add margin, not width.
     public static let readingWidth: CGFloat = 720
-    public static let tabMaxWidth: CGFloat = 180
+    public static let tabMaxWidth: CGFloat = 230
     public static let suggestionHeight: CGFloat = 96
     public static let minimumWindow = CGSize(width: 900, height: 600)
     public static let defaultWindow = CGSize(width: 1280, height: 820)
@@ -42,4 +46,10 @@ public enum Metrics {
     public static let stepIndent: CGFloat = 22
     public static let progressHeight: CGFloat = 2
     public static let dot: CGFloat = 6
+    /// The effort slider.
+    public static let effortCardWidth: CGFloat = 300
+    public static let effortTrackHeight: CGFloat = 26
+    public static let effortKnob: CGFloat = 24
+    /// How much of the content height the backdrop covers before it has faded out.
+    public static let backdropHeight: CGFloat = 0.62
 }

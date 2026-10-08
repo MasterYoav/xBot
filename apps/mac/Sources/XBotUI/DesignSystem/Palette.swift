@@ -14,6 +14,9 @@ public enum Palette {
     public static let hairline = dynamic(0x000000, 0xFFFFFF, alpha: (0.08, 0.08))
     public static let hover = dynamic(0x000000, 0xFFFFFF, alpha: (0.04, 0.05))
 
+    /// The tab strip, like a title bar: a step lighter than the content in dark, darker in light.
+    public static let tabStrip = dynamic(0xEBEBE9, 0x2A2A2A)
+
     // Text
     public static let textPrimary = dynamic(0x1A1A1A, 0xECECEC)
     public static let textSecondary = dynamic(0x1A1A1A, 0xECECEC, alpha: (0.6, 0.6))
@@ -32,6 +35,18 @@ public enum Palette {
     public static let failureTint = dynamic(0xD0453E, 0xF07A72, alpha: (0.10, 0.16))
     public static let warning = dynamic(0xC98A1E, 0xE8A845)
     public static let warningTint = dynamic(0xC98A1E, 0xE8A845, alpha: (0.12, 0.18))
+
+    // Effort slider — the one place colour is the point: plum to pink as effort rises, and the
+    // Galaxy stop's night-sky blues.
+    public static let effortFillStart = dynamic(0xE9C6DF, 0x3A1F33)
+    public static let effortFillEnd = dynamic(0xD45FA8, 0x9B4D96)
+    public static let effortKnob = dynamic(0xE0479A, 0xFF6FB0)
+    public static let galaxy = dynamic(0x5B6CFF, 0x8C7CFF)
+    public static let galaxyLabel = dynamic(0x3E7BE0, 0x7FB8FF)
+    public static let galaxyPixels: [Color] = [
+        dynamic(0x4C6FFF, 0x4C6FFF), dynamic(0x9B6BFF, 0x9B6BFF), dynamic(0xE46BD0, 0xE46BD0),
+        dynamic(0x6FD6FF, 0x6FD6FF), dynamic(0x2B2F6B, 0x1C1E45),
+    ]
 
     // Code
     public static let codeKeyword = dynamic(0xA2456F, 0xE0A0C0)

@@ -19,6 +19,8 @@ struct XBotApp: App {
         // Content runs to the top edge, the traffic lights float over the sidebar, and the top bar
         // is the drag area — the way the apps this one sits beside are built.
         .windowStyle(.hiddenTitleBar)
+        // A compact title bar row with the traffic lights centred in it — the height of the tab strip.
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
             SidebarCommands()
             CommandGroup(replacing: .appInfo) {
@@ -35,6 +37,12 @@ struct XBotApp: App {
                 }
                 .keyboardShortcut("w", modifiers: .command)
                 .disabled(workspace.selectedChatID == nil)
+            }
+            CommandGroup(after: .windowArrangement) {
+                ForEach(1...9, id: \.self) { number in
+                    Button(String(localized: "Tab \(number)")) { workspace.openTab(at: number - 1) }
+                        .keyboardShortcut(KeyEquivalent(Character("\(number)")), modifiers: .command)
+                }
             }
             CommandGroup(after: .textEditing) {
                 Button(String(localized: "Search Chats")) { workspace.requestSearchFocus() }

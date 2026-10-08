@@ -5,6 +5,7 @@ import XBotCore
 struct Sidebar: View {
     let workspace: Workspace
     let addProject: () -> Void
+    let hide: () -> Void
     @State private var query = ""
     @State private var expanded: Set<UUID> = []
     @State private var collapsed: Set<UUID> = []
@@ -21,7 +22,7 @@ struct Sidebar: View {
     var body: some View {
         let model = model
         VStack(alignment: .leading, spacing: Space.s) {
-            header
+            titleRow
             search
             ScrollView {
                 VStack(alignment: .leading, spacing: 1) {
@@ -58,26 +59,23 @@ struct Sidebar: View {
             .scrollIndicators(.never)
             footer
         }
-        .padding(.top, Metrics.titleBarInset)
         .background(Palette.sidebar)
-        // The strip by the traffic lights moves the window, as a title bar would.
-        .overlay(alignment: .top) {
-            Color.clear
-                .frame(height: Metrics.titleBarInset)
-                .contentShape(Rectangle())
-                .gesture(WindowDragGesture())
-        }
+        .ignoresSafeArea(.container, edges: .top)
         .onChange(of: workspace.searchFocusRequest) { searchFocused = true }
     }
 
-    private var header: some View {
-        HStack(spacing: Space.s) {
-            AppMarkView(size: Space.l + Space.xxs)
-            Text(verbatim: "xBot").emphasisText().foregroundStyle(Palette.textPrimary)
+    /// The title bar row: the traffic lights sit at its left; hide-sidebar and new-chat at its
+    /// right. The empty part moves the window, as a title bar would.
+    private var titleRow: some View {
+        HStack(spacing: Space.xxs) {
             Spacer()
+            IconButton("sidebar.left", help: String(localized: "Hide sidebar (⌃⌘S)"), action: hide)
             IconButton("square.and.pencil", help: String(localized: "New chat (⌘N)")) { workspace.startDraft(in: nil) }
         }
-        .padding(.horizontal, Space.m)
+        .padding(.leading, Metrics.trafficLights)
+        .padding(.trailing, Space.s)
+        .frame(height: Metrics.titleBar)
+        .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
     }
 
     private var search: some View {

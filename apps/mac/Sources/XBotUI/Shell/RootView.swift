@@ -5,21 +5,25 @@ import XBotCore
 public struct RootView: View {
     @Bindable private var workspace: Workspace
     @State private var addingProject = false
+    @State private var columns: NavigationSplitViewVisibility = .all
     @Namespace private var composer
 
     public init(workspace: Workspace) { self.workspace = workspace }
 
     public var body: some View {
-        NavigationSplitView {
-            Sidebar(workspace: workspace, addProject: { addingProject = true })
+        NavigationSplitView(columnVisibility: $columns) {
+            Sidebar(workspace: workspace, addProject: { addingProject = true },
+                    hide: { withAnimation(Motion.panel) { columns = .detailOnly } })
                 .navigationSplitViewColumnWidth(
                     min: Metrics.sidebarWidth.lowerBound, ideal: Metrics.sidebarIdealWidth,
                     max: Metrics.sidebarWidth.upperBound
                 )
                 .toolbar(removing: .sidebarToggle)
+                .toolbar(removing: .title)
         } detail: {
             VStack(spacing: 0) {
-                TopBar(workspace: workspace)
+                TopBar(workspace: workspace, sidebarVisible: columns != .detailOnly,
+                       showSidebar: { withAnimation(Motion.panel) { columns = .all } })
                 if let problem = workspace.problem {
                     Label(problem, systemImage: "exclamationmark.triangle")
                         .captionText()
@@ -30,6 +34,7 @@ public struct RootView: View {
                         .background(Palette.failureTint)
                 }
                 ZStack {
+                    Backdrop(workspace.isHome ? .home : .chat)
                     if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
                         ChatView(workspace: workspace, chat: chat, composer: composer).id(chat.id)
                     } else {
@@ -39,7 +44,7 @@ public struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .background(Palette.window)
-            .toolbar(.hidden, for: .windowToolbar)
+            .ignoresSafeArea(.container, edges: .top)
         }
         .overlay(alignment: .bottom) { ToastHost(center: workspace.toasts) }
         .fileImporter(isPresented: $addingProject, allowedContentTypes: [.folder]) { result in

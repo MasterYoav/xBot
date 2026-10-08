@@ -148,4 +148,16 @@ import XBotBrain
         let segments = ReplyLayout.segments([.text("Look"), .tool(a), .tool(b), .text("Done"), .failure("boom")])
         #expect(segments == [.text("Look"), .tools([a, b]), .text("Done"), .failure("boom")])
     }
+
+    /// ⌘1…⌘9: the tab in that place, if there is one.
+    @Test func numberedTabsOpenByPosition() async throws {
+        let w = await workspace()
+        let a = try #require(w.newChat(in: nil)), b = try #require(w.newChat(in: nil))
+        w.openTab(at: 0)
+        #expect(w.selectedChatID == a.id)
+        w.openTab(at: 1)
+        #expect(w.selectedChatID == b.id)
+        w.openTab(at: 5)
+        #expect(w.selectedChatID == b.id)
+    }
 }

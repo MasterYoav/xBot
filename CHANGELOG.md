@@ -26,6 +26,11 @@ xBot is now a native app that drives the agent CLIs you already have. See
   read like documents — headings, lists, code — with the agent's tools folded into one line.
   Plan cards, status pills and toasts share one component kit. Deleting a chat offers Undo.
 
+- Reasoning effort on a slider — Low to Max, and Galaxy: Claude Code at max on Opus, Codex at its
+  ultra level. Saved per chat. Codex's model menu shows its real models.
+- Terminal-style tabs in the title bar (⌘1…⌘9), the sidebar running to the top beside the traffic
+  lights, and a sunset that fades across the top of Home and, softly, behind chats.
+
 ### Removed
 - The OpenBot engine, Docker and Colima, Postgres, the CopilotKit runner, the engine image and its
   update pipeline, onboarding, settings and the web admin. Onboarding, bots, notes, the native model

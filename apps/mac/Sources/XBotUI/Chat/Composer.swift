@@ -25,6 +25,7 @@ struct Composer: View {
                     .onSubmit(send)
                 HStack(spacing: Space.xxs) {
                     agentMenu
+                    EffortChip(effort: effort, recommended: recommendedEffort, onChange: setEffort)
                     permissionMenu
                     planMenu
                     Spacer(minLength: Space.s)
@@ -86,13 +87,14 @@ struct Composer: View {
         Menu {
             ForEach(workspace.availableHarnesses, id: \.self) { kind in
                 Section(kind.displayName) {
-                    ForEach(kind.models, id: \.self) { model in
-                        Button(model ?? String(localized: "Default model")) { choose(kind, model) }
+                    Button(String(localized: "Default model")) { choose(kind, nil) }
+                    ForEach(workspace.models(for: kind)) { option in
+                        Button(option.name) { choose(kind, option.id) }
                     }
                 }
             }
         } label: {
-            Chip(harness?.displayName ?? String(localized: "No agent"), detail: model.map { "· \($0)" },
+            Chip(harness?.displayName ?? String(localized: "No agent"), detail: modelName.map { "· \($0)" },
                  dot: harness.map(Palette.agent), showsChevron: true)
         }
         .menuStyle(.button)
@@ -176,6 +178,22 @@ struct Composer: View {
     private var harness: HarnessKind? { chat?.harness ?? workspace.draftHarness }
     private var model: String? { chat.map(\.model) ?? (workspace.draft.harness == harness ? workspace.draft.model : nil) }
     private var mode: PermissionMode { chat?.mode ?? workspace.draft.mode }
+
+    private var modelName: String? {
+        guard let model, let harness else { return model }
+        return workspace.models(for: harness).first { $0.id == model }?.name ?? model
+    }
+
+    private var recommendedEffort: Effort {
+        harness.map { workspace.recommendedEffort(for: $0, model: model) } ?? .medium
+    }
+
+    /// Unset means the agent's default, which the slider shows as its recommended stop.
+    private var effort: Effort { (chat.map(\.effort) ?? workspace.draft.effort) ?? recommendedEffort }
+
+    private func setEffort(_ effort: Effort) {
+        if let chat { workspace.setEffort(effort, for: chat.id) } else { workspace.draft.effort = effort }
+    }
     private var planMode: Bool { chat?.planMode ?? workspace.draft.planMode }
     private var reviewPlan: Bool { chat?.reviewPlan ?? workspace.draft.reviewPlan }
     private var isRunning: Bool { chat.map { workspace.isRunning($0.id) } ?? false }
