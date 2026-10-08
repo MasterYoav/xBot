@@ -22,6 +22,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let path = ProcessInfo.processInfo.environment["XBOT_WINDOW_SNAPSHOT"] else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(5))
+            if ProcessInfo.processInfo.environment["XBOT_DRAFT_PROJECT"] != nil, let workspace = Self.workspace {
+                workspace.startDraft(in: workspace.projects.first?.id)
+                try? await Task.sleep(for: .seconds(1))
+            }
+            // XBOT_CLICK="145,16;878,16": real clicks at points measured from the window's top left.
+            if let window = NSApp.windows.first(where: \.isVisible),
+               let clicks = ProcessInfo.processInfo.environment["XBOT_CLICK"] {
+                for pair in clicks.split(separator: ";") {
+                    let xy = pair.split(separator: ",").compactMap { Double($0) }
+                    guard xy.count == 2, let height = window.contentView?.superview?.bounds.height else { continue }
+                    let point = CGPoint(x: xy[0], y: height - xy[1])
+                    for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                        if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                                                          timestamp: ProcessInfo.processInfo.systemUptime,
+                                                          windowNumber: window.windowNumber, context: nil,
+                                                          eventNumber: 0, clickCount: 1, pressure: 1) {
+                            window.sendEvent(event)
+                        }
+                    }
+                    try? await Task.sleep(for: .seconds(1.5))
+                }
+            }
             if let window = NSApp.windows.first(where: \.isVisible), let frame = window.contentView?.superview,
                let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) {
                 frame.cacheDisplay(in: frame.bounds, to: rep)
@@ -29,8 +51,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].map { type in
                     window.standardWindowButton(type).map { "\(type.rawValue): hidden=\($0.isHidden) frame=\($0.frame) super=\(String(describing: $0.superview?.frame))" } ?? "\(type.rawValue): none"
                 }
+                // Which view a click in the title bar row reaches, across the window's width.
+                let hits = stride(from: CGFloat(10), to: frame.bounds.width, by: 30).map { x -> String in
+                    let point = CGPoint(x: x, y: frame.bounds.height - 16)
+                    var chain: [String] = []
+                    var view = frame.hitTest(point)
+                    while let v = view, chain.count < 4 { chain.append(String(describing: type(of: v))); view = v.superview }
+                    return "hit x=\(Int(x)): " + chain.joined(separator: " < ")
+                }
                 try? (["window: \(window.frame)", "content: \(String(describing: window.contentView?.frame))",
-                       "contentLayoutRect: \(window.contentLayoutRect)"] + buttons)
+                       "contentLayoutRect: \(window.contentLayoutRect)"] + buttons + hits)
                     .joined(separator: "\n").write(toFile: path + ".txt", atomically: true, encoding: .utf8)
             }
             NSApp.terminate(nil)
