@@ -61,4 +61,37 @@ struct MessageMarkdownTests {
         let text = "an unclosed [link and **bold"
         #expect(String(MessageMarkdown.inline(text).characters).contains("unclosed"))
     }
+
+    @Test func headingsUpToThreeLevels() {
+        #expect(MessageMarkdown.blocks(of: "# Title\n## Part\n### Bit\n#hashtag") == [
+            .heading("Title", level: 1), .heading("Part", level: 2), .heading("Bit", level: 3),
+            .prose("#hashtag"),
+        ])
+    }
+
+    @Test func bulletsAndNumbersBecomeLists() {
+        #expect(MessageMarkdown.blocks(of: "To try it:\n- one\n* two\n\n1. first\n2) second") == [
+            .prose("To try it:"), .list(["one", "two"], ordered: false), .list(["first", "second"], ordered: true),
+        ])
+    }
+
+    @Test func anIndentedLineContinuesItsItem() {
+        #expect(MessageMarkdown.blocks(of: "- a long\n  item\n- next") == [.list(["a long item", "next"], ordered: false)])
+    }
+
+    @Test func proseBetweenListsSplitsThem() {
+        #expect(MessageMarkdown.blocks(of: "1. a\nThen:\n1. b") == [
+            .list(["a"], ordered: true), .prose("Then:"), .list(["b"], ordered: true),
+        ])
+    }
+
+    @Test func aBulletInsideCodeStaysCode() {
+        #expect(MessageMarkdown.blocks(of: "```\n- not a list\n```") == [.code("- not a list", language: nil)])
+    }
+
+    /// A blank line before a list or a fence belongs to neither; kept, it draws as a gap.
+    @Test func blankLinesAroundProseAreDropped() {
+        #expect(MessageMarkdown.blocks(of: "First.\n\n- one") == [.prose("First."), .list(["one"], ordered: false)])
+        #expect(MessageMarkdown.blocks(of: "\nA\n\nB\n\n") == [.prose("A\n\nB")])
+    }
 }

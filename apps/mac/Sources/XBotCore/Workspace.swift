@@ -7,9 +7,11 @@ import XBotBrain
 @Observable
 public final class Workspace {
     public private(set) var projects: [Project] = []
-    public private(set) var chats: [Chat] = []
+    public internal(set) var chats: [Chat] = []
     public private(set) var openChatIDs: [UUID] = []
     public var selectedChatID: UUID?
+    /// What the main area shows instead of Home or the chat: the profile, or a file's diff.
+    public var page: Page = .main
     /// The reply being written right now, per chat. Saved as a message when the turn ends.
     public private(set) var live: [UUID: [Part]] = [:]
     /// True until the installed CLIs have been looked for. Nothing claims one is missing before then.
@@ -17,25 +19,68 @@ public final class Workspace {
     /// Set when xBot cannot save, so the window can say so instead of pretending.
     public var problem: String?
 
-    private var brains: [HarnessKind: any Brain] = [:]
-    private var transcripts: [UUID: [ChatMessage]] = [:]
+    /// Small messages at the bottom of the window.
+    public let toasts = ToastCenter()
+    /// What Home's composer holds before a chat exists.
+    public var draft = ChatDraft()
+    /// Bumped to ask the sidebar's search field for focus (⌘K).
+    public internal(set) var searchFocusRequest = 0
+    /// "@path" waiting to be put into the composer on screen, and the request that asks for it.
+    public internal(set) var pendingMention: String?
+    public internal(set) var mentionRequest = 0
+    /// Bumped to ask the composer for focus (a suggestion was chosen).
+    public internal(set) var composerFocusRequest = 0
+
+    var brains: [HarnessKind: any Brain] = [:]
+    var transcripts: [UUID: [ChatMessage]] = [:]
     /// The running turn per chat. The token is how a turn's own task recognises it: a stopped
     /// turn's task unwinds after the next one may have started, and must leave that one alone.
-    private var turns: [UUID: (token: UUID, task: Task<Void, Never>)] = [:]
-    private let store: Store
+    var turns: [UUID: (token: UUID, task: Task<Void, Never>)] = [:]
+    let store: Store
+    /// Chat → the message holding its plan, while a plan turn runs.
+    var planTurns: [UUID: UUID] = [:]
     private let inbox: URL
     private let discover: @Sendable () async -> [HarnessKind: any Brain]
+    private let loadCodexModels: @Sendable () -> [ModelOption]
+    /// Codex's limits, read from its newest session log.
+    let codexUsage: @Sendable () -> RateLimits?
+    /// Where the person's defaults for new chats are kept.
+    @ObservationIgnored let defaults: UserDefaults
+    /// git, if this Mac has it.
+    @ObservationIgnored let gitTool: GitTool?
+    /// Each project's git, made when first asked for.
+    @ObservationIgnored var gitModels: [UUID: ProjectGit] = [:]
+    /// The person's agent history, once the indexer has read it.
+    public internal(set) var history: HistorySummary?
+    public internal(set) var planRunCount = 0
+    @ObservationIgnored let indexer: HistoryIndexer?
+    /// Each agent's limits as it last reported them.
+    public internal(set) var usage: [HarnessKind: AgentUsage] = [:]
+    /// The models each agent offers, read when the agents are found.
+    public private(set) var modelOptions: [HarnessKind: [ModelOption]] = [:]
 
     public init(
         store: Store,
         inbox: URL,
-        discover: @escaping @Sendable () async -> [HarnessKind: any Brain]
+        discover: @escaping @Sendable () async -> [HarnessKind: any Brain],
+        codexModels: @escaping @Sendable () -> [ModelOption] = { CodexModels.read() },
+        codexUsage: @escaping @Sendable () -> RateLimits? = { CodexUsage.latest() },
+        defaults: UserDefaults = .standard,
+        gitTool: GitTool? = GitTool.find(),
+        indexer: HistoryIndexer? = nil
     ) {
+        self.gitTool = gitTool
+        self.indexer = indexer
         self.store = store
         self.inbox = inbox
         self.discover = discover
+        self.loadCodexModels = codexModels
+        self.codexUsage = codexUsage
+        self.defaults = defaults
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
+        usage = attempt { try store.usage() } ?? [:]
+        applyDraftDefaults()
     }
 
     public var availableHarnesses: [HarnessKind] { HarnessKind.allCases.filter { brains[$0] != nil } }
@@ -43,6 +88,7 @@ public final class Workspace {
     public func refreshHarnesses() async {
         isDiscovering = true
         brains = await discover()
+        modelOptions = [.claude: Self.claudeModels, .codex: loadCodexModels()]
         isDiscovering = false
     }
 
@@ -105,6 +151,7 @@ public final class Workspace {
         if transcripts[id] == nil { transcripts[id] = attempt { try store.messages(in: id) } ?? [] }
         if !openChatIDs.contains(id) { openChatIDs.append(id) }
         selectedChatID = id
+        page = .main
     }
 
     /// Closes the tab. A running turn keeps going; the chat is still in the sidebar.
@@ -122,11 +169,17 @@ public final class Workspace {
         update(id) { $0.title = trimmed }
     }
 
-    public func deleteChat(_ id: UUID) {
+    /// Removes the chat and its messages, and returns them so the removal can be undone.
+    @discardableResult
+    public func deleteChat(_ id: UUID) -> DeletedChat? {
+        guard let chat = chat(id) else { return nil }
         stop(id)
+        let messages = transcripts[id] ?? attempt { try store.messages(in: id) } ?? []
+        let wasOpen = openChatIDs.contains(id)
         attempt { try store.deleteChat(id) }
         chats.removeAll { $0.id == id }
         forget(id)
+        return DeletedChat(chat: chat, messages: messages, wasOpen: wasOpen)
     }
 
     public func setHarness(_ kind: HarnessKind, for id: UUID) {
@@ -137,6 +190,33 @@ public final class Workspace {
     public func setModel(_ model: String?, for id: UUID) { update(id) { $0.model = model } }
 
     public func setMode(_ mode: PermissionMode, for id: UUID) { update(id) { $0.mode = mode } }
+
+    public func setEffort(_ effort: Effort?, for id: UUID) { update(id) { $0.effort = effort } }
+
+    /// Claude Code's models by the aliases its CLI takes; any can go to Galaxy (it switches to Opus).
+    static let claudeModels: [ModelOption] = [
+        ModelOption(id: "opus", name: "Opus", efforts: Effort.allCases),
+        ModelOption(id: "sonnet", name: "Sonnet", efforts: Effort.allCases),
+        ModelOption(id: "haiku", name: "Haiku", efforts: Effort.allCases),
+    ]
+
+    public func models(for kind: HarnessKind) -> [ModelOption] { modelOptions[kind] ?? [] }
+
+    /// The level the slider marks "Recommended": the model's own default where the agent says
+    /// (Codex), otherwise Medium (Claude Code does not report one).
+    public func recommendedEffort(for kind: HarnessKind, model: String?) -> Effort {
+        let options = models(for: kind)
+        return options.first { $0.id == model }?.recommended
+            ?? (model == nil ? nil : options.first?.recommended)
+            ?? .medium
+    }
+
+    /// The model a turn runs on: the chat's, unless Galaxy needs a Codex model that reasons further.
+    func turnModel(for chat: Chat) -> String? {
+        chat.harness == .codex
+            ? CodexModels.model(for: chat.effort, chosen: chat.model, in: models(for: .codex))
+            : chat.model
+    }
 
     // MARK: Turns
 
@@ -154,20 +234,35 @@ public final class Workspace {
         chat.updatedAt = .now
         replace(chat)
 
+        if chat.planMode {
+            startPlanning(prompt, chat: chat, brain: brain)
+            return true
+        }
+
         let request = TurnRequest(
-            prompt: prompt, directory: directory(for: chat), model: chat.model,
-            mode: chat.mode, resumeID: chat.sessionID
+            prompt: prompt, directory: directory(for: chat), model: turnModel(for: chat),
+            mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort
         )
         live[id] = []
+        let harness = chat.harness
+        launch(id) { workspace, token in
+            for await event in workspace.events(brain, request, harness: harness) {
+                workspace.receive(event, in: id, turn: token)
+            }
+        }
+        return true
+    }
+
+    /// Runs `body` as the chat's turn. The token is how the body's own steps recognise it is still
+    /// the current turn after it awaits.
+    func launch(_ id: UUID, _ body: @escaping @MainActor (Workspace, UUID) async -> Void) {
         let token = UUID()
         let task = Task { [weak self] in
-            for await event in brain.run(request) {
-                self?.receive(event, in: id, turn: token)
-            }
-            self?.end(id, turn: token, stopped: false)
+            guard let self else { return }
+            await body(self, token)
+            self.end(id, turn: token, stopped: false)
         }
         turns[id] = (token, task)
-        return true
     }
 
     public func stop(_ id: UUID) {
@@ -199,9 +294,14 @@ public final class Workspace {
     }
 
     /// Ends a turn once: whichever of stop and the stream finishing comes first saves the reply.
-    private func end(_ id: UUID, turn token: UUID, stopped: Bool) {
+    func end(_ id: UUID, turn token: UUID, stopped: Bool) {
         guard turns[id]?.token == token else { return }
         turns[id] = nil
+        if let messageID = planTurns.removeValue(forKey: id) {
+            if stopped { haltPlan(messageID, in: id) }
+            update(id) { $0.updatedAt = .now }
+            return
+        }
         // A tool with no result when the turn ends never finished; saved as running, it would spin
         // in the transcript forever.
         var parts = (live.removeValue(forKey: id) ?? []).map { part in
@@ -215,7 +315,7 @@ public final class Workspace {
         update(id) { $0.updatedAt = .now }
     }
 
-    private func directory(for chat: Chat) -> URL {
+    func directory(for chat: Chat) -> URL {
         if let projectID = chat.projectID, let project = projects.first(where: { $0.id == projectID }) {
             return project.url
         }
@@ -223,12 +323,12 @@ public final class Workspace {
         return inbox
     }
 
-    private func save(_ message: ChatMessage) {
+    func save(_ message: ChatMessage) {
         attempt { try store.append(message) }
         transcripts[message.chatID, default: []].append(message)
     }
 
-    private func update(_ id: UUID, _ change: (inout Chat) -> Void) {
+    func update(_ id: UUID, _ change: (inout Chat) -> Void) {
         guard var chat = chat(id) else { return }
         change(&chat)
         replace(chat)
@@ -247,7 +347,7 @@ public final class Workspace {
 
     /// Runs a store call; a failure becomes `problem` rather than a crash or a silent loss.
     @discardableResult
-    private func attempt<T>(_ body: () throws -> T) -> T? {
+    func attempt<T>(_ body: () throws -> T) -> T? {
         do { return try body() } catch {
             problem = String(localized: "xBot couldn't save to its library: \(String(describing: error))")
             return nil

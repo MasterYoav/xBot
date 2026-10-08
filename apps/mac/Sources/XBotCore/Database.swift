@@ -90,6 +90,11 @@ extension Database.Value {
     }
 
     static func date(_ date: Date) -> Self { .real(date.timeIntervalSinceReferenceDate) }
+
+    var number: Double { if case .real(let n) = self { n } else { 0 } }
+
+    var bool: Bool { if case .real(let n) = self { n != 0 } else { false } }
+    static func bool(_ value: Bool) -> Self { .real(value ? 1 : 0) }
 }
 
 extension Optional where Wrapped == String {

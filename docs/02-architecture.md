@@ -49,3 +49,23 @@ harness running on the Mac.
 | Read only | `--permission-mode default` (anything needing approval is refused, since `-p` cannot ask) | `sandbox_mode="read-only"` |
 | Can edit | `--permission-mode acceptEdits` | `sandbox_mode="workspace-write"` |
 | Full access | `--permission-mode bypassPermissions` | `sandbox_mode="danger-full-access"` |
+
+## Plan mode
+
+With the Plan chip on, a message becomes three kinds of turn, all through the same `HarnessBrain`
+([design](superpowers/specs/2026-10-08-plan-mode-design.md)):
+
+1. **Planning** — always read-only (Claude Code `--permission-mode plan`, Codex
+   `sandbox_mode="read-only"`), and the answer must follow `PlanSchemas.plan`: a one-sentence
+   summary and steps, each with an imperative title and an "-ing" label. Claude Code returns it as
+   `structured_output` on its result line; Codex as its last message (`SchemaTail` holds each
+   message back until something else proves it was not the last). Both become `.structured`.
+2. **One turn per step**, resuming the session, in the chat's own permission mode, answering in
+   `PlanSchemas.step`: done or failed, a note, steps to add. The agent's "failed" is recorded and
+   the loop goes on; a turn that itself fails (the CLI crashed, signed out, hit a limit) halts the
+   plan, and Resume retries that step. At most 20 steps may be added.
+3. **A closing sentence**, read-only, no schema.
+
+xBot runs the loop itself because neither CLI exposes a to-do list when run headless, and because
+running one turn per step means every tool row, time and failure belongs to a known step. The plan
+is a `.plan` part of one assistant message, saved in place (`Store.replace`) on every change.

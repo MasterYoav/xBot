@@ -31,7 +31,12 @@ enum ClaudeStream {
                 guard block["type"] as? String == "tool_use",
                       let id = block["id"] as? String,
                       let name = block["name"] as? String else { return nil }
-                return .toolCall(id: id, name: name, summary: summary(of: block["input"]))
+                let input = block["input"] as? [String: Any] ?? [:]
+                // Plumbing, not work: how the schema'd answer is delivered, and the plan file plan
+                // mode writes into ~/.claude/plans.
+                if name == "StructuredOutput" { return nil }
+                if (input["file_path"] as? String)?.contains("/.claude/plans/") == true { return nil }
+                return .toolCall(id: id, name: name, summary: summary(of: input), size: size(name, input))
             }
 
         case "user":
@@ -46,6 +51,19 @@ enum ClaudeStream {
                 )
             }
 
+        case "rate_limit_event":
+            guard let info = object["rate_limit_info"] as? [String: Any],
+                  let windows = info["unifiedWindows"] as? [String: Any] else { return [] }
+            func window(_ key: String) -> RateWindow? {
+                guard let w = windows[key] as? [String: Any],
+                      let used = (w["utilization"] as? NSNumber)?.doubleValue,
+                      let reset = (w["resetsAt"] as? NSNumber)?.doubleValue else { return nil }
+                // A fraction; kept to a tenth of a percent so 0.55 is 55, not 55.000000000000007.
+                return RateWindow(usedPercent: (used * 1000).rounded() / 10, resetsAt: Date(timeIntervalSince1970: reset))
+            }
+            let limits = RateLimits(fiveHour: window("five_hour"), weekly: window("seven_day"))
+            return limits.fiveHour == nil && limits.weekly == nil ? [] : [.limits(limits)]
+
         case "result":
             if object["is_error"] as? Bool == true || object["subtype"] as? String != "success" {
                 let reason = (object["errors"] as? [String])?.joined(separator: "\n")
@@ -53,11 +71,26 @@ enum ClaudeStream {
                     ?? String(localized: "Claude Code stopped with an error.")
                 return [.failed(reason)]
             }
+            if let answer = object["structured_output"],
+               JSONSerialization.isValidJSONObject(answer),
+               let data = try? JSONSerialization.data(withJSONObject: answer, options: .sortedKeys) {
+                return [.structured(String(decoding: data, as: UTF8.self)), .done]
+            }
             return [.done]
 
         default:
             return []
         }
+    }
+
+    /// "+N" lines for what a write or an edit put in.
+    private static func size(_ name: String, _ input: [String: Any]) -> String? {
+        let text = switch name {
+        case "Write": input["content"] as? String
+        case "Edit": input["new_string"] as? String
+        default: nil as String?
+        }
+        return text.map { "+\(lineCount($0))" }
     }
 
     private static func blocks(of object: [String: Any]) -> [[String: Any]] {

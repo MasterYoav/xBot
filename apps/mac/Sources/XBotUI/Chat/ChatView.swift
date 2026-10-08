@@ -4,31 +4,42 @@ import XBotCore
 struct ChatView: View {
     let workspace: Workspace
     let chat: Chat
+    let composer: Namespace.ID
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Space.xl) {
+                LazyVStack(alignment: .leading, spacing: Space.l) {
                     ForEach(workspace.messages(in: chat.id)) { message in
-                        MessageView(role: message.role, parts: message.parts)
+                        if let plan = message.plan {
+                            PlanView(workspace: workspace, chatID: chat.id, messageID: message.id, plan: plan)
+                        } else if message.role == .user {
+                            UserMessage(parts: message.parts)
+                        } else {
+                            AgentReply(harness: chat.harness, parts: message.parts,
+                                       workedFor: workspace.workedFor(message.id, in: chat.id),
+                                       sentAt: message.createdAt,
+                                       // Only the last reply can be retried: Retry asks the last question again.
+                                       retry: message.id == workspace.messages(in: chat.id).last?.id
+                                           ? { workspace.retryLast(in: chat.id) } : nil)
+                        }
                     }
                     if let live = workspace.live[chat.id] {
-                        MessageView(role: .assistant, parts: live, isLive: true)
+                        AgentReply(harness: chat.harness, parts: live, isLive: true)
                     }
                 }
-                .padding(Space.xl)
+                .padding(.horizontal, Space.xl)
+                .padding(.vertical, Space.xl)
                 .frame(maxWidth: Metrics.readingWidth)
                 .frame(maxWidth: .infinity)
             }
             .defaultScrollAnchor(.bottom)
-            ChatComposer(workspace: workspace, chat: chat)
+            PlanStatusBar(workspace: workspace, chatID: chat.id)
+            Composer(workspace: workspace, target: .chat(chat.id), namespace: composer, addProject: {})
+                .frame(maxWidth: Metrics.readingWidth)
+                .padding(.horizontal, Space.xl)
+                .padding(.bottom, Space.l)
+                .padding(.top, Space.s)
         }
-        .navigationTitle(chat.title)
-        .navigationSubtitle(subtitle)
-    }
-
-    private var subtitle: String {
-        chat.projectID.flatMap { id in workspace.projects.first { $0.id == id }?.path }
-            ?? String(localized: "Inbox")
     }
 }

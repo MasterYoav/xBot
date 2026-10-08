@@ -21,3 +21,8 @@ func oneLine(_ text: String, limit: Int = 160) -> String {
         .trimmingCharacters(in: .whitespaces)
     return flat.count > limit ? String(flat.prefix(limit)) + "…" : flat
 }
+
+/// Lines in a piece of text, not counting a final newline.
+func lineCount(_ text: String) -> Int {
+    text.split(separator: "\n", omittingEmptySubsequences: false).count - (text.hasSuffix("\n") ? 1 : 0)
+}

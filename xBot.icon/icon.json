@@ -1,32 +1,58 @@
 {
-  "fill" : "system-light",
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+  },
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "Untitled blend-4096x4096.png",
-          "name" : "Untitled blend-4096x4096",
-          "position-specializations" : [
-            {
-              "value" : {
-                "scale" : 1,
-                "translation-in-points" : [
-                  -278.859375,
-                  123.265625
-                ]
-              }
-            },
-            {
-              "idiom" : "square",
-              "value" : {
-                "scale" : 1.2,
-                "translation-in-points" : [
-                  -223.203125,
-                  95.375
-                ]
-              }
-            }
-          ]
+          "hidden" : true,
+          "image-name" : "Image 5.png",
+          "name" : "Image 5",
+          "position" : {
+            "scale" : 1.09,
+            "translation-in-points" : [
+              93.99999999999994,
+              -181
+            ]
+          }
+        },
+        {
+          "hidden" : true,
+          "image-name" : "Image 4.png",
+          "name" : "Image 4",
+          "position" : {
+            "scale" : 0.94,
+            "translation-in-points" : [
+              0,
+              -77.88000000000011
+            ]
+          }
+        },
+        {
+          "hidden" : true,
+          "image-name" : "Image 3.png",
+          "name" : "Image 3",
+          "position" : {
+            "scale" : 0.96,
+            "translation-in-points" : [
+              58,
+              -127
+            ]
+          }
+        },
+        {
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "Image 2.png",
+          "name" : "Image 2",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -56,
+              -46
+            ]
+          }
         }
       ],
       "shadow" : {
@@ -35,7 +61,7 @@
       },
       "translucency" : {
         "enabled" : true,
-        "value" : 0.5
+        "value" : 0.3
       }
     }
   ],

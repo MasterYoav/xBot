@@ -191,8 +191,8 @@ Treat these as invariants. A change that breaks one is wrong even if it passes C
    deletes an audit row.
 4. **A secret's value is never echoed.** Record that it was supplied and its length.
 5. **No listening ports.** The tool relay uses a Unix socket (0600), a bot's VM uses vsock.
-6. **Destructive actions are confirmed once.** Deleting a chat or a bot (which deletes its
-   computer) earns a confirmation; almost nothing else does.
+6. **Destructive actions are confirmed or undoable.** Deleting a bot (its computer and browser
+   profile) is confirmed once. Deleting a chat is immediate and undoable from the toast.
 7. **The app degrades honestly.** No CLI installed, a CLI signed out, a folder that moved, a
    library that will not open — say so, in a sentence, with the one button that fixes it. Never an
    empty state that implies everything is fine.

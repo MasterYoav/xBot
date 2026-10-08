@@ -46,12 +46,8 @@ struct CodeBlockView: View {
             }
         }
         .background(
-            Palette.codeBackground,
-            in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
-                .strokeBorder(Palette.separator, lineWidth: 1)
+            Palette.inset,
+            in: RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
         )
         .onHover { hovering = $0 }
     }
@@ -73,7 +69,7 @@ struct CodeBlockView: View {
             )
             .captionText()
             .labelStyle(.titleAndIcon)
-            .foregroundStyle(copied ? Palette.stateRunning : Palette.textSecondary)
+            .foregroundStyle(copied ? Palette.success : Palette.textSecondary)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(String(localized: "Copy code"))

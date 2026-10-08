@@ -90,6 +90,26 @@ func collect(_ stream: AsyncStream<BrainEvent>) async -> [BrainEvent] {
         #expect(await collect(brain.run(TurnRequest(prompt: "x", directory: tmp, mode: .readOnly))) == [.done])
     }
 
+    /// Codex reads its schema from a file. The file holds the schema while the turn runs and is gone
+    /// afterwards.
+    @Test func codexGetsTheSchemaInAFileThatIsRemovedAfterwards() async throws {
+        let cli = try fakeCLI("""
+        cat > /dev/null
+        while [ $# -gt 0 ]; do
+          if [ "$1" = "--output-schema" ]; then cat "$2" > "$OUT/schema"; echo "$2" > "$OUT/path"; fi
+          shift
+        done
+        echo '{"type":"turn.completed"}'
+        """)
+        let brain = HarnessBrain(kind: .codex, executable: cli.url, environment: [:])
+        let request = TurnRequest(prompt: "x", directory: tmp, mode: .readOnly, schema: #"{"type":"object"}"#)
+        #expect(await collect(brain.run(request)) == [.done])
+        #expect(try String(contentsOf: cli.out.appending(path: "schema"), encoding: .utf8) == #"{"type":"object"}"#)
+        let path = try String(contentsOf: cli.out.appending(path: "path"), encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(!FileManager.default.fileExists(atPath: path))
+    }
+
     @Test func missingFolderFailsWithoutSpawning() async throws {
         let cli = try fakeCLI("touch \"$OUT/ran\"")
         let gone = tmp.appending(path: "xbot-missing-\(UUID().uuidString)")
