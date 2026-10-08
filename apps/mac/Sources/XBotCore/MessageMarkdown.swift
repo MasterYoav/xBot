@@ -40,7 +40,7 @@ public enum MessageMarkdown: Sendable {
         var inCode = false
 
         func flushProse() {
-            let joined = prose.joined(separator: "\n")
+            let joined = prose.joined(separator: "\n").trimmingCharacters(in: .newlines)
             if !joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { blocks.append(.prose(joined)) }
             prose = []
         }

@@ -8,21 +8,30 @@ struct TasksCard: View {
     @State private var showCompleted = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s) {
-            Text(String(localized: "On it. I'll keep this list updated as I go.")).bodyText()
-            VStack(alignment: .leading, spacing: Space.s) {
-                header
-                progress
-                if !collapsed {
-                    if !plan.note.isEmpty {
-                        Text(plan.note).captionText().foregroundStyle(Palette.textSecondary)
+        VStack(alignment: .leading, spacing: Space.m) {
+            Text(String(localized: "On it. I'll keep this list updated as I go.")).readingText()
+            Card(title: String(localized: "Tasks"), meta: counts) {
+                VStack(alignment: .leading, spacing: Space.s) {
+                    progress.padding(.horizontal, Space.s)
+                    if !collapsed {
+                        if !plan.note.isEmpty {
+                            Text(plan.note).captionText().foregroundStyle(Palette.textSecondary)
+                                .padding(.horizontal, Space.s)
+                        }
+                        InsetPanel { rows }
                     }
-                    rows
-                    if plan.added > 0 {
-                        Text(plan.added == 1 ? String(localized: "Plan updated · 1 added")
-                                             : String(localized: "Plan updated · \(plan.added) added"))
-                            .captionText()
+                }
+                .padding(.bottom, Space.xs)
+            } footer: {
+                CardFooter(status) {
+                    if let start = plan.startedAt {
+                        Elapsed(start: start, end: plan.status == .running ? nil : plan.endedAt)
+                            .labelText()
                             .foregroundStyle(Palette.textTertiary)
+                    }
+                    IconButton(collapsed ? "chevron.down" : "chevron.up",
+                               help: collapsed ? String(localized: "Show steps") : String(localized: "Hide steps")) {
+                        collapsed.toggle()
                     }
                 }
             }
@@ -30,20 +39,14 @@ struct TasksCard: View {
         .motion(Motion.quick, value: collapsed)
     }
 
-    private var header: some View {
-        HStack(spacing: Space.s) {
-            Text(String(localized: "Tasks")).emphasisText()
-            Text(counts).captionText().foregroundStyle(Palette.textSecondary)
-            Spacer()
-            if let start = plan.startedAt {
-                Elapsed(start: start, end: plan.status == .running ? nil : plan.endedAt)
-                    .captionText()
-                    .foregroundStyle(Palette.textTertiary)
-            }
-            Button { collapsed.toggle() } label: { Image(systemName: collapsed ? "chevron.down" : "chevron.up") }
-                .buttonStyle(.plain)
-                .foregroundStyle(Palette.textTertiary)
+    /// "Running", "Finished · 2 added", "Stopped".
+    private var status: String {
+        let state = switch plan.status {
+        case .running: String(localized: "Running")
+        case .finished: String(localized: "Finished")
+        default: String(localized: "Stopped")
         }
+        return plan.added == 0 ? state : state + String(localized: " · \(plan.added) added")
     }
 
     private var counts: String {
@@ -56,7 +59,7 @@ struct TasksCard: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Palette.hairline)
                 Capsule()
-                    .fill(plan.failedCount > 0 ? Palette.failure : Palette.textPrimary)
+                    .fill(plan.failedCount > 0 ? Palette.failure : Palette.accent)
                     .frame(width: geometry.size.width * fraction)
             }
         }

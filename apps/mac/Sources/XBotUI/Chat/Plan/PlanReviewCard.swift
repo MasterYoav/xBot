@@ -22,43 +22,45 @@ struct PlanReviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             Text(String(localized: "Here's my plan. Change anything you like, then run it.")).bodyText()
-            VStack(alignment: .leading, spacing: Space.xxs) {
-                Text(String(localized: "Review the plan")).emphasisText()
-                Text(String(localized: "Edit, reorder or remove steps before the agent starts. Move a step with ⌥↑ and ⌥↓."))
-                    .captionText()
-                    .foregroundStyle(Palette.textSecondary)
-            }
-            VStack(spacing: Space.xxs) {
-                ForEach(Array($steps.enumerated()), id: \.element.id) { index, $step in
-                    row(index, $step)
-                }
-            }
-            Button(action: add) {
-                Label(String(localized: "Add step"), systemImage: "plus").captionText()
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, Space.s)
-            Divider()
-            HStack(spacing: Space.m) {
-                Text(footer).captionText().foregroundStyle(Palette.textTertiary)
-                Spacer()
-                Button(String(localized: "Cancel")) { workspace.cancelPlan(messageID, in: chatID) }
-                    .buttonStyle(.plain)
-                    .captionText()
-                Button(action: run) {
-                    HStack(spacing: Space.xs) {
-                        Text(String(localized: "Run plan"))
-                        Text(verbatim: "⌘↩").opacity(0.7)
+            Card(
+                title: String(localized: "Review the plan"),
+                meta: footer
+            ) {
+                VStack(alignment: .leading, spacing: Space.s) {
+                    Text(String(localized: "Edit, reorder or remove steps before the agent starts. Move a step with ⌥↑ and ⌥↓."))
+                        .captionText()
+                        .foregroundStyle(Palette.textTertiary)
+                        .padding(.horizontal, Space.s)
+                    InsetPanel {
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            ForEach(Array($steps.enumerated()), id: \.element.id) { index, $step in
+                                row(index, $step)
+                            }
+                            Button(action: add) {
+                                Label(String(localized: "Add step"), systemImage: "plus")
+                                    .font(Typography.chip)
+                                    .foregroundStyle(Palette.textSecondary)
+                                    .padding(.horizontal, Space.s)
+                                    .frame(height: Metrics.row)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .captionText()
-                    .padding(.horizontal, Space.m)
-                    .padding(.vertical, Space.xs)
-                    .foregroundStyle(Palette.window)
-                    .background(Palette.textPrimary, in: Capsule())
                 }
-                .buttonStyle(XBotButtonStyle())
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(runnable.isEmpty || workspace.isRunning(chatID))
+            } footer: {
+                CardFooter(String(localized: "Read-only planning")) {
+                    Button(String(localized: "Cancel")) { workspace.cancelPlan(messageID, in: chatID) }
+                        .buttonStyle(QuietButtonStyle())
+                    Button(action: run) {
+                        HStack(spacing: Space.xs) {
+                            Text(String(localized: "Run plan"))
+                            Text(verbatim: "⌘↩").opacity(0.6)
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(runnable.isEmpty || workspace.isRunning(chatID))
+                }
             }
         }
         .motion(Motion.quick, value: steps.map(\.id))
@@ -106,6 +108,11 @@ struct PlanReviewCard: View {
         .padding(.vertical, Space.xs)
         .background(highlighted ? Palette.raised : .clear,
                     in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
+        .overlay {
+            if focused == id {
+                RoundedRectangle(cornerRadius: Radius.small, style: .continuous).strokeBorder(Palette.hairline)
+            }
+        }
         .onHover { hovered = $0 ? id : (hovered == id ? nil : hovered) }
     }
 

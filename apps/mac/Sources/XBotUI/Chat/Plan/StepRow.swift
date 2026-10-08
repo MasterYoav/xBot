@@ -13,6 +13,9 @@ struct StepRow: View {
             HStack(spacing: Space.s) {
                 icon.frame(width: Space.l)
                 title
+                if step.added, step.status == .pending || step.status == .running {
+                    StatusPill(.accent, String(localized: "Added"))
+                }
                 Spacer()
                 if let start = step.startedAt {
                     Elapsed(start: start, end: step.endedAt).captionText().foregroundStyle(Palette.textTertiary)

@@ -88,4 +88,10 @@ struct MessageMarkdownTests {
     @Test func aBulletInsideCodeStaysCode() {
         #expect(MessageMarkdown.blocks(of: "```\n- not a list\n```") == [.code("- not a list", language: nil)])
     }
+
+    /// A blank line before a list or a fence belongs to neither; kept, it draws as a gap.
+    @Test func blankLinesAroundProseAreDropped() {
+        #expect(MessageMarkdown.blocks(of: "First.\n\n- one") == [.prose("First."), .list(["one"], ordered: false)])
+        #expect(MessageMarkdown.blocks(of: "\nA\n\nB\n\n") == [.prose("A\n\nB")])
+    }
 }
