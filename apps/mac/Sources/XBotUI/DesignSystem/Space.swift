@@ -21,8 +21,8 @@ public enum Radius {
 }
 
 public enum Metrics {
-    public static let sidebarWidth: ClosedRange<CGFloat> = 200...320
-    public static let sidebarIdealWidth: CGFloat = 240
+    public static let sidebarWidth: ClosedRange<CGFloat> = 220...340
+    public static let sidebarIdealWidth: CGFloat = 260
     /// Room for the traffic lights above the sidebar's header.
     public static let titleBarInset: CGFloat = 38
     public static let topBar: CGFloat = 44

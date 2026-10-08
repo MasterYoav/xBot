@@ -27,7 +27,7 @@ struct ChatView: View {
             }
             .defaultScrollAnchor(.bottom)
             PlanStatusBar(workspace: workspace, chatID: chat.id)
-            ChatComposer(workspace: workspace, chat: chat)
+            Composer(workspace: workspace, target: .chat(chat.id), namespace: composer, addProject: {})
         }
         .navigationTitle(chat.title)
         .navigationSubtitle(subtitle)

@@ -66,7 +66,7 @@ struct Sidebar: View {
     private var header: some View {
         HStack(spacing: Space.s) {
             AppMarkView(size: Space.l + Space.xxs)
-            Text(verbatim: "xBot").emphasisText()
+            Text(verbatim: "xBot").emphasisText().foregroundStyle(Palette.textPrimary)
             Spacer()
             IconButton("square.and.pencil", help: String(localized: "New chat (⌘N)")) { workspace.startDraft(in: nil) }
         }
@@ -182,6 +182,8 @@ struct Sidebar: View {
                     HStack(spacing: Space.xs) {
                         Circle().fill(Palette.agent(kind)).frame(width: Metrics.dot, height: Metrics.dot)
                         Text(kind.displayName).captionText().foregroundStyle(Palette.textSecondary)
+                            .lineLimit(1)
+                            .fixedSize()
                     }
                 }
             }
