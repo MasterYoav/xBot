@@ -53,6 +53,11 @@ public enum Metrics {
     public static let effortCardWidth: CGFloat = 300
     public static let effortTrackHeight: CGFloat = 26
     public static let effortKnob: CGFloat = 24
+    /// The person's picture: in the sidebar footer, in the menu, on the profile.
+    public static let avatarSmall: CGFloat = 28
+    public static let avatarMenu: CGFloat = 36
+    public static let avatarLarge: CGFloat = 96
+    public static let accountMenuWidth: CGFloat = 288
     /// How much of the content height the backdrop covers before it has faded out.
     public static let backdropHeight: CGFloat = 0.62
 }

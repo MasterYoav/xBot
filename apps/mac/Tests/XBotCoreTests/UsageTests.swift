@@ -19,6 +19,12 @@ import Testing
         #expect(UsageText.resets(now.addingTimeInterval(7 * 86400), now: now, calendar: utc, locale: us) == "Oct 15")
     }
 
+    @Test func aResetWithinADayIsATimeEvenAfterMidnight() {
+        let lateEvening = Date(timeIntervalSince1970: 1791496800)  // 2026-10-08 22:00 UTC
+        let time = UsageText.resets(lateEvening.addingTimeInterval(3 * 3600), now: lateEvening, calendar: utc, locale: us)
+        #expect(time.replacingOccurrences(of: "\u{202F}", with: " ") == "1:00 AM")
+    }
+
     @Test func updatedAgo() {
         let now = Date.now
         #expect(UsageText.updated(now.addingTimeInterval(-20), now: now) == "Updated just now")

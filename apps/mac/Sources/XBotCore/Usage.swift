@@ -20,7 +20,7 @@ public enum UsageText {
         "\(min(max(Int((100 - window.usedPercent).rounded()), 0), 100))%"
     }
 
-    /// "12:42 AM" when it resets today, else "Oct 15".
+    /// "12:42 AM" when it resets within a day, else "Oct 15".
     public static func resets(
         _ date: Date, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
     ) -> String {
@@ -28,7 +28,7 @@ public enum UsageText {
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
         formatter.locale = locale
-        formatter.setLocalizedDateFormatFromTemplate(calendar.isDate(date, inSameDayAs: now) ? "jmm" : "MMMd")
+        formatter.setLocalizedDateFormatFromTemplate(date.timeIntervalSince(now) < 86_400 ? "jmm" : "MMMd")
         return formatter.string(from: date)
     }
 

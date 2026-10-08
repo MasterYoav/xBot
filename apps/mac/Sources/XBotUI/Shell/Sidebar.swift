@@ -1,7 +1,7 @@
 import SwiftUI
 import XBotCore
 
-/// Search, Home and Inbox, projects with their chats, Recent, and the agents found.
+/// Search, Home and Inbox, projects with their chats, Recent, and the account button.
 struct Sidebar: View {
     let workspace: Workspace
     let addProject: () -> Void
@@ -170,32 +170,5 @@ struct Sidebar: View {
         .padding(.leading, indent ? Space.l + Space.s : 0)
     }
 
-    private var footer: some View {
-        HStack(spacing: Space.m) {
-            if workspace.availableHarnesses.isEmpty {
-                if workspace.isDiscovering {
-                    ProgressView().controlSize(.mini)
-                    Text(String(localized: "Looking for agents…")).captionText().foregroundStyle(Palette.textTertiary)
-                } else {
-                    Text(String(localized: "No agent found")).captionText().foregroundStyle(Palette.textTertiary)
-                    Button(String(localized: "Look again")) { Task { await workspace.refreshHarnesses() } }
-                        .buttonStyle(.link)
-                        .captionText()
-                }
-            } else {
-                ForEach(workspace.availableHarnesses, id: \.self) { kind in
-                    HStack(spacing: Space.xs) {
-                        Circle().fill(Palette.agent(kind)).frame(width: Metrics.dot, height: Metrics.dot)
-                        Text(kind.displayName).captionText().foregroundStyle(Palette.textSecondary)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                }
-            }
-            Spacer()
-        }
-        .padding(.horizontal, Space.m)
-        .padding(.vertical, Space.s)
-        .overlay(alignment: .top) { Rectangle().fill(Palette.hairline).frame(height: 1) }
-    }
+    private var footer: some View { AccountButton(workspace: workspace) }
 }
