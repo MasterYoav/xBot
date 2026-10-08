@@ -57,6 +57,10 @@ private struct ReplyText: View {
                     Text(MessageMarkdown.inline(prose)).bodyText().textSelection(.enabled)
                 case .code(let code, let language):
                     CodeBlockView(code: code, language: language)
+                case .heading(let title, _):
+                    Text(MessageMarkdown.inline(title)).bodyText().bold()
+                case .list(let items, _):
+                    Text(items.map { "• " + $0 }.joined(separator: "\n")).bodyText()
                 }
             }
         }
