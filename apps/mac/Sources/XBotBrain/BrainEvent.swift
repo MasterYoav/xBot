@@ -45,6 +45,8 @@ public struct TurnRequest: Equatable, Sendable {
     public var model: String?
     public var mode: PermissionMode
     public var resumeID: String?
+    /// Nil: the agent's own default.
+    public var effort: Effort?
     /// A JSON Schema the final answer must follow. It arrives as `.structured`.
     public var schema: String?
     /// Investigate only. Forces the CLI's read-only mode whatever `mode` says.
@@ -56,6 +58,7 @@ public struct TurnRequest: Equatable, Sendable {
         model: String? = nil,
         mode: PermissionMode,
         resumeID: String? = nil,
+        effort: Effort? = nil,
         schema: String? = nil,
         planning: Bool = false
     ) {
@@ -64,6 +67,7 @@ public struct TurnRequest: Equatable, Sendable {
         self.model = model
         self.mode = mode
         self.resumeID = resumeID
+        self.effort = effort
         self.schema = schema
         self.planning = planning
     }

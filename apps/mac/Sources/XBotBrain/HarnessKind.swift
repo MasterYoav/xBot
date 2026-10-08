@@ -43,7 +43,10 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
                 "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
                 "--permission-mode", mode,
             ]
-            if let model = request.model { arguments += ["--model", model] }
+            // Galaxy is max effort on the strongest model, whatever model was picked.
+            let model = request.effort == .galaxy ? "opus" : request.model
+            if let model { arguments += ["--model", model] }
+            if let effort = request.effort { arguments += ["--effort", effort.claudeValue] }
             if let resume = request.resumeID { arguments += ["--resume", resume] }
             if let schema = request.schema { arguments += ["--json-schema", schema] }
             return arguments
@@ -59,6 +62,7 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             if request.resumeID != nil { arguments.append("resume") }
             arguments += ["--json", "--skip-git-repo-check", "-c", "sandbox_mode=\"\(sandbox)\""]
             if let model = request.model { arguments += ["-m", model] }
+            if let effort = request.effort { arguments += ["-c", "model_reasoning_effort=\"\(effort.codexValue)\""] }
             if let schemaFile { arguments += ["--output-schema", schemaFile.path] }
             if let resume = request.resumeID { arguments.append(resume) }
             arguments.append("-")
