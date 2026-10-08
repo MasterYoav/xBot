@@ -130,6 +130,19 @@ public final class ProjectGit {
         }
     }
 
+    /// The file's changes against the last commit. An untracked file is compared with nothing:
+    /// `--no-index` exits 1 when the files differ, which here is the normal answer.
+    public func diff(_ file: GitFile) async -> [DiffLine] {
+        let result = file.isUntracked
+            ? await tool.git(["diff", "--no-index", "--no-color", "--", "/dev/null", file.path], in: directory)
+            : await tool.git(["diff", "--no-color", "HEAD", "--"] + paths(file), in: directory)
+        guard result.status == 0 || (file.isUntracked && result.status == 1) else {
+            problem = result.error
+            return []
+        }
+        return UnifiedDiff.parse(result.output)
+    }
+
     /// Of these project-relative paths, the ones git ignores.
     public func ignored(_ paths: [String]) async -> Set<String> {
         guard !paths.isEmpty else { return [] }
