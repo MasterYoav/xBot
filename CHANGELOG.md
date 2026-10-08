@@ -20,6 +20,12 @@ xBot is now a native app that drives the agent CLIs you already have. See
   with their reason, and steps the agent adds to finish the job. **Review plan first** off runs the
   plan straight away. Stop and Resume work mid-plan.
 
+- A new look: neutral surfaces in light and dark with one accent, a quiet sidebar (search ⌘K,
+  Home, Inbox, projects with their chats, Recent), pill tabs, and a Home that asks "What should we
+  work on?" over a composer with the project and branch on top and four ways in below. Replies
+  read like documents — headings, lists, code — with the agent's tools folded into one line.
+  Plan cards, status pills and toasts share one component kit. Deleting a chat offers Undo.
+
 ### Removed
 - The OpenBot engine, Docker and Colima, Postgres, the CopilotKit runner, the engine image and its
   update pipeline, onboarding, settings and the web admin. Onboarding, bots, notes, the native model

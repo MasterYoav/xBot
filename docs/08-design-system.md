@@ -1,5 +1,10 @@
 # Design system
 
+> **Colour, type and components changed in October 2026** — see the
+> [premium UI spec](superpowers/specs/2026-10-08-premium-ui-design.md). `Palette.swift`,
+> `Typography.swift` and `Components/` are the source of truth for values; the motion, feedback and
+> accessibility rules below still hold.
+
 Derived from Apple's *Designing Fluid Interfaces* (WWDC 2018), *The Details of UI Typography*
 (WWDC 2020), and the eight design principles. Translated to SwiftUI.
 
