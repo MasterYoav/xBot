@@ -12,7 +12,8 @@ struct ChangesPanel: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.m) {
+            // Lazy, so a burst of agent edits redraws the rows on screen, not one per changed file.
+            LazyVStack(alignment: .leading, spacing: Space.m) {
                 header
                 if git.isRepository, let status = git.status {
                     stateLine(status)
@@ -231,7 +232,7 @@ struct ChangesPanel: View {
     @ViewBuilder
     private func files(_ status: GitStatus) -> some View {
         if !status.files.isEmpty {
-            VStack(alignment: .leading, spacing: 1) {
+            LazyVStack(alignment: .leading, spacing: 1) {
                 Text(String(localized: "Changed files")).captionText().foregroundStyle(Palette.textTertiary)
                     .padding(.bottom, Space.xs)
                 ForEach(status.files) { file in

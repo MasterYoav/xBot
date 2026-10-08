@@ -53,40 +53,50 @@ public final class ProjectGit {
         await task.value
     }
 
+    /// Observation fires on every assignment, equal or not, and each one redraws the panels; so
+    /// state is only set when it differs, and a new generation only begins when something changed.
     private func readState(pullRequest: Bool) async {
         guard await tool.git(["rev-parse", "--is-inside-work-tree"], in: directory).succeeded else {
-            isRepository = false
-            status = nil
-            totals = DiffTotals()
-            generation += 1
+            if isRepository || status != nil {
+                isRepository = false
+                status = nil
+                totals = DiffTotals()
+                generation += 1
+            }
             return
         }
-        isRepository = true
         let result = await tool.git(["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"], in: directory)
         guard result.succeeded else {
             problem = result.error
             return
         }
-        status = GitStatus.parse(result.output)
-        if status?.behind == 0 { needsMerge = false }
+        let newStatus = GitStatus.parse(result.output)
         // A repository with no commit yet has no HEAD to compare with: no totals, and not an error.
         let numstat = await tool.git(["diff", "--numstat", "HEAD"], in: directory)
-        totals = numstat.succeeded ? DiffTotals.parse(numstat: numstat.output) : DiffTotals()
-        generation += 1
+        let newTotals = numstat.succeeded ? DiffTotals.parse(numstat: numstat.output) : DiffTotals()
+        if !isRepository { isRepository = true }
+        if newStatus.behind == 0, needsMerge { needsMerge = false }
+        if newTotals != totals { totals = newTotals }
+        if newStatus != status {
+            status = newStatus
+            generation += 1
+        }
         if pullRequest { await refreshPullRequest() }
     }
 
     /// The branch's pull request through gh, when gh is installed and signed in; otherwise none.
     private func refreshPullRequest() async {
         let url = await tool.git(["remote", "get-url", "origin"], in: directory)
-        remote = url.succeeded ? GitHubRemote.parse(url.output) : nil
+        let parsedRemote = url.succeeded ? GitHubRemote.parse(url.output) : nil
+        if parsedRemote != remote { remote = parsedRemote }
         guard let remote, let branch = status?.branch,
               let result = await tool.gh(["pr", "view", branch, "-R", remote.slug, "--json", PullRequest.fields], in: directory),
               result.succeeded else {
-            pullRequest = nil
+            if pullRequest != nil { pullRequest = nil }
             return
         }
-        pullRequest = PullRequest.parse(json: result.output)
+        let parsed = PullRequest.parse(json: result.output)
+        if parsed != pullRequest { pullRequest = parsed }
     }
 
     public func fetch() async { await perform(["fetch", "--quiet"]) }

@@ -21,6 +21,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let path = ProcessInfo.processInfo.environment["XBOT_WINDOW_SNAPSHOT"] else { return }
         Task { @MainActor in
+            // XBOT_PROJECT=/path: aim Home at that folder (added for the run, removed at the end).
+            var added: UUID?
+            if let path = ProcessInfo.processInfo.environment["XBOT_PROJECT"], let workspace = Self.workspace {
+                let project = workspace.addProject(at: URL(filePath: path))
+                added = project.id
+                workspace.startDraft(in: project.id)
+            }
+            // XBOT_HANG_LOG=/path: a line for every time the main thread is late by 100 ms or more.
+            if let log = ProcessInfo.processInfo.environment["XBOT_HANG_LOG"] {
+                Self.watchMainThread(log: log)
+            }
+            defer { if let added { Self.workspace?.removeProject(added) } }
             try? await Task.sleep(for: .seconds(5))
             if ProcessInfo.processInfo.environment["XBOT_DRAFT_PROJECT"] != nil, let workspace = Self.workspace {
                 workspace.startDraft(in: workspace.projects.first?.id)
@@ -44,6 +56,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     try? await Task.sleep(for: .seconds(1.5))
                 }
             }
+            // XBOT_SOAK=seconds: after the clicks, leave the app running that long before the picture.
+            if let soak = ProcessInfo.processInfo.environment["XBOT_SOAK"].flatMap(Double.init) {
+                if ProcessInfo.processInfo.environment["XBOT_DRAFT_PROJECT"] != nil, let workspace = Self.workspace {
+                    workspace.startDraft(in: workspace.projects.first?.id)
+                }
+                try? await Task.sleep(for: .seconds(soak))
+            }
             if let window = NSApp.windows.first(where: \.isVisible), let frame = window.contentView?.superview,
                let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) {
                 frame.cacheDisplay(in: frame.bounds, to: rep)
@@ -64,6 +83,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .joined(separator: "\n").write(toFile: path + ".txt", atomically: true, encoding: .utf8)
             }
             NSApp.terminate(nil)
+        }
+    }
+
+    /// Pings the main queue every 50 ms from a background thread and logs each reply that came late.
+    private static func watchMainThread(log: String) {
+        FileManager.default.createFile(atPath: log, contents: nil)
+        let handle = FileHandle(forWritingAtPath: log)
+        Thread.detachNewThread {
+            while true {
+                let sent = Date.now
+                let answered = DispatchSemaphore(value: 0)
+                DispatchQueue.main.async { answered.signal() }
+                answered.wait()
+                let late = Date.now.timeIntervalSince(sent)
+                if late >= 0.1 { handle?.write(Data("\(Int(sent.timeIntervalSince1970)) late \(Int(late * 1000)) ms\n".utf8)) }
+                Thread.sleep(forTimeInterval: 0.05)
+            }
         }
     }
     #endif

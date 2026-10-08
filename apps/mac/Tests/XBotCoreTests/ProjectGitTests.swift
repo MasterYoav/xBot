@@ -77,6 +77,20 @@ struct TempRepo {
         #expect(git.status?.files.map(\.path) == ["new/one.txt", "new/two.txt"])
     }
 
+    @Test func aRefreshThatFindsNothingNewChangesNothing() async throws {
+        let repo = try TempRepo.make()
+        try repo.write("a.txt", "changed\n")
+        let git = ProjectGit(directory: repo.work, tool: tool)
+        await git.refresh()
+        let generation = git.generation
+        await git.refresh(pullRequest: false)
+        // The explorer reads its folders again on every new generation; nothing changed, so none.
+        #expect(git.generation == generation)
+        try repo.write("b.txt", "new\n")
+        await git.refresh(pullRequest: false)
+        #expect(git.generation == generation + 1)
+    }
+
     @Test func notARepository() async throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "plain-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
