@@ -21,8 +21,11 @@ public enum ToolLabel {
 
     public static func symbol(_ name: String) -> String {
         switch name {
-        case "Read", "Write", "Edit", "MultiEdit": "doc.text"
-        case "Bash", "Shell": "terminal"
+        case "Read", "Write", "Edit", "MultiEdit", "apply_patch": "doc.text"
+        case "Bash", "Shell", "shell", "exec", "exec_command": "terminal"
+        case "Skill": "sparkles"
+        case "Task", "Agent": "person.2"
+        case "TodoWrite", "update_plan": "checklist"
         case "Grep", "Glob": "magnifyingglass"
         case "LS": "folder"
         case "WebSearch", "WebFetch": "globe"

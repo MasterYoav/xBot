@@ -62,9 +62,9 @@ struct XBotApp: App {
         let discover: @Sendable () async -> [HarnessKind: any Brain] = { await HarnessLocator.installed() }
         let workspace: Workspace
         do {
-            workspace = Workspace(store: try Store.live(), inbox: inbox, discover: discover)
+            workspace = Workspace(store: try Store.live(), inbox: inbox, discover: discover, indexer: try? .live())
         } catch {
-            workspace = Workspace(store: .inMemory(), inbox: inbox, discover: discover)
+            workspace = Workspace(store: .inMemory(), inbox: inbox, discover: discover, indexer: try? .live())
             workspace.problem = String(
                 localized: "xBot couldn't open its library, so this session won't be saved. \(String(describing: error))"
             )

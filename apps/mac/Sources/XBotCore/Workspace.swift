@@ -50,6 +50,10 @@ public final class Workspace {
     @ObservationIgnored let gitTool: GitTool?
     /// Each project's git, made when first asked for.
     @ObservationIgnored var gitModels: [UUID: ProjectGit] = [:]
+    /// The person's agent history, once the indexer has read it.
+    public internal(set) var history: HistorySummary?
+    public internal(set) var planRunCount = 0
+    @ObservationIgnored let indexer: HistoryIndexer?
     /// Each agent's limits as it last reported them.
     public internal(set) var usage: [HarnessKind: AgentUsage] = [:]
     /// The models each agent offers, read when the agents are found.
@@ -62,9 +66,11 @@ public final class Workspace {
         codexModels: @escaping @Sendable () -> [ModelOption] = { CodexModels.read() },
         codexUsage: @escaping @Sendable () -> RateLimits? = { CodexUsage.latest() },
         defaults: UserDefaults = .standard,
-        gitTool: GitTool? = GitTool.find()
+        gitTool: GitTool? = GitTool.find(),
+        indexer: HistoryIndexer? = nil
     ) {
         self.gitTool = gitTool
+        self.indexer = indexer
         self.store = store
         self.inbox = inbox
         self.discover = discover

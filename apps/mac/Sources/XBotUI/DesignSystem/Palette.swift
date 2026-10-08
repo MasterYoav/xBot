@@ -48,6 +48,12 @@ public enum Palette {
         dynamic(0x6FD6FF, 0x6FD6FF), dynamic(0x2B2F6B, 0x1C1E45),
     ]
 
+    /// The token heatmap: four shades of Claude's clay, light to deep.
+    public static let heat: [Color] = [
+        dynamic(0xF3D3C6, 0x4A2A20), dynamic(0xE9A98F, 0x7A3F2D),
+        dynamic(0xDF8466, 0xB4583D), dynamic(0xC85F3F, 0xE08A6E),
+    ]
+
     // Code
     public static let codeKeyword = dynamic(0xA2456F, 0xE0A0C0)
     public static let codeString = dynamic(0x2F7D4F, 0x8CC8A0)

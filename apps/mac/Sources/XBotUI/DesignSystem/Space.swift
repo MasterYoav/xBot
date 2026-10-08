@@ -58,6 +58,10 @@ public enum Metrics {
     public static let avatarMenu: CGFloat = 36
     public static let avatarLarge: CGFloat = 96
     public static let accountMenuWidth: CGFloat = 288
+    /// The token heatmap: one square a day.
+    public static let heatCell: CGFloat = 9
+    public static let heatGap: CGFloat = 3
+    public static let toolTile: CGFloat = 52
     /// How much of the content height the backdrop covers before it has faded out.
     public static let backdropHeight: CGFloat = 0.62
 }

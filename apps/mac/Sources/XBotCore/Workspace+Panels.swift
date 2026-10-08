@@ -88,3 +88,15 @@ extension Workspace {
         mentionRequest += 1
     }
 }
+
+// MARK: History
+
+extension Workspace {
+    /// One pass of the indexer, then the profile's numbers read again.
+    public func indexHistory() async {
+        guard let indexer else { return }
+        await indexer.index()
+        history = await indexer.summary()
+        planRunCount = attempt { try store.planRuns() } ?? 0
+    }
+}

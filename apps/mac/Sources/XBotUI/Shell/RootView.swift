@@ -80,5 +80,12 @@ public struct RootView: View {
             }
         }
         .task { await workspace.refreshHarnesses() }
+        // The profile's history: read at launch, then every hour.
+        .task {
+            while !Task.isCancelled {
+                await workspace.indexHistory()
+                try? await Task.sleep(for: .seconds(3600))
+            }
+        }
     }
 }
