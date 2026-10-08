@@ -19,7 +19,9 @@ struct ChatView: View {
                             AgentReply(harness: chat.harness, parts: message.parts,
                                        workedFor: workspace.workedFor(message.id, in: chat.id),
                                        sentAt: message.createdAt,
-                                       retry: { workspace.retryLast(in: chat.id) })
+                                       // Only the last reply can be retried: Retry asks the last question again.
+                                       retry: message.id == workspace.messages(in: chat.id).last?.id
+                                           ? { workspace.retryLast(in: chat.id) } : nil)
                         }
                     }
                     if let live = workspace.live[chat.id] {

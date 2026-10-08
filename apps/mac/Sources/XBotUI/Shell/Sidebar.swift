@@ -60,6 +60,13 @@ struct Sidebar: View {
         }
         .padding(.top, Metrics.titleBarInset)
         .background(Palette.sidebar)
+        // The strip by the traffic lights moves the window, as a title bar would.
+        .overlay(alignment: .top) {
+            Color.clear
+                .frame(height: Metrics.titleBarInset)
+                .contentShape(Rectangle())
+                .gesture(WindowDragGesture())
+        }
         .onChange(of: workspace.searchFocusRequest) { searchFocused = true }
     }
 
