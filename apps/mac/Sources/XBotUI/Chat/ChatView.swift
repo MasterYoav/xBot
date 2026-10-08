@@ -4,6 +4,7 @@ import XBotCore
 struct ChatView: View {
     let workspace: Workspace
     let chat: Chat
+    let composer: Namespace.ID
 
     var body: some View {
         VStack(spacing: 0) {

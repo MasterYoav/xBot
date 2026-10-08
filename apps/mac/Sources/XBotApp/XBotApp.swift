@@ -16,7 +16,11 @@ struct XBotApp: App {
                 .frame(minWidth: Metrics.minimumWindow.width, minHeight: Metrics.minimumWindow.height)
         }
         .defaultSize(Metrics.defaultWindow)
+        // Content runs to the top edge, the traffic lights float over the sidebar, and the top bar
+        // is the drag area — the way the apps this one sits beside are built.
+        .windowStyle(.hiddenTitleBar)
         .commands {
+            SidebarCommands()
             CommandGroup(replacing: .appInfo) {
                 Button(String(localized: "About xBot")) { AboutPanel.show() }
             }
@@ -24,14 +28,17 @@ struct XBotApp: App {
                 Button(String(localized: "Check for Updates…")) { appUpdates.checkForUpdates(userInitiated: true) }
             }
             CommandGroup(replacing: .newItem) {
-                Button(String(localized: "New Chat")) { workspace.newChat(in: nil) }
+                Button(String(localized: "New Chat")) { workspace.startDraft(in: nil) }
                     .keyboardShortcut("n", modifiers: .command)
-                    .disabled(workspace.availableHarnesses.isEmpty)
                 Button(String(localized: "Close Tab")) {
                     if let id = workspace.selectedChatID { workspace.close(id) }
                 }
                 .keyboardShortcut("w", modifiers: .command)
                 .disabled(workspace.selectedChatID == nil)
+            }
+            CommandGroup(after: .textEditing) {
+                Button(String(localized: "Search Chats")) { workspace.requestSearchFocus() }
+                    .keyboardShortcut("k", modifiers: .command)
             }
             CommandGroup(replacing: .help) {
                 Button(String(localized: "xBot Documentation")) { NSWorkspace.shared.open(AboutPanel.documentationURL) }
