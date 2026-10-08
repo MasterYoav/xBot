@@ -117,6 +117,8 @@ extension Workspace {
         open(chat.id)
         guard send(text, in: chat.id) else { return false }
         draft.text = ""
+        // The next chat starts from the person's defaults, not from this one's choices.
+        applyDraftDefaults()
         return true
     }
 

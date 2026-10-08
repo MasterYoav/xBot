@@ -100,3 +100,44 @@ extension Workspace {
         planRunCount = attempt { try store.planRuns() } ?? 0
     }
 }
+
+// MARK: Defaults
+
+extension Workspace {
+    /// The agent a new chat starts with; nil means the one used most recently.
+    public var defaultHarness: HarnessKind? {
+        get { defaults.string(forKey: "default.harness").flatMap(HarnessKind.init(rawValue:)) }
+        set {
+            defaults.set(newValue?.rawValue, forKey: "default.harness")
+            draft.harness = newValue
+            draft.model = nil
+        }
+    }
+
+    /// The reasoning a new chat starts with; nil means the agent's own default.
+    public var defaultEffort: Effort? {
+        get { defaults.string(forKey: "default.effort").flatMap(Effort.init(rawValue:)) }
+        set {
+            defaults.set(newValue?.rawValue, forKey: "default.effort")
+            draft.effort = newValue
+        }
+    }
+
+    public var defaultMode: PermissionMode {
+        get { defaults.string(forKey: "default.mode").flatMap(PermissionMode.init(rawValue:)) ?? .editFiles }
+        set {
+            defaults.set(newValue.rawValue, forKey: "default.mode")
+            draft.mode = newValue
+        }
+    }
+
+    func applyDraftDefaults() {
+        draft.harness = defaultHarness
+        draft.model = nil
+        draft.effort = defaultEffort
+        draft.mode = defaultMode
+    }
+
+    /// Where an installed agent's CLI is.
+    public func executable(for kind: HarnessKind) -> URL? { (brains[kind] as? HarnessBrain)?.executable }
+}

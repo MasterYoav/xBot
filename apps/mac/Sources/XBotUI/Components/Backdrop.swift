@@ -16,6 +16,8 @@ public struct Backdrop: View {
     }
 
     let strength: Strength
+    /// Settings › General › Background picture.
+    @AppStorage("showBackdrop") private var show = true
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -26,7 +28,7 @@ public struct Backdrop: View {
 
     public var body: some View {
         GeometryReader { geometry in
-            if let image = Self.image, !reduceTransparency {
+            if let image = Self.image, show, !reduceTransparency {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)

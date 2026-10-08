@@ -80,6 +80,7 @@ public final class Workspace {
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
         usage = attempt { try store.usage() } ?? [:]
+        applyDraftDefaults()
     }
 
     public var availableHarnesses: [HarnessKind] { HarnessKind.allCases.filter { brains[$0] != nil } }

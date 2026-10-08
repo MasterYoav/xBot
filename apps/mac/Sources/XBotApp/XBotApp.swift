@@ -9,6 +9,7 @@ struct XBotApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let appUpdates = SparkleAppUpdateController()
     @State private var workspace = Self.makeWorkspace()
+    @AppStorage("inspectorShown") private var inspectorShown = false
 
     var body: some Scene {
         Window("xBot", id: "main") {
@@ -38,6 +39,10 @@ struct XBotApp: App {
                 .keyboardShortcut("w", modifiers: .command)
                 .disabled(workspace.selectedChatID == nil)
             }
+            CommandGroup(after: .sidebar) {
+                Button(String(localized: "Files and Changes")) { inspectorShown.toggle() }
+                    .keyboardShortcut("0", modifiers: [.command, .option])
+            }
             CommandGroup(after: .windowArrangement) {
                 ForEach(1...9, id: \.self) { number in
                     Button(String(localized: "Tab \(number)")) { workspace.openTab(at: number - 1) }
@@ -51,6 +56,10 @@ struct XBotApp: App {
             CommandGroup(replacing: .help) {
                 Button(String(localized: "xBot Documentation")) { NSWorkspace.shared.open(AboutPanel.documentationURL) }
             }
+        }
+
+        Settings {
+            SettingsView(workspace: workspace)
         }
     }
 

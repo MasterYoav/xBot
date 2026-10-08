@@ -62,6 +62,7 @@ public enum Metrics {
     public static let heatCell: CGFloat = 9
     public static let heatGap: CGFloat = 3
     public static let toolTile: CGFloat = 52
+    public static let settingsWidth: CGFloat = 520
     /// How much of the content height the backdrop covers before it has faded out.
     public static let backdropHeight: CGFloat = 0.62
 }

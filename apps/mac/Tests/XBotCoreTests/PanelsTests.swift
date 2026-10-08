@@ -34,4 +34,25 @@ import Testing
         w.askToMerge()
         #expect(w.draft.text.contains("merge"))
     }
+
+    @Test func defaultsShapeTheNextDraftAndAreRemembered() async {
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        let w = Workspace(store: .inMemory(), inbox: FileManager.default.temporaryDirectory, discover: { [:] }, defaults: defaults)
+        w.defaultMode = .readOnly
+        w.defaultEffort = .high
+        w.defaultHarness = .codex
+        #expect(w.draft.mode == .readOnly && w.draft.effort == .high && w.draft.harness == .codex)
+        let again = Workspace(store: .inMemory(), inbox: FileManager.default.temporaryDirectory, discover: { [:] }, defaults: defaults)
+        #expect(again.draft.mode == .readOnly && again.draft.effort == .high && again.draft.harness == .codex)
+    }
+
+    @Test func aSentDraftStartsOverFromTheDefaults() async throws {
+        let brain = ScriptedBrain([.done])
+        let w = await workspace(brain)
+        w.defaultMode = .readOnly
+        w.draft.mode = .fullAccess
+        w.draft.text = "go"
+        #expect(w.sendDraft())
+        #expect(w.draft.mode == .readOnly)
+    }
 }
