@@ -14,15 +14,15 @@ final class TerminalShells {
     private(set) var titles: [UUID: String] = [:]
     @ObservationIgnored private var views: [UUID: LocalProcessTerminalView] = [:]
     @ObservationIgnored private var watchers: [UUID: Watcher] = [:]
-    /// Windows already closed. A closing window can be drawn once more after it ended; that must
-    /// not start a new shell nobody can see.
+    /// Tabs already closed. A closing tab can be drawn once more after it ended; that must not
+    /// start a new shell nobody can see.
     @ObservationIgnored private var ended: Set<UUID> = []
-    /// Ends a window whose shell exited on its own (`exit`, ⌃D).
-    @ObservationIgnored var closeWindow: (UUID) -> Void = { _ in }
+    /// Closes a tab whose shell exited on its own (`exit`, ⌃D).
+    @ObservationIgnored var closeTab: (UUID) -> Void = { _ in }
 
-    func view(for window: TerminalWindow) -> LocalProcessTerminalView {
+    func view(for window: TerminalTab) -> LocalProcessTerminalView {
         if let view = views[window.id] { return view }
-        let view = LocalProcessTerminalView(frame: CGRect(origin: .zero, size: window.size))
+        let view = LocalProcessTerminalView(frame: CGRect(origin: .zero, size: TerminalDeck.defaultSize))
         if ended.contains(window.id) { return view }
         view.font = NSFont.monospacedSystemFont(ofSize: Metrics.terminalFont, weight: .regular)
         view.nativeBackgroundColor = NSColor(Palette.terminalBackground)
@@ -65,7 +65,7 @@ final class TerminalShells {
 
     fileprivate func exited(_ id: UUID) {
         guard views[id] != nil else { return }
-        closeWindow(id)
+        closeTab(id)
     }
 
     /// The person's login shell, from the password database; zsh if that says nothing.
@@ -116,10 +116,10 @@ final class TerminalShells {
     }
 }
 
-/// SwiftTerm's view, the same instance every time it's shown. Takes the keyboard when its window
+/// SwiftTerm's view, the same instance every time it's shown. Takes the keyboard when its tab
 /// becomes the focused one, not on every redraw (that would pull typing away from the composer).
 struct ShellView: NSViewRepresentable {
-    let window: TerminalWindow
+    let window: TerminalTab
     var focused: Bool
 
     final class Coordinator { var wasFocused = false }

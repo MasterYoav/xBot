@@ -6,86 +6,101 @@ import Testing
     let chat = UUID()
     let folder = URL(filePath: "/tmp")
 
-    @Test func theFirstToggleOpensOneAndShowsIt() {
+    @Test func theFirstToggleOpensAWindowWithOneTab() {
         let deck = TerminalDeck()
         #expect(!deck.isShown(chat))
         deck.toggle(chat, in: folder)
         #expect(deck.isShown(chat))
-        #expect(deck.windows(in: chat).count == 1)
-        #expect(deck.windows(in: chat).first?.directory == folder)
+        #expect(deck.tabs(in: chat).count == 1)
+        #expect(deck.tabs(in: chat).first?.directory == folder)
+        #expect(deck.panel(chat)?.selectedTabID == deck.tabs(in: chat).first?.id)
     }
 
-    /// Hiding keeps the shells: showing again brings back the same windows.
-    @Test func theSecondToggleHidesAndKeepsThem() {
+    /// Hiding keeps the shells: showing again brings back the same tabs.
+    @Test func theSecondToggleHidesAndKeepsTheTabs() {
         let deck = TerminalDeck()
         deck.toggle(chat, in: folder)
-        let first = deck.windows(in: chat)
+        deck.openTab(chat, in: folder)
+        let tabs = deck.tabs(in: chat)
         deck.toggle(chat, in: folder)
         #expect(!deck.isShown(chat))
-        #expect(deck.windows(in: chat) == first)
+        #expect(deck.tabs(in: chat) == tabs)
         deck.toggle(chat, in: folder)
-        #expect(deck.windows(in: chat) == first)
+        #expect(deck.tabs(in: chat) == tabs)
     }
 
-    @Test func eachNewWindowCascadesFromTheLast() {
+    @Test func aNewTabGoesAtTheEndAndIsSelected() {
         let deck = TerminalDeck()
-        let a = deck.open(chat, in: folder)
-        let b = deck.open(chat, in: folder)
-        #expect(b.offset.width < a.offset.width && b.offset.height > a.offset.height)
-        #expect(deck.windows(in: chat).map(\.id) == [a.id, b.id])
+        let a = deck.openTab(chat, in: folder)
+        let b = deck.openTab(chat, in: folder)
+        #expect(deck.tabs(in: chat).map(\.id) == [a.id, b.id])
+        #expect(deck.panel(chat)?.selectedTabID == b.id)
         #expect(b.number == a.number + 1)
+        deck.select(a.id)
+        #expect(deck.panel(chat)?.selectedTabID == a.id)
     }
 
-    @Test func closingEndsItAndTheLastCloseHides() {
+    /// Closing the selected tab selects its neighbour, as the main tabs do; the last one closing
+    /// closes the window.
+    @Test func closingSelectsANeighbourAndTheLastClosesTheWindow() {
         let deck = TerminalDeck()
         var ended: [UUID] = []
         deck.onEnd = { ended.append($0) }
-        let a = deck.open(chat, in: folder)
-        let b = deck.open(chat, in: folder)
-        deck.close(a.id)
-        #expect(ended == [a.id] && deck.isShown(chat))
-        deck.close(b.id)
-        #expect(ended == [a.id, b.id])
-        #expect(!deck.isShown(chat) && deck.windows(in: chat).isEmpty)
+        let a = deck.openTab(chat, in: folder)
+        let b = deck.openTab(chat, in: folder)
+        let c = deck.openTab(chat, in: folder)
+        deck.select(b.id)
+        deck.closeTab(b.id)
+        #expect(deck.panel(chat)?.selectedTabID == c.id)
+        deck.closeTab(c.id)
+        #expect(deck.panel(chat)?.selectedTabID == a.id)
+        deck.closeTab(a.id)
+        #expect(ended == [b.id, c.id, a.id])
+        #expect(!deck.isShown(chat) && deck.panel(chat) == nil)
         deck.toggle(chat, in: folder)
-        #expect(deck.windows(in: chat).count == 1)
+        #expect(deck.tabs(in: chat).count == 1)
     }
 
-    @Test func raisingBringsAWindowToTheFront() {
+    @Test func tabsReorderByDrag() {
         let deck = TerminalDeck()
-        let a = deck.open(chat, in: folder)
-        let b = deck.open(chat, in: folder)
-        deck.raise(a.id)
-        #expect(deck.windows(in: chat).map(\.id) == [b.id, a.id])
+        let a = deck.openTab(chat, in: folder)
+        let b = deck.openTab(chat, in: folder)
+        let c = deck.openTab(chat, in: folder)
+        deck.moveTab(c.id, to: 0)
+        #expect(deck.tabs(in: chat).map(\.id) == [c.id, a.id, b.id])
+        deck.moveTab(c.id, to: 99)
+        #expect(deck.tabs(in: chat).map(\.id) == [a.id, b.id, c.id])
+        #expect(deck.panel(chat)?.selectedTabID == c.id)
     }
 
-    @Test func movesAndResizesAreKeptWithinLimits() {
+    @Test func theWindowMovesAndResizesWithinLimits() {
         let deck = TerminalDeck()
-        let a = deck.open(chat, in: folder)
-        deck.move(a.id, to: CGSize(width: -120, height: 40))
-        #expect(deck.window(a.id)?.offset == CGSize(width: -120, height: 40))
-        deck.resize(a.id, to: CGSize(width: 10, height: 10))
-        #expect(deck.window(a.id)?.size == TerminalDeck.minimumSize)
+        deck.toggle(chat, in: folder)
+        deck.setFrame(chat, offset: CGSize(width: -120, height: 40), size: CGSize(width: 700, height: 420))
+        #expect(deck.panel(chat)?.offset == CGSize(width: -120, height: 40))
+        #expect(deck.panel(chat)?.size == CGSize(width: 700, height: 420))
+        deck.setFrame(chat, offset: .zero, size: CGSize(width: 10, height: 10))
+        #expect(deck.panel(chat)?.size == TerminalDeck.minimumSize)
     }
 
-    @Test func aDeletedChatsWindowsAreEnded() {
+    @Test func aDeletedChatsTabsAreEnded() {
         let deck = TerminalDeck()
         var ended: [UUID] = []
         deck.onEnd = { ended.append($0) }
-        let a = deck.open(chat, in: folder)
+        let a = deck.openTab(chat, in: folder)
         let other = UUID()
-        let b = deck.open(other, in: folder)
+        let b = deck.openTab(other, in: folder)
         deck.closeAll(chat)
         #expect(ended == [a.id])
-        #expect(deck.windows(in: other).map(\.id) == [b.id])
+        #expect(deck.tabs(in: other).map(\.id) == [b.id])
         #expect(!deck.isShown(chat))
     }
 
-    @Test func chatsDontSeeEachOthersWindows() {
+    @Test func chatsDontSeeEachOthersTerminals() {
         let deck = TerminalDeck()
         deck.toggle(chat, in: folder)
         let other = UUID()
-        #expect(!deck.isShown(other) && deck.windows(in: other).isEmpty)
+        #expect(!deck.isShown(other) && deck.tabs(in: other).isEmpty)
     }
 
     @Test func theWorkspaceOpensTerminalsInTheChatsFolderAndEndsThemWithIt() async throws {
@@ -95,10 +110,11 @@ import Testing
         let project = w.addProject(at: FileManager.default.temporaryDirectory)
         let chat = try #require(w.newChat(in: project.id))
         w.toggleTerminals(in: chat.id)
-        #expect(w.terminals.windows(in: chat.id).first?.directory == project.url)
+        w.openTerminal(in: chat.id)
+        #expect(w.terminals.tabs(in: chat.id).allSatisfy { $0.directory == project.url })
         var ended: [UUID] = []
         w.terminals.onEnd = { ended.append($0) }
         _ = w.deleteChat(chat.id)
-        #expect(ended.count == 1)
+        #expect(ended.count == 2)
     }
 }

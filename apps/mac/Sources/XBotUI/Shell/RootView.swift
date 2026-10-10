@@ -64,7 +64,7 @@ public struct RootView: View {
                                     ChatView(workspace: workspace, chat: chat, composer: composer).id(chat.id)
                                         .overlay {
                                             if workspace.terminals.isShown(chat.id) {
-                                                TerminalLayer(workspace: workspace, chatID: chat.id).id(chat.id)
+                                                TerminalWindowView(workspace: workspace, chatID: chat.id).id(chat.id)
                                             }
                                         }
                                         .overlay(alignment: .bottomTrailing) {
@@ -103,7 +103,7 @@ public struct RootView: View {
             // The deck decides when a shell ends; a shell that exits on its own closes its window.
             let deck = workspace.terminals
             deck.onEnd = { TerminalShells.shared.end($0) }
-            TerminalShells.shared.closeWindow = { deck.close($0) }
+            TerminalShells.shared.closeTab = { deck.closeTab($0) }
         }
         // The profile's history: read at launch, then every hour.
         .task {

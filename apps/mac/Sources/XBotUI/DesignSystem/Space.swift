@@ -77,6 +77,10 @@ public enum Metrics {
     /// Terminal windows: their title bar, and the shell's type size.
     public static let terminalTitleBar: CGFloat = 30
     public static let terminalFont: CGFloat = 12
+    public static let terminalTabMinWidth: CGFloat = 110
+    public static let terminalTabMaxWidth: CGFloat = 180
+    /// How far into a floating window's edge a resize can start.
+    public static let resizeGrip: CGFloat = 6
     /// Agents: the page, and the editor sheet.
     public static let agentsWidth: CGFloat = 1040
     public static let agentEditorWidth: CGFloat = 720
