@@ -30,7 +30,7 @@ public struct RootView: View {
             // sidebar moved while it was open.
             HStack(spacing: 0) {
                 ZStack(alignment: .top) {
-                    Backdrop(workspace.isHome ? .home : .chat)
+                    Backdrop(workspace.isHome && workspace.page == .main ? .home : .chat)
                     VStack(spacing: 0) {
                         TopBar(workspace: workspace, sidebarVisible: columns != .detailOnly,
                                showSidebar: { withAnimation(Motion.panel) { columns = .all } },
@@ -53,6 +53,10 @@ public struct RootView: View {
                                 }
                             case .profile:
                                 ProfileView(workspace: workspace)
+                            case .abilities:
+                                AbilitiesView(workspace: workspace)
+                            case .notes:
+                                NotesView(workspace: workspace, addProject: { addingProject = true })
                             case .main:
                                 if let id = workspace.selectedChatID, let chat = workspace.chat(id) {
                                     ChatView(workspace: workspace, chat: chat, composer: composer).id(chat.id)

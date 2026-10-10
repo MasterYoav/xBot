@@ -1,7 +1,7 @@
 import SwiftUI
 import XBotCore
 
-/// Search, Home and Inbox, projects with their chats, Recent, and the account button.
+/// Search, Abilities, Notes and Inbox, projects with their chats, Recent, and the account button.
 struct Sidebar: View {
     let workspace: Workspace
     let addProject: () -> Void
@@ -26,8 +26,13 @@ struct Sidebar: View {
             search
             ScrollView {
                 VStack(alignment: .leading, spacing: 1) {
-                    Button { workspace.goHome() } label: {
-                        SidebarRow(String(localized: "Home"), systemImage: "house", isSelected: workspace.isHome)
+                    Button { workspace.showAbilities() } label: {
+                        SidebarRow(String(localized: "Abilities"), systemImage: "square.stack.3d.up",
+                                   isSelected: workspace.page == .abilities)
+                    }
+                    .buttonStyle(.plain)
+                    Button { workspace.showNotes() } label: {
+                        SidebarRow(String(localized: "Notes"), systemImage: "note.text", isSelected: workspace.page == .notes)
                     }
                     .buttonStyle(.plain)
                     Button { inboxOpen.toggle() } label: {

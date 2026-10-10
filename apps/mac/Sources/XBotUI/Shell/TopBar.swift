@@ -41,6 +41,10 @@ struct TopBar: View {
                         .gesture(reorder(id))
                 }
             }
+            // A new chat before its first message is a tab of its own (Home's old place).
+            if workspace.isHome && workspace.page == .main && !workspace.availableHarnesses.isEmpty {
+                DraftTab()
+            }
             IconButton("plus", help: String(localized: "New chat (⌘N)")) {
                 workspace.startDraft(in: workspace.selectedChatID.flatMap { workspace.chat($0)?.projectID })
             }
@@ -95,6 +99,23 @@ struct TopBar: View {
             }
     }
 
+    private struct DraftTab: View {
+        var body: some View {
+            HStack(spacing: Space.s) {
+                Image(systemName: "square.and.pencil").imageScale(.small).foregroundStyle(Palette.textTertiary)
+                Text(String(localized: "New chat")).font(Typography.chip).foregroundStyle(Palette.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Space.s)
+            .frame(minWidth: Metrics.tabMinWidth, maxWidth: Metrics.tabMaxWidth, maxHeight: .infinity)
+            .background(RoundedRectangle(cornerRadius: Radius.small, style: .continuous).fill(Palette.tabSelected))
+            .padding(.vertical, Space.xs)
+            .padding(.horizontal, Space.xxs)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isSelected)
+        }
+    }
+
     private struct Tab: View {
         let workspace: Workspace
         let chat: Chat
@@ -103,7 +124,8 @@ struct TopBar: View {
         @State private var hovering = false
 
         var body: some View {
-            let selected = workspace.selectedChatID == chat.id
+            // Selected only while its chat is what the window shows, not under Abilities or Notes.
+            let selected = workspace.selectedChatID == chat.id && workspace.page == .main
             HStack(spacing: Space.s) {
                 // Room for the ×, which is laid over the tab rather than inside it: inside, a click
                 // on it reached the tab's own tap as well, which reopened the chat it had just closed.
