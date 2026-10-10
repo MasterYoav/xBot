@@ -1,0 +1,9 @@
+Checking MCP server health…
+
+claude.ai Claude Docs: https://api.anthropic.com/v1/pages/mcp - ✔ Connected
+claude.ai Higgsfield.ai MCP: https://mcp.higgsfield.ai/mcp - ! Needs authentication
+claude.ai Zoom for Claude: https://mcp.zoom.us/mcp/zoom/streamable - ✔ Connected
+claude.ai Supabase: https://mcp.supabase.com/mcp - ✔ Connected
+claude.ai Gmail: https://gmailmcp.googleapis.com/mcp/v1 - ✔ Connected
+tokensave: /Users/me/.local/bin/tokensave serve - ✘ Failed to connect — CONNECTION_CLOSED: Connection closed
+headroom: /Users/me/.local/bin/headroom mcp serve - ✔ Connected
