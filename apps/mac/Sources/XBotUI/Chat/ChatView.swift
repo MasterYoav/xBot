@@ -44,6 +44,9 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity)
             }
             .defaultScrollAnchor(.bottom)
+            .environment(\.runInTerminal, { [workspace, id = chat.id] command in
+                withAnimation(.spring(duration: 0.3, bounce: 0)) { workspace.runInTerminal(command, in: id) }
+            })
             PlanStatusBar(workspace: workspace, chatID: chat.id)
             Composer(workspace: workspace, target: .chat(chat.id), namespace: composer, addProject: {})
                 .frame(maxWidth: Metrics.readingWidth)

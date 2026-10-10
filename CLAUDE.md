@@ -155,8 +155,9 @@ inject the storage rather than serialise the suites, so **run a suspect suite te
 - **Swift 6 language mode, strict concurrency.** Actors for anything touching the runtime or the
   network. `@MainActor` on view models.
 - **Observation (`@Observable`), not `ObservableObject`.** macOS 26 is the floor.
-- **No third-party UI frameworks.** SwiftUI and AppKit interop only. Sparkle is the one exception,
-  for updates.
+- **No third-party UI frameworks.** SwiftUI and AppKit interop only. Two exceptions: Sparkle, for
+  updates, and SwiftTerm (1.20.x), for the in-app terminal: a terminal that can't run vim or the
+  agents' own TUIs isn't one (approved 2026-10-10, see the in-app terminal spec).
 - **Views are dumb.** A view renders state and sends intents. Business logic lives in
   `XBotCore`/`XBotBrain`. If a view has a `URLSession` or a `Process` in it, that is a bug.
 - **Every string the user reads goes through `String(localized:)`.** Even in v1 when English is

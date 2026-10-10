@@ -11,6 +11,8 @@ public enum Palette {
     public static let sidebar = dynamic(0xF0F0EE, 0x191919)
     public static let raised = dynamic(0xFFFFFF, 0x262626)
     public static let inset = dynamic(0xF2F2F0, 0x202020)
+    /// Behind a terminal's text: a shade deeper than the chat, light or dark.
+    public static let terminalBackground = dynamic(0xFBFBFA, 0x151515)
     public static let hairline = dynamic(0x000000, 0xFFFFFF, alpha: (0.08, 0.08))
     public static let hover = dynamic(0x000000, 0xFFFFFF, alpha: (0.04, 0.05))
 
