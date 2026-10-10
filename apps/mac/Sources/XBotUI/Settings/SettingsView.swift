@@ -1,7 +1,7 @@
 import SwiftUI
 import XBotCore
 
-/// The Settings window (⌘,): how new chats start, the agents found, and about xBot.
+/// The Settings window (⌘,): how new chats start, how xBot looks, the agents found, and about xBot.
 public struct SettingsView: View {
     let workspace: Workspace
 
@@ -11,6 +11,8 @@ public struct SettingsView: View {
         TabView {
             GeneralSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "General"), systemImage: "gearshape") }
+            AppearanceSettings()
+                .tabItem { Label(String(localized: "Appearance"), systemImage: "paintpalette") }
             AgentSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Agents"), systemImage: "cpu") }
             AboutSettings()
@@ -22,7 +24,6 @@ public struct SettingsView: View {
 
 private struct GeneralSettings: View {
     let workspace: Workspace
-    @AppStorage("showBackdrop") private var showBackdrop = true
     // Local copies: the defaults live in UserDefaults, which observation does not see.
     @State private var harness: HarnessKind?
     @State private var effort: Effort?
@@ -30,7 +31,6 @@ private struct GeneralSettings: View {
 
     var body: some View {
         Form {
-            Toggle(String(localized: "Background picture"), isOn: $showBackdrop)
             Picker(String(localized: "Default agent"), selection: $harness) {
                 Text(String(localized: "Most recent")).tag(HarnessKind?.none)
                 ForEach(HarnessKind.allCases, id: \.self) { Text($0.displayName).tag(HarnessKind?.some($0)) }
