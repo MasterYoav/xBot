@@ -74,6 +74,9 @@ public enum Metrics {
     /// Browse and other large sheets.
     public static let sheetWidth: CGFloat = 640
     public static let sheetHeight: CGFloat = 560
+    /// Terminal windows: their title bar, and the shell's type size.
+    public static let terminalTitleBar: CGFloat = 30
+    public static let terminalFont: CGFloat = 12
     /// Agents: the page, and the editor sheet.
     public static let agentsWidth: CGFloat = 1040
     public static let agentEditorWidth: CGFloat = 720
