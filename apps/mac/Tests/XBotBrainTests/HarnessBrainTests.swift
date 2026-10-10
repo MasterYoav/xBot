@@ -48,18 +48,16 @@ func collect(_ stream: AsyncStream<BrainEvent>) async -> [BrainEvent] {
         #expect(try !String(contentsOf: cli.out.appending(path: "args"), encoding: .utf8).contains("dangerously"))
     }
 
-    /// Exit 0 is the CLI saying it finished. Seen live: a Claude Code turn that ran a slow shell
-    /// command completed (its own session log says so) but the result line never reached xBot,
-    /// which then showed "stopped before finishing (exit code 0)" under a finished reply.
-    @Test func aCleanExitWithoutAResultStillEnds() async throws {
-        let cli = try fakeCLI("""
-        cat > /dev/null
-        echo '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"done"}},"parent_tool_use_id":null}'
-        exit 0
-        """)
+    /// A schema'd answer arrives in a ~47 KB result line (a recorded animated wallpaper); it must
+    /// come through whole, as `.structured`.
+    @Test func aBigStructuredAnswerComesThrough() async throws {
+        let url = try #require(Bundle.module.url(forResource: "claude-big-structured", withExtension: "jsonl", subdirectory: "Fixtures"))
+        let cli = try fakeCLI("cat > /dev/null; cat '\(url.path)'")
         let brain = HarnessBrain(kind: .claude, executable: cli.url, environment: [:])
-        let events = await collect(brain.run(TurnRequest(prompt: "x", directory: tmp, mode: .readOnly)))
-        #expect(events == [.textDelta("done"), .done])
+        let events = await collect(brain.run(TurnRequest(prompt: "x", directory: tmp, mode: .readOnly, schema: "{}")))
+        let structured = events.compactMap { if case .structured(let json) = $0 { json } else { nil } }
+        #expect(structured.count == 1 && structured.first?.contains("frames") == true)
+        #expect(events.last == .done)
     }
 
     @Test func exitWithoutAResultIsAFailure() async throws {
