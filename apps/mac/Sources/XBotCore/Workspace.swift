@@ -17,6 +17,15 @@ public final class Workspace {
     /// Connectors, plugins, skills and MCP servers, read from the agents' own CLIs.
     @ObservationIgnored public private(set) lazy var abilities: AbilityCatalog = makeAbilities()
     @ObservationIgnored var projectNotes: [UUID: ProjectNotes] = [:]
+    /// The crew, in their order. HeadMaster first.
+    public internal(set) var agents: [Agent] = []
+    /// When each agent last finished a turn, and when the person last looked: Done in between.
+    /// Set to ask the Agents page to open the editor on a new member; the page clears it.
+    public var wantsToHire = false
+    var agentFinishedAt: [UUID: Date] = [:]
+    var agentSeenAt: [UUID: Date] = [:]
+    /// A handed-off chat → HeadMaster's chat that handed it, to report back to.
+    var handoffOrigins: [UUID: UUID] = [:]
     /// The reply being written right now, per chat. Saved as a message when the turn ends.
     public private(set) var live: [UUID: [Part]] = [:]
     /// True until the installed CLIs have been looked for. Nothing claims one is missing before then.
@@ -84,6 +93,7 @@ public final class Workspace {
         self.defaults = defaults
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
+        agents = attempt { try store.agents() } ?? []
         usage = attempt { try store.usage() } ?? [:]
         applyDraftDefaults()
     }
@@ -157,6 +167,7 @@ public final class Workspace {
         if !openChatIDs.contains(id) { openChatIDs.append(id) }
         selectedChatID = id
         page = .main
+        if let agentID = chat(id)?.agentID { agentSeenAt[agentID] = .now }
     }
 
     /// Moves an open tab to `index` among the open tabs (clamped to the ends): a tab dragged along
@@ -262,7 +273,8 @@ public final class Workspace {
 
         let request = TurnRequest(
             prompt: turnPrompt, directory: directory(for: chat), model: turnModel(for: chat),
-            mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort
+            mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort,
+            instructions: instructions(for: chat)
         )
         live[id] = []
         let harness = chat.harness
@@ -331,8 +343,17 @@ public final class Workspace {
             tool.isError = true
             return .tool(tool)
         }
-        if stopped { parts.append(.notice(String(localized: "Stopped."))) }
+        if stopped {
+            parts.append(.notice(String(localized: "Stopped.")))
+        } else {
+            parts += handOff(from: id, reply: parts)
+        }
         if !parts.isEmpty { save(ChatMessage(chatID: id, role: .assistant, parts: parts)) }
+        if !stopped { reportBack(from: id, reply: parts) }
+        if let agentID = chat(id)?.agentID {
+            agentFinishedAt[agentID] = .now
+            if selectedChatID == id && page == .main { agentSeenAt[agentID] = .now }
+        }
         update(id) { $0.updatedAt = .now }
     }
 
