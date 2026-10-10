@@ -14,7 +14,10 @@ struct ChatView: View {
                         if let plan = message.plan {
                             PlanView(workspace: workspace, chatID: chat.id, messageID: message.id, plan: plan)
                         } else if message.role == .user {
-                            UserMessage(parts: message.parts)
+                            UserMessage(parts: message.parts, sentAt: message.createdAt,
+                                        resend: workspace.isRunning(chat.id) ? nil : { text in
+                                            workspace.resend(message.id, as: text, in: chat.id)
+                                        })
                         } else {
                             AgentReply(harness: chat.harness, parts: message.parts,
                                        workedFor: workspace.workedFor(message.id, in: chat.id),
