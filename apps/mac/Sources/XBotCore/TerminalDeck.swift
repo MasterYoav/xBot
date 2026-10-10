@@ -33,6 +33,10 @@ public final class TerminalDeck {
     private var counters: [UUID: Int] = [:]
     /// A tab was closed, or its chat went: end its shell.
     @ObservationIgnored public var onEnd: (UUID) -> Void = { _ in }
+    /// Type a command into a tab's shell and press Return.
+    @ObservationIgnored public var onRun: (UUID, String) -> Void = { _, _ in }
+    /// Whether a tab's shell is running something (not at its prompt).
+    @ObservationIgnored public var isBusy: (UUID) -> Bool = { _ in false }
 
     public init() {}
 
@@ -54,6 +58,11 @@ public final class TerminalDeck {
             if tabs(in: chatID).isEmpty { openTab(chatID, in: directory) }
             shown.insert(chatID)
         }
+    }
+
+    /// Shows the chat's terminal if it has one; leaves it alone if it doesn't.
+    public func showTerminal(_ chatID: UUID) {
+        if panels[chatID] != nil { shown.insert(chatID) }
     }
 
     /// A new tab at the end, selected; the window is shown.

@@ -42,6 +42,38 @@ final class TerminalShells {
         return view
     }
 
+    /// Types `command` into the tab's shell and presses Return. A tab that hasn't been drawn yet
+    /// gets its shell now; the pty holds the keystrokes until the shell reads them.
+    func run(_ command: String, in tab: TerminalTab) {
+        let view = view(for: tab)
+        // Return, not newline, ends a line typed at a terminal; each line runs in turn.
+        let typed = command.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\n", with: "\r") + "\r"
+        Task { @MainActor in
+            // A shell just started hasn't drawn its prompt yet, and keys typed before it get echoed
+            // twice. Wait (briefly) for the prompt: the cursor leaves the top-left corner.
+            for _ in 0..<60 {
+                let buffer = view.getTerminal().buffer
+                if buffer.x > 0 || buffer.y > 0 { break }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            if !(buffer(of: view).x == 0 && buffer(of: view).y == 0) {
+                try? await Task.sleep(for: .milliseconds(120))
+            }
+            guard self.views[tab.id] === view else { return }
+            view.process.send(data: ArraySlice(Array(typed.utf8)))
+        }
+    }
+
+    private func buffer(of view: LocalProcessTerminalView) -> Buffer { view.getTerminal().buffer }
+
+    /// Whether the tab's shell has handed the terminal to a program (vim, a build, a server): the
+    /// terminal's foreground process group is no longer the shell's own.
+    func isBusy(_ id: UUID) -> Bool {
+        guard let process = views[id]?.process, process.childfd >= 0, process.shellPid > 0 else { return false }
+        let foreground = tcgetpgrp(process.childfd)
+        return foreground > 0 && foreground != process.shellPid
+    }
+
     /// The window was closed or its chat deleted: stop the shell, forget the view.
     func end(_ id: UUID) {
         ended.insert(id)

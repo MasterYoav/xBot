@@ -27,6 +27,17 @@ Revised 2026-10-10: one window with tabs replaced several free-floating windows.
 - The Metal toolchain (`xcodebuild -downloadComponent MetalToolchain`) is needed to build, since
   SwiftTerm compiles a shader; CI downloads it.
 
+## Run from a reply
+
+Shell code blocks in a chat's replies (`bash`, `sh`, `zsh`, `shell`, `console`, `terminal`,
+`fish`) have a **Run** button beside Copy. It types the command into the chat's terminal and presses
+Return: in the selected tab if its shell is at a prompt, else in a new tab, so it never types into
+vim or a running job (busy = the terminal's foreground process group isn't the shell's). It opens
+the terminal if the chat has none, and shows it if hidden. In a transcript (`$ ` or `% ` lines) only
+the prompted lines run; the rest is output. Untagged and other-language blocks don't get Run: they
+are as often output as commands. Nothing runs without the click. Into a shell that has just
+started, the keys wait for its prompt, or they would be echoed twice.
+
 ## How
 
 - **SwiftTerm** (MIT, Miguel de Icaza) is the emulator: `LocalProcessTerminalView` runs the
