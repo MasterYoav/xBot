@@ -4,6 +4,7 @@ import XBotCore
 /// The Agents page: the workplace, then what the crew is doing.
 struct AgentsView: View {
     let workspace: Workspace
+    var stageBottomChanged: (CGFloat) -> Void = { _ in }
     @State private var editing: AgentDraft?
 
     var body: some View {
@@ -11,6 +12,9 @@ struct AgentsView: View {
             VStack(alignment: .leading, spacing: Space.l) {
                 header
                 WorkplaceScene(workspace: workspace, edit: { editing = AgentDraft($0, isNew: false) })
+                    .onGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.frame(in: .named("workplaceBackdrop")).maxY
+                    } action: { stageBottomChanged($0) }
                 TimelineView(.periodic(from: .now, by: 1)) { _ in
                     cards
                 }
@@ -38,6 +42,18 @@ struct AgentsView: View {
                     .bodyText().foregroundStyle(Palette.textSecondary)
             }
             Spacer()
+            Picker(String(localized: "World"), selection: Binding(
+                get: { workspace.workplace },
+                set: { world in withAnimation(Motion.standard) { workspace.workplace = world } }
+            )) {
+                ForEach(WorkplaceSetting.allCases, id: \.self) { world in
+                    Label(world.title, systemImage: world.symbol).tag(world)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel(String(localized: "World"))
+            .fixedSize()
+            .help(String(localized: "Where your crew lives"))
             Button {
                 editing = AgentDraft(workspace.hire(), isNew: true)
             } label: {
@@ -45,6 +61,8 @@ struct AgentsView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
         }
+        .padding(Space.m)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.medium, style: .continuous))
     }
 
     // MARK: Cards

@@ -9,6 +9,7 @@ public struct RootView: View {
     @AppStorage("inspectorShown") private var inspectorShown = false
     @AppStorage("inspectorWidth") private var inspectorWidth = Double(Metrics.inspectorIdealWidth)
     @State private var dragStartWidth: Double?
+    @State private var worldStageBottom: CGFloat = 480
     @Namespace private var composer
 
     public init(workspace: Workspace) { self.workspace = workspace }
@@ -30,7 +31,11 @@ public struct RootView: View {
             // sidebar moved while it was open.
             HStack(spacing: 0) {
                 ZStack(alignment: .top) {
-                    Backdrop(workspace.isHome && workspace.page == .main ? .home : .chat)
+                    if Self.usesWallpaper(on: workspace.page) {
+                        Backdrop(workspace.isHome && workspace.page == .main ? .home : .chat)
+                    } else {
+                        WorkplaceBackdrop(setting: workspace.workplace, stageBottom: worldStageBottom)
+                    }
                     VStack(spacing: 0) {
                         TopBar(workspace: workspace, sidebarVisible: columns != .detailOnly,
                                showSidebar: { withAnimation(Motion.panel) { columns = .all } },
@@ -54,7 +59,7 @@ public struct RootView: View {
                             case .profile:
                                 ProfileView(workspace: workspace)
                             case .agents:
-                                AgentsView(workspace: workspace)
+                                AgentsView(workspace: workspace, stageBottomChanged: { worldStageBottom = $0 })
                             case .abilities:
                                 AbilitiesView(workspace: workspace)
                             case .notes:
@@ -80,6 +85,7 @@ public struct RootView: View {
                         .belowTitleBar()
                     }
                 }
+                .coordinateSpace(name: "workplaceBackdrop")
                 if showsInspector, let project = workspace.contextProject {
                     inspectorHandle
                     InspectorView(workspace: workspace, project: project)
@@ -119,6 +125,9 @@ public struct RootView: View {
     }
 
     private var showsInspector: Bool { inspectorShown && workspace.contextProject != nil }
+
+    /// Agents owns its environment; Appearance's wallpaper is for the other tabs.
+    static func usesWallpaper(on page: Page) -> Bool { page != .agents }
 
     /// The hairline between the content and the column; drag it to resize the column.
     private var inspectorHandle: some View {
