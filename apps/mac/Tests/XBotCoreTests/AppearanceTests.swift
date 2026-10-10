@@ -82,4 +82,21 @@ import Testing
         defaults.set("Some Font Nobody Has", forKey: "fontFamily")
         #expect(Appearance(defaults: defaults, folder: folder, installedFamilies: { ["Avenir"] }).fontFamily == nil)
     }
+
+    @Test func theAppIconIsInkUntilAnotherIsChosenAndThenKept() {
+        let (defaults, folder) = fresh()
+        let a = Appearance(defaults: defaults, folder: folder)
+        #expect(a.appIcon == .ink)
+        #expect(a.appIcon.isDefault)
+        a.appIcon = .plum
+        #expect(Appearance(defaults: defaults, folder: folder).appIcon == .plum)
+        defaults.set("a colour from a later version", forKey: "appIcon")
+        #expect(Appearance(defaults: defaults, folder: folder).appIcon == .ink)
+    }
+
+    /// The names match the variants scripts/generate-app-icon.sh compiles from xBot.icon.
+    @Test func everyAppIconHasAResourceName() {
+        #expect(Appearance.AppIcon.allCases.map(\.rawValue) == ["ink", "rose", "sunset", "plum"])
+    }
 }
+

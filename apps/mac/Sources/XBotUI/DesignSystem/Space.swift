@@ -65,6 +65,8 @@ public enum Metrics {
     public static let settingsWidth: CGFloat = 520
     /// A wallpaper choice in Settings › Appearance: the window's proportions, small.
     public static let wallpaperThumb = CGSize(width: 96, height: 60)
+    /// An app icon choice in Settings › Appearance.
+    public static let appIconChoice: CGFloat = 64
     /// How much of the content height the backdrop covers before it has faded out.
     public static let backdropHeight: CGFloat = 0.62
 }
