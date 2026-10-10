@@ -11,7 +11,7 @@ public struct SettingsView: View {
         TabView {
             GeneralSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "General"), systemImage: "gearshape") }
-            AppearanceSettings()
+            AppearanceSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Appearance"), systemImage: "paintpalette") }
             AgentSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Agents"), systemImage: "cpu") }

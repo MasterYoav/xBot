@@ -37,6 +37,8 @@ public final class Appearance {
         case desktop
         /// A picture of their own, copied into xBot's folder.
         case custom(URL)
+        /// Text art an agent drew, still or moving, saved as JSON in xBot's folder.
+        case ascii(URL)
         case none
     }
 
@@ -69,6 +71,8 @@ public final class Appearance {
             case .custom(let url):
                 defaults.set("custom", forKey: Keys.wallpaper)
                 defaults.set(url.lastPathComponent, forKey: Keys.customFile)
+            case .ascii:
+                defaults.set("ascii", forKey: Keys.wallpaper)
             }
         }
     }
@@ -111,6 +115,9 @@ public final class Appearance {
             } else {
                 wallpaper = .sunset
             }
+        case "ascii":
+            let file = folder.appending(path: Self.asciiFile)
+            wallpaper = FileManager.default.fileExists(atPath: file.path) ? .ascii(file) : .sunset
         case "sunset": wallpaper = .sunset
         default:
             wallpaper = defaults.object(forKey: Keys.legacyBackdrop) as? Bool == false ? .none : .sunset
@@ -122,6 +129,20 @@ public final class Appearance {
             fontFamily = nil
         }
     }
+
+    static let asciiFile = "wallpaper-ascii.json"
+
+    /// Saves drawn art into xBot's folder and makes it the wallpaper.
+    public func useAscii(_ art: AsciiArt) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appending(path: Self.asciiFile)
+        try JSONEncoder().encode(art).write(to: file, options: .atomic)
+        asciiRevision += 1
+        wallpaper = .ascii(file)
+    }
+
+    /// Bumped when new art is saved under the same file name, so the backdrop reloads it.
+    public private(set) var asciiRevision = 0
 
     /// Copies the picture into xBot's folder and uses the copy. The original can then move or go.
     public func useCustomPicture(at url: URL) throws {
