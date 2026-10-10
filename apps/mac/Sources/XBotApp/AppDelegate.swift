@@ -59,8 +59,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     while let v = view, chain.count < 4 { chain.append(String(describing: type(of: v))); view = v.superview }
                     return "hit x=\(Int(x)): " + chain.joined(separator: " < ")
                 }
+                // Every AppKit scroll view, in window coordinates: one reaching into the title bar row
+                // sits above the SwiftUI top bar and takes its clicks.
+                var scrollViews: [String] = []
+                func collect(_ view: NSView) {
+                    if view is NSScrollView {
+                        scrollViews.append("scroll: \(view.convert(view.bounds, to: nil))")
+                    }
+                    view.subviews.forEach(collect)
+                }
+                collect(frame)
                 try? (["window: \(window.frame)", "content: \(String(describing: window.contentView?.frame))",
-                       "contentLayoutRect: \(window.contentLayoutRect)"] + buttons + hits)
+                       "contentLayoutRect: \(window.contentLayoutRect)"] + buttons + scrollViews + hits)
                     .joined(separator: "\n").write(toFile: path + ".txt", atomically: true, encoding: .utf8)
             }
             NSApp.terminate(nil)
