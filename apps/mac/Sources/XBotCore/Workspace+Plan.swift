@@ -90,7 +90,8 @@ extension Workspace {
     private func requestPlan(_ prompt: String, chat: Chat, brain: any Brain, messageID: UUID) {
         let request = TurnRequest(
             prompt: Self.planningPrompt(prompt), directory: directory(for: chat), model: turnModel(for: chat),
-            mode: .readOnly, resumeID: chat.sessionID, effort: chat.effort, schema: PlanSchemas.plan, planning: true
+            mode: .readOnly, resumeID: chat.sessionID, effort: chat.effort, schema: PlanSchemas.plan, planning: true,
+            instructions: instructions(for: chat)
         )
         let chatID = chat.id
         planTurns[chatID] = messageID
@@ -147,7 +148,8 @@ extension Workspace {
             }
             let request = TurnRequest(
                 prompt: Self.stepPrompt(plan.steps, index), directory: directory(for: chat), model: turnModel(for: chat),
-                mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort, schema: PlanSchemas.step
+                mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort, schema: PlanSchemas.step,
+                instructions: instructions(for: chat)
             )
             var answer: String?
             var failure: String?
@@ -197,7 +199,8 @@ extension Workspace {
         guard turns[chatID]?.token == token, let chat = chat(chatID) else { return }
         var closing = ""
         let request = TurnRequest(prompt: Self.closingPrompt, directory: directory(for: chat), model: turnModel(for: chat),
-                                  mode: .readOnly, resumeID: chat.sessionID, effort: chat.effort)
+                                  mode: .readOnly, resumeID: chat.sessionID, effort: chat.effort,
+                                  instructions: instructions(for: chat))
         for await event in events(brain, request, harness: chat.harness) {
             guard turns[chatID]?.token == token else { return }
             switch event {

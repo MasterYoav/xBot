@@ -109,17 +109,25 @@ struct AgentReply: View {
     var isLive = false
     var sentAt: Date?
     var retry: (() -> Void)?
+    /// The crew member this chat is with: the reply is theirs, under their face and name.
+    var agent: Agent?
+    /// The crew, so hand-off notices show as cards with the member's face; and how to open theirs.
+    var crew: [Agent] = []
+    var openAgent: ((UUID) -> Void)?
     @State private var hovering = false
     @State private var copied = false
 
+    private var who: String { agent?.name ?? harness.displayName }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            header
+            // A note on its own (a member reporting back) is not a reply: no "worked for".
+            if !parts.allSatisfy({ if case .notice = $0 { true } else { false } }) || isLive { header }
             ForEach(Array(ReplyLayout.segments(parts).enumerated()), id: \.offset) { _, segment in
                 switch segment {
-                case .text(let text): MarkdownText(text: text)
+                case .text(let text): MarkdownText(text: agent == nil ? text : Handoff.stripping(text))
                 case .tools(let tools): ToolFold(tools: tools, isLive: isLive)
-                case .notice(let text): Text(text).captionText().foregroundStyle(Palette.textTertiary)
+                case .notice(let text): notice(text)
                 case .failure(let reason): FailureCallout(reason: reason, retry: isLive ? nil : retry)
                 }
             }
@@ -133,16 +141,62 @@ struct AgentReply: View {
         .motion(Motion.quick, value: hovering)
     }
 
+    @ViewBuilder
+    private func notice(_ text: String) -> some View {
+        if let (member, handed, rest) = handoff(text) {
+            Button { openAgent?(member.id) } label: {
+                HStack(spacing: Space.s) {
+                    AgentFace(agent: member, size: 26)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(handed ? String(localized: "Handed to \(member.name)") : String(localized: "\(member.name) finished"))
+                            .emphasisText().foregroundStyle(Palette.textPrimary)
+                        Text(rest).captionText().foregroundStyle(Palette.textSecondary).lineLimit(1)
+                    }
+                    Spacer(minLength: Space.s)
+                    Text(String(localized: "Open")).captionText().foregroundStyle(Palette.textTertiary)
+                    Image(systemName: "arrow.up.right").imageScale(.small).foregroundStyle(Palette.textTertiary)
+                }
+                .padding(.horizontal, Space.m)
+                .padding(.vertical, Space.s)
+                .frame(maxWidth: 460, alignment: .leading)
+                .background(Palette.raised, in: RoundedRectangle(cornerRadius: Radius.medium, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.medium, style: .continuous).strokeBorder(
+                    handed ? Palette.hairline : Palette.success.opacity(0.5)))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(openAgent == nil)
+        } else {
+            Text(text).captionText().foregroundStyle(Palette.textTertiary)
+        }
+    }
+
+    private func handoff(_ text: String) -> (Agent, Bool, String)? {
+        for member in crew {
+            if text.hasPrefix(Handoff.handedPrefix(member.name)) {
+                return (member, true, String(text.dropFirst(Handoff.handedPrefix(member.name).count)))
+            }
+            if text.hasPrefix(Handoff.finishedPrefix(member.name)) {
+                return (member, false, String(text.dropFirst(Handoff.finishedPrefix(member.name).count)))
+            }
+        }
+        return nil
+    }
+
     private var header: some View {
         HStack(spacing: Space.xs) {
-            Circle().fill(Palette.agent(harness)).frame(width: Metrics.dot + 1, height: Metrics.dot + 1)
-            if isLive {
-                Text(String(localized: "\(harness.displayName) is working…"))
-                ProgressView().controlSize(.mini)
-            } else if let workedFor {
-                Text(String(localized: "\(harness.displayName) worked for \(Elapsed.format(workedFor))"))
+            if let agent {
+                AgentFace(agent: agent, size: 20, status: isLive ? .working(activity: nil, since: .now) : .idle)
             } else {
-                Text(harness.displayName)
+                Circle().fill(Palette.agent(harness)).frame(width: Metrics.dot + 1, height: Metrics.dot + 1)
+            }
+            if isLive {
+                Text(String(localized: "\(who) is working…"))
+                if agent == nil { ProgressView().controlSize(.mini) }
+            } else if let workedFor {
+                Text(String(localized: "\(who) worked for \(Elapsed.format(workedFor))"))
+            } else {
+                Text(who)
             }
         }
         .captionText()

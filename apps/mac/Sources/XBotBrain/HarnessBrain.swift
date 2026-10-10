@@ -133,6 +133,12 @@ public struct HarnessBrain: Brain {
             if let finishedSchema { try? FileManager.default.removeItem(at: finishedSchema) }
             if !ended {
                 let said = stderr.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                // A clean exit with nothing said is the CLI finishing; only its last line went missing.
+                if status == 0 && said.isEmpty {
+                    continuation.yield(.done)
+                    continuation.finish()
+                    return
+                }
                 continuation.yield(.failed(said.isEmpty
                     ? String(localized: "\(kind.displayName) stopped before finishing (exit code \(status)).")
                     : said))

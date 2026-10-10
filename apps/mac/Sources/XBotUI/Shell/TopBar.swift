@@ -131,7 +131,9 @@ struct TopBar: View {
                 // on it reached the tab's own tap as well, which reopened the chat it had just closed.
                 Color.clear.frame(width: Space.l, height: Space.l)
                 Spacer(minLength: 0)
-                if workspace.isRunning(chat.id) {
+                if let agent = workspace.agent(chat.agentID) {
+                    AgentFace(agent: agent, size: 18, status: workspace.isRunning(chat.id) ? .working(activity: nil, since: .now) : .idle)
+                } else if workspace.isRunning(chat.id) {
                     ProgressView().controlSize(.mini)
                 } else {
                     Circle().fill(Palette.agent(chat.harness)).frame(width: Metrics.dot, height: Metrics.dot)

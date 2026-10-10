@@ -66,9 +66,9 @@ struct Composer: View {
     private var contextStrip: some View {
         HStack(spacing: Space.s) {
             Menu {
-                Button(String(localized: "Inbox")) { workspace.draft.projectID = nil }
+                Button(String(localized: "Inbox")) { chooseProject(nil) }
                 ForEach(workspace.projects) { project in
-                    Button(project.name) { workspace.draft.projectID = project.id }
+                    Button(project.name) { chooseProject(project.id) }
                 }
                 Divider()
                 Button(String(localized: "Add a folder…"), action: addProject)
@@ -77,9 +77,9 @@ struct Composer: View {
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
-            .menuIndicator(target == .draft ? .visible : .hidden)
+            .menuIndicator(canChooseProject ? .visible : .hidden)
             .fixedSize()
-            .disabled(target != .draft)
+            .disabled(!canChooseProject)
             if let branch = workspace.branch(for: projectID) {
                 Label(branch, systemImage: "arrow.triangle.branch").font(Typography.mono).lineLimit(1)
             }
@@ -180,6 +180,16 @@ struct Composer: View {
             : $chatText
     }
 
+    /// A draft, or a chat nothing has been said in yet (one just opened with an agent).
+    private var canChooseProject: Bool {
+        guard let chat else { return true }
+        return workspace.messages(in: chat.id).isEmpty && !workspace.isRunning(chat.id)
+    }
+
+    private func chooseProject(_ id: UUID?) {
+        if let chat { workspace.setProject(id, for: chat.id) } else { workspace.draft.projectID = id }
+    }
+
     private var projectID: UUID? { chat?.projectID ?? (target == .draft ? workspace.draft.projectID : nil) }
 
     private var projectName: String {
@@ -216,6 +226,9 @@ struct Composer: View {
     }
 
     private var placeholder: String {
+        if !planMode, let agent = workspace.agent(chat?.agentID) {
+            return String(localized: "Ask \(agent.name)…")
+        }
         guard planMode else { return String(localized: "Describe a task, a bug to fix, an idea to try…") }
         return reviewPlan
             ? String(localized: "Describe the change. You'll review the plan first.")
