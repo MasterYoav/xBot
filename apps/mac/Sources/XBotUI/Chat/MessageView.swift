@@ -5,9 +5,36 @@ import XBotCore
 /// The person's message: right-aligned, on a raised fill, as typed.
 struct UserMessage: View {
     let parts: [Part]
+    var sentAt: Date?
+    /// Sends the edited text in place of this message. Nil while the chat is busy: an edit would
+    /// replace a turn that is still being written.
+    var resend: ((String) -> Bool)?
+    @State private var hovering = false
+    @State private var copied = false
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    private var text: String {
+        parts.compactMap { if case .text(let t) = $0 { t } else { nil } }.joined(separator: "\n")
+    }
 
     var body: some View {
-        Text(parts.compactMap { if case .text(let t) = $0 { t } else { nil } }.joined(separator: "\n"))
+        VStack(alignment: .trailing, spacing: Space.xs) {
+            if editing { editor } else { bubble }
+            if !editing {
+                actions.opacity(hovering ? 1 : 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .motion(Motion.quick, value: hovering)
+        .motion(Motion.quick, value: editing)
+    }
+
+    private var bubble: some View {
+        Text(text)
             .readingText()
             .textSelection(.enabled)
             .foregroundStyle(Palette.textPrimary)
@@ -15,7 +42,62 @@ struct UserMessage: View {
             .padding(.vertical, Space.s + 1)
             .raisedSurface()
             .frame(maxWidth: Metrics.readingWidth * 0.8, alignment: .trailing)
-            .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    /// The bubble, opened for editing: the same place, the full reading width, and the two choices.
+    private var editor: some View {
+        VStack(alignment: .trailing, spacing: Space.s) {
+            TextField(String(localized: "Edit your message"), text: $draft, axis: .vertical)
+                .textFieldStyle(.plain)
+                .readingText()
+                .foregroundStyle(Palette.textPrimary)
+                .lineLimit(1...12)
+                .focused($focused)
+                .onSubmit(send)
+                .onKeyPress(.escape) { cancel(); return .handled }
+            HStack(spacing: Space.s) {
+                Button(String(localized: "Cancel"), action: cancel)
+                    .buttonStyle(QuietButtonStyle())
+                Button(String(localized: "Send"), action: send)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || resend == nil)
+            }
+        }
+        .padding(.horizontal, Space.m + 2)
+        .padding(.vertical, Space.s + 1)
+        .raisedSurface()
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private var actions: some View {
+        HStack(spacing: Space.xs) {
+            if let sentAt {
+                Text(sentAt, format: .dateTime.hour().minute()).captionText().foregroundStyle(Palette.textTertiary)
+            }
+            IconButton(copied ? "checkmark" : "doc.on.doc", help: String(localized: "Copy message")) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+                copied = true
+                Task { try? await Task.sleep(for: .seconds(2)); copied = false }
+            }
+            if resend != nil {
+                IconButton("pencil", help: String(localized: "Edit and send again")) {
+                    draft = text
+                    editing = true
+                    focused = true
+                }
+            }
+        }
+    }
+
+    private func send() {
+        guard let resend, resend(draft) else { return }
+        editing = false
+    }
+
+    private func cancel() {
+        editing = false
+        draft = ""
     }
 }
 

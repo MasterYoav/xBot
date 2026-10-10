@@ -168,6 +168,12 @@ public final class Store {
         try db.execute("UPDATE messages SET parts = ? WHERE id = ?", [.text(parts), .text(message.id.uuidString)])
     }
 
+    /// Removes these messages: the turns an edited prompt replaces. Restoring them is `append`, in
+    /// their order, which puts them back where they were (messages are ordered by insertion).
+    public func deleteMessages(_ ids: [UUID]) throws {
+        for id in ids { try db.execute("DELETE FROM messages WHERE id = ?", [.text(id.uuidString)]) }
+    }
+
     /// Plans that were run, not just proposed, across every chat.
     public func planRuns() throws -> Int {
         try db.rows("SELECT parts FROM messages WHERE role = 'assistant' AND parts LIKE '%\"plan\"%'").reduce(0) { count, r in

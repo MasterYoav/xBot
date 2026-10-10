@@ -62,6 +62,7 @@ public struct RootView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .belowTitleBar()
                     }
                 }
                 if showsInspector, let project = workspace.contextProject {

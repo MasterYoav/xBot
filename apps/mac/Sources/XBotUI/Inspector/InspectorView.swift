@@ -20,6 +20,7 @@ struct InspectorView: View {
                     case .changes: ChangesPanel(workspace: workspace, project: project, git: git)
                     }
                 }
+                .belowTitleBar()
                 .task(id: project.id) {
                     await git.refresh()
                     git.startWatching()
