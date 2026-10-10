@@ -74,6 +74,9 @@ public enum Metrics {
     /// Browse and other large sheets.
     public static let sheetWidth: CGFloat = 640
     public static let sheetHeight: CGFloat = 560
+    /// Agents: the page, and the editor sheet.
+    public static let agentsWidth: CGFloat = 1040
+    public static let agentEditorWidth: CGFloat = 720
     /// Notes: the list of notes beside the editor.
     public static let notesListWidth: CGFloat = 240
     /// How much of the content height the backdrop covers before it has faded out.
