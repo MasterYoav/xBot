@@ -23,49 +23,6 @@ public struct DeletedChat: Sendable {
     public let wasOpen: Bool
 }
 
-/// Home's four ways in.
-public enum Suggestion: CaseIterable, Sendable {
-    case plan, explain, fixBug, writeTests
-
-    public var title: String {
-        switch self {
-        case .plan: String(localized: "Plan a change")
-        case .explain: String(localized: "Explain")
-        case .fixBug: String(localized: "Find and fix")
-        case .writeTests: String(localized: "Write tests")
-        }
-    }
-
-    public var subtitle: String {
-        switch self {
-        case .plan: String(localized: "from an idea")
-        case .explain: String(localized: "this project")
-        case .fixBug: String(localized: "a bug")
-        case .writeTests: String(localized: "for recent changes")
-        }
-    }
-
-    public var symbol: String {
-        switch self {
-        case .plan: "list.bullet.clipboard"
-        case .explain: "text.magnifyingglass"
-        case .fixBug: "ladybug"
-        case .writeTests: "checkmark.seal"
-        }
-    }
-
-    public var prompt: String {
-        switch self {
-        case .plan: ""
-        case .explain: String(localized: "Explain how this project is put together.")
-        case .fixBug: String(localized: "Find the bug: ")
-        case .writeTests: String(localized: "Write tests for the most recent changes.")
-        }
-    }
-
-    public var turnsOnPlan: Bool { self == .plan }
-}
-
 extension Workspace {
     public var isHome: Bool { selectedChatID == nil }
 
@@ -76,7 +33,7 @@ extension Workspace {
         page = .main
     }
 
-    /// Home, aimed at a project (nil: the Inbox).
+    /// A new chat, aimed at a project (nil: the Inbox): the composer on its own, in a tab of its own.
     public func startDraft(in projectID: UUID?) {
         draft.projectID = projectID
         goHome()
@@ -120,12 +77,6 @@ extension Workspace {
         // The next chat starts from the person's defaults, not from this one's choices.
         applyDraftDefaults()
         return true
-    }
-
-    public func use(_ suggestion: Suggestion) {
-        draft.text = suggestion.prompt
-        if suggestion.turnsOnPlan { draft.planMode = true }
-        composerFocusRequest += 1
     }
 
     public func branch(for projectID: UUID?) -> String? {

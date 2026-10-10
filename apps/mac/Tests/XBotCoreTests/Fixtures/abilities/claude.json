@@ -1,0 +1,44 @@
+{
+  "mcpServers": {
+    "tokensave": {
+      "type": "stdio",
+      "command": "/Users/me/.local/bin/tokensave",
+      "args": [
+        "serve"
+      ],
+      "env": {}
+    },
+    "headroom": {
+      "type": "stdio",
+      "command": "/Users/me/.local/bin/headroom",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {}
+    }
+  },
+  "projects": {
+    "/Users/me/Developer": {
+      "mcpServers": {
+        "refero": {
+          "type": "http",
+          "url": "https://api.refero.design/mcp",
+          "headers": {
+            "Authorization": "<redacted>"
+          }
+        }
+      },
+      "disabledMcpServers": []
+    },
+    "/Users/me/Developer/Colony": {
+      "mcpServers": {
+        "swiftpieces": {
+          "type": "http",
+          "url": "https://swiftpieces.com/api/mcp"
+        }
+      },
+      "disabledMcpServers": []
+    }
+  }
+}

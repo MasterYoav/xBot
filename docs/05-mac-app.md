@@ -13,7 +13,7 @@ XBotApp ── XBotUI ── XBotCore ── XBotBrain   (Foundation only)
 | Module | Owns |
 | --- | --- |
 | `XBotBrain` | `Brain`, `BrainEvent`, `TurnRequest`; `HarnessKind` (arguments and stream parsing per CLI); `HarnessBrain` (one process per turn); `HarnessLocator` (finding CLIs and the login-shell `PATH`) |
-| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite); `Workspace`, the `@MainActor @Observable` object the window talks to. Re-exports `XBotBrain`. |
+| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite); `Workspace`, the `@MainActor @Observable` object the window talks to; `AbilityCatalog` (connectors, plugins, skills, MCPs through the agents' CLIs) and `ProjectNotes` (`<project>/notes/*.md`). Re-exports `XBotBrain`. |
 | `XBotUI` | The design system; `RootView`, the sidebar, chat tabs, transcript and composer |
 | `XBotApp` | `@main`, menus, Sparkle, quitting cleanly (`AppDelegate` stops running turns so their replies are saved) |
 
@@ -27,6 +27,9 @@ methods.
 - `HarnessBrain` is tested against fake CLIs — small shell scripts — that check the prompt arrived
   on stdin, that cancelling kills the process, and that an exit without a result is a failure.
 - `Workspace` is tested with a scripted `Brain` and an in-memory store.
+- Abilities parsers are tested against CLI output recorded on a real Mac
+  (`Tests/XBotCoreTests/Fixtures/abilities`, personal paths and secrets removed); the catalog's
+  actions run against a scripted `CommandRunner`.
 - `LiveHarnessTests` runs real turns against the installed CLIs, only with `XBOT_LIVE_HARNESS=1`.
 
 ```sh
