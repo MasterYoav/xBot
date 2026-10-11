@@ -224,10 +224,18 @@ public final class Workspace {
     /// composer keeps what was typed.
     @discardableResult
     public func send(_ text: String, in id: UUID) -> Bool {
+        send(text, in: id, earlier: nil)
+    }
+
+    /// `earlier`, when set, goes to the agent ahead of the prompt but is not shown or saved as
+    /// part of it: the conversation an edited prompt starts a new session with.
+    @discardableResult
+    func send(_ text: String, in id: UUID, earlier: String?) -> Bool {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isRunning(id), var chat = chat(id), let brain = brains[chat.harness] else {
             return false
         }
+        let turnPrompt = earlier.map { $0 + prompt } ?? prompt
 
         save(ChatMessage(chatID: id, role: .user, parts: [.text(prompt)]))
         if chat.title == String(localized: "New chat") { chat.title = Self.title(from: prompt) }
@@ -235,12 +243,12 @@ public final class Workspace {
         replace(chat)
 
         if chat.planMode {
-            startPlanning(prompt, chat: chat, brain: brain)
+            startPlanning(turnPrompt, chat: chat, brain: brain)
             return true
         }
 
         let request = TurnRequest(
-            prompt: prompt, directory: directory(for: chat), model: turnModel(for: chat),
+            prompt: turnPrompt, directory: directory(for: chat), model: turnModel(for: chat),
             mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort
         )
         live[id] = []

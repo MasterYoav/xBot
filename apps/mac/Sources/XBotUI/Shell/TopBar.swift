@@ -53,13 +53,9 @@ struct TopBar: View {
         var body: some View {
             let selected = workspace.selectedChatID == chat.id
             HStack(spacing: Space.s) {
-                Button { workspace.close(chat.id) } label: {
-                    Image(systemName: "xmark").imageScale(.small).foregroundStyle(Palette.textTertiary)
-                        .frame(width: Space.l, height: Space.l)
-                }
-                .buttonStyle(.plain)
-                .opacity(hovering ? 1 : 0)
-                .help(String(localized: "Close tab (⌘W)"))
+                // Room for the ×, which is laid over the tab rather than inside it: inside, a click
+                // on it reached the tab's own tap as well, which reopened the chat it had just closed.
+                Color.clear.frame(width: Space.l, height: Space.l)
                 Spacer(minLength: 0)
                 if workspace.isRunning(chat.id) {
                     ProgressView().controlSize(.mini)
@@ -85,6 +81,19 @@ struct TopBar: View {
             .padding(.horizontal, Space.xxs)
             .contentShape(Rectangle())
             .onTapGesture { workspace.open(chat.id) }
+            .overlay(alignment: .leading) {
+                Button { workspace.close(chat.id) } label: {
+                    Image(systemName: "xmark").imageScale(.small).foregroundStyle(Palette.textTertiary)
+                        .frame(width: Space.l, height: Space.l)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, Space.s + Space.xxs)
+                .opacity(hovering ? 1 : 0)
+                .allowsHitTesting(hovering)
+                .help(String(localized: "Close tab (⌘W)"))
+                .accessibilityLabel(String(localized: "Close \(chat.title)"))
+            }
             .onHover { hovering = $0 }
             .motion(Motion.quick, value: selected)
             .accessibilityAddTraits(.isButton)
