@@ -67,6 +67,8 @@ public enum Palette {
         switch kind {
         case .claude: claude
         case .codex: textPrimary
+        case .antigravity: dynamic(0x1A73E8, 0x8AB4F8)   // Google blue
+        case .copilot: dynamic(0x8250DF, 0xC297FF)       // Copilot purple
         }
     }
 

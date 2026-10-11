@@ -24,7 +24,9 @@ public final class AbilityCatalog {
     public private(set) var isLoadingMarketplace = false
     public private(set) var installing: Set<String> = []
     /// Agents with no CLI on this Mac: nothing of theirs can be shown.
-    public var missingAgents: [HarnessKind] { HarnessKind.allCases.filter { tools()[$0] == nil } }
+    /// The agents whose abilities this page manages.
+    public static let agents: [HarnessKind] = [.claude, .codex]
+    public var missingAgents: [HarnessKind] { Self.agents.filter { tools()[$0] == nil } }
 
     @ObservationIgnored private let runner: any CommandRunner
     @ObservationIgnored private let home: URL
@@ -246,6 +248,7 @@ public final class AbilityCatalog {
             case (.claude, .url(let url)): arguments = ["mcp", "add", "-s", "user", "--transport", "http", name, url]
             case (.codex, .command(let command, let args)): arguments = ["mcp", "add", name, "--", command] + args
             case (.codex, .url(let url)): arguments = ["mcp", "add", name, "--url", url]
+            case (.antigravity, _), (.copilot, _): continue   // Abilities manages Claude Code and Codex only
             }
             if let failure = await command(agent, arguments) {
                 report(String(localized: "\(agent.displayName) didn't add \(name): \(failure)"))

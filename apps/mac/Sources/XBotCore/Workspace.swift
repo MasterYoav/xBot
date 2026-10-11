@@ -108,6 +108,9 @@ public final class Workspace {
         isDiscovering = true
         brains = await discover()
         modelOptions = [.claude: Self.claudeModels, .codex: loadCodexModels()]
+        if let agy = brains[.antigravity] as? HarnessBrain {
+            modelOptions[.antigravity] = await AntigravityModels.read(executable: agy.executable, environment: agy.environment)
+        }
         isDiscovering = false
     }
 
@@ -271,7 +274,8 @@ public final class Workspace {
         chat.updatedAt = .now
         replace(chat)
 
-        if chat.planMode {
+        // Plan mode needs answers to a schema; on an agent that can't give them, the chat just runs.
+        if chat.planMode && chat.harness.givesStructuredAnswers {
             startPlanning(turnPrompt, chat: chat, brain: brain)
             return true
         }

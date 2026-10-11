@@ -68,6 +68,19 @@ final class ScriptedBrain: Brain {
         w.stop(chat.id)
     }
 
+    /// Plan mode needs a schema'd answer; on Copilot or Antigravity the message simply runs.
+    @Test func planModeOnAnAgentWithoutSchemasJustRuns() async throws {
+        let brain = ScriptedBrain([.textDelta("ok"), .done])
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.copilot: brain] })
+        await w.refreshHarnesses()
+        let chat = try #require(w.newChat(in: nil))
+        w.setPlanMode(true, for: chat.id)
+        #expect(w.send("go", in: chat.id))
+        await settle(w, chat.id)
+        #expect(brain.requests.withLock { $0.last?.schema } == nil)
+        #expect(w.messages(in: chat.id).last?.parts == [.text("ok")])
+    }
+
     @Test func stopKeepsThePartialReply() async throws {
         let w = await workspace(ScriptedBrain([.textDelta("Half an ans")], hold: true))
         let chat = try #require(w.newChat(in: nil))

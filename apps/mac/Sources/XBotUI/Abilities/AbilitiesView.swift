@@ -22,7 +22,7 @@ struct AbilitiesView: View {
             VStack(alignment: .leading, spacing: Space.xl) {
                 header
                 tabs
-                if !catalog.missingAgents.isEmpty, catalog.missingAgents.count < HarnessKind.allCases.count {
+                if !catalog.missingAgents.isEmpty, catalog.missingAgents.count < AbilityCatalog.agents.count {
                     Text(String(localized: "\(catalog.missingAgents.map(\.displayName).formatted(.list(type: .and))) isn't installed, so its abilities aren't shown."))
                         .captionText().foregroundStyle(Palette.textTertiary)
                 }
@@ -35,7 +35,7 @@ struct AbilitiesView: View {
         }
         .task { await catalog.refresh() }
         .sheet(isPresented: $browsing) { BrowseSheet(catalog: catalog) }
-        .sheet(isPresented: $addingServer) { AddServerSheet(catalog: catalog, agents: workspace.availableHarnesses) }
+        .sheet(isPresented: $addingServer) { AddServerSheet(catalog: catalog, agents: workspace.availableHarnesses.filter(AbilityCatalog.agents.contains)) }
         .fileImporter(isPresented: $choosingSkill, allowedContentTypes: [.folder]) { result in
             guard case .success(let url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
@@ -72,7 +72,7 @@ struct AbilitiesView: View {
                 Menu {
                     Button(String(localized: "MCP Server…")) { addingServer = true }
                     Menu(String(localized: "Skill Folder…")) {
-                        ForEach(workspace.availableHarnesses, id: \.self) { agent in
+                        ForEach(workspace.availableHarnesses.filter(AbilityCatalog.agents.contains), id: \.self) { agent in
                             Button(String(localized: "For \(agent.displayName)…")) { skillAgent = agent; choosingSkill = true }
                         }
                     }
@@ -377,7 +377,7 @@ private struct BrowseSheet: View {
             HStack(spacing: Space.m) {
                 Picker(String(localized: "Agent"), selection: $agent) {
                     Text(String(localized: "All")).tag(HarnessKind?.none)
-                    ForEach(HarnessKind.allCases, id: \.self) { Text($0.displayName).tag(HarnessKind?.some($0)) }
+                    ForEach(AbilityCatalog.agents, id: \.self) { Text($0.displayName).tag(HarnessKind?.some($0)) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()

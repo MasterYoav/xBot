@@ -49,7 +49,9 @@ struct UsageSection: View {
 
     /// The installed agents, or both before they have been looked for.
     private var agents: [HarnessKind] {
-        workspace.availableHarnesses.isEmpty ? HarnessKind.allCases : workspace.availableHarnesses
+        // Claude Code and Codex report their limits; the others don't say.
+        let reporting: [HarnessKind] = [.claude, .codex]
+        return workspace.availableHarnesses.isEmpty ? reporting : workspace.availableHarnesses.filter(reporting.contains)
     }
 
     private func agent(_ kind: HarnessKind, now: Date) -> some View {

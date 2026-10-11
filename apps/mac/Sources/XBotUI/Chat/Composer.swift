@@ -120,6 +120,10 @@ struct Composer: View {
             ForEach(PermissionMode.allCases, id: \.self) { mode in
                 Button { setMode(mode) } label: { Label(mode.title, systemImage: mode.symbol) }
             }
+            if harness?.editingNeedsFullAccess == true {
+                Divider()
+                Text(String(localized: "\(harness?.displayName ?? "") can only edit with full access, so “Can edit” runs with full access."))
+            }
         } label: {
             Chip(mode.title, systemImage: mode.symbol, showsChevron: true)
         }
@@ -129,7 +133,17 @@ struct Composer: View {
         .fixedSize()
     }
 
-    private var planMenu: some View {
+    @ViewBuilder private var planMenu: some View {
+        if harness?.givesStructuredAnswers == false {
+            Chip(String(localized: "Plan"), systemImage: "list.bullet.clipboard", isOn: false)
+                .opacity(0.4)
+                .help(String(localized: "\(harness?.displayName ?? "") can't make plans in xBot yet."))
+        } else {
+            planChip
+        }
+    }
+
+    private var planChip: some View {
         Menu {
             Toggle(String(localized: "Review plan first"), isOn: Binding(get: { reviewPlan }, set: setReview))
         } label: {

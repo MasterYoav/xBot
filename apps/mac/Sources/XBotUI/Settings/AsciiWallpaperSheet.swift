@@ -40,7 +40,7 @@ struct AsciiWallpaperSheet: View {
                     label(String(localized: "Agent"))
                     HStack(spacing: Space.s) {
                         Picker(String(localized: "Agent"), selection: $harness) {
-                            ForEach(workspace.availableHarnesses, id: \.self) { Text($0.displayName).tag(HarnessKind?.some($0)) }
+                            ForEach(workspace.availableHarnesses.filter(\.givesStructuredAnswers), id: \.self) { Text($0.displayName).tag(HarnessKind?.some($0)) }
                         }
                         .labelsHidden().fixedSize()
                         .onChange(of: harness) { model = nil }
@@ -105,7 +105,7 @@ struct AsciiWallpaperSheet: View {
         }
         .padding(Space.xl)
         .frame(width: Metrics.sheetWidth)
-        .onAppear { harness = harness ?? workspace.availableHarnesses.first }
+        .onAppear { harness = harness ?? workspace.availableHarnesses.first(where: \.givesStructuredAnswers) }
         .onDisappear { drawing?.cancel() }
     }
 
