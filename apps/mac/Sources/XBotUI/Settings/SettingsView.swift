@@ -15,6 +15,8 @@ public struct SettingsView: View {
                 .tabItem { Label(String(localized: "Appearance"), systemImage: "paintpalette") }
             AgentSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Agents"), systemImage: "cpu") }
+            DevicesSettings(workspace: workspace)
+                .tabItem { Label(String(localized: "Devices"), systemImage: "iphone") }
             AboutSettings()
                 .tabItem { Label(String(localized: "About"), systemImage: "info.circle") }
         }

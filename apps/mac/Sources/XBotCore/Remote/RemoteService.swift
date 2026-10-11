@@ -50,6 +50,8 @@ public final class RemoteService {
     public let macID: UUID
     public let macName: String
     public let host: RemoteHost
+    /// Called once iCloud is ready: the app registers for its silent pushes.
+    @ObservationIgnored public var wantsPushes: (() -> Void)?
 
     @ObservationIgnored private let secrets: any PairingSecrets
     @ObservationIgnored private let defaults: UserDefaults
@@ -192,6 +194,7 @@ public final class RemoteService {
                 try await box.prepare(subscriptionID: "xbot-remote-mac")
                 mailbox = box
                 cloudProblem = nil
+                wantsPushes?()
             } catch {
                 cloudProblem = String(localized: "iCloud isn't available: \(error.localizedDescription)")
                 return

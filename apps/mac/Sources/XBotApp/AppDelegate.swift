@@ -79,6 +79,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
 
     /// Saves every reply in progress and stops the CLIs writing them.
+    /// iCloud pushes for the phone's mail (only arrive once a device is paired and xBot is signed
+    /// for iCloud).
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        guard let remote = Self.workspace?.remote else { return }
+        Task { await remote.cloudPushed() }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         Self.workspace?.stopAll()
     }

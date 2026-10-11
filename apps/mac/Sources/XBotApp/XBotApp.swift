@@ -117,6 +117,10 @@ struct XBotApp: App {
         }
         AppDelegate.workspace = workspace
         workspace.startAutomationClock()
+        let remote = RemoteService(workspace: workspace)
+        workspace.remote = remote
+        remote.wantsPushes = { NSApplication.shared.registerForRemoteNotifications() }
+        remote.start()
         return workspace
     }
 }
