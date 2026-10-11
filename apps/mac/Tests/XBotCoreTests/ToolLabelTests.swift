@@ -31,3 +31,11 @@ import Testing
         #expect(Page.main.showsTabs && Page.profile.showsTabs)
     }
 }
+
+@Suite struct PageReachesTopTests {
+    /// Notes and Automations run up to the window's top edge, under where the tabs would be.
+    @Test func notesAndAutomationsReachTheTop() {
+        #expect(Page.notes.reachesTop && Page.automations.reachesTop)
+        for page: Page in [.main, .profile, .abilities, .agents] { #expect(!page.reachesTop, "\(page)") }
+    }
+}

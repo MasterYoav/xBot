@@ -70,6 +70,10 @@ public enum Page: Equatable, Sendable {
         case .main, .profile, .diff: true
         }
     }
+
+    /// Whether the page runs up to the window's top edge, with no bar above it: the window's
+    /// buttons float over its corners instead.
+    public var reachesTop: Bool { self == .notes || self == .automations }
 }
 
 extension Workspace {

@@ -37,9 +37,7 @@ public struct RootView: View {
                         WorkplaceBackdrop(setting: workspace.workplace, stageBottom: worldStageBottom)
                     }
                     VStack(spacing: 0) {
-                        TopBar(workspace: workspace, sidebarVisible: columns != .detailOnly,
-                               showSidebar: { withAnimation(Motion.panel) { columns = .all } },
-                               inspectorShown: $inspectorShown, inspectorAvailable: workspace.contextProject != nil)
+                        if !workspace.page.reachesTop { topBar }
                         if let problem = workspace.problem {
                             Label(problem, systemImage: "exclamationmark.triangle")
                                 .captionText()
@@ -84,8 +82,14 @@ public struct RootView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // With the sidebar hidden, the traffic lights and the show-sidebar button
+                        // float over a page that runs to the top: keep its corner clear of them.
+                        .padding(.leading, workspace.page.reachesTop && columns == .detailOnly
+                                 ? Metrics.trafficLights + Metrics.titleBar : 0)
                         .belowTitleBar()
                     }
+                    // Notes and Automations run to the top; the bar's buttons float over them.
+                    if workspace.page.reachesTop { topBar }
                 }
                 .coordinateSpace(name: "workplaceBackdrop")
                 if showsInspector, let project = workspace.contextProject {
@@ -124,6 +128,12 @@ public struct RootView: View {
                 try? await Task.sleep(for: .seconds(3600))
             }
         }
+    }
+
+    private var topBar: some View {
+        TopBar(workspace: workspace, sidebarVisible: columns != .detailOnly,
+               showSidebar: { withAnimation(Motion.panel) { columns = .all } },
+               inspectorShown: $inspectorShown, inspectorAvailable: workspace.contextProject != nil)
     }
 
     private var showsInspector: Bool { inspectorShown && workspace.contextProject != nil }

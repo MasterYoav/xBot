@@ -30,10 +30,15 @@ struct TopBar: View {
                     .padding(.trailing, Space.xs)
             }
             if workspace.page.showsTabs { tabs }
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .gesture(WindowDragGesture())
+            // Over a page that runs to the top, the empty middle lets clicks through to the page.
+            if workspace.page.reachesTop {
+                Spacer()
+            } else {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(WindowDragGesture())
+            }
             IconButton(
                 "sidebar.right",
                 help: inspectorAvailable
