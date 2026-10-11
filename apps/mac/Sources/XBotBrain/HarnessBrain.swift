@@ -53,16 +53,10 @@ public struct HarnessBrain: Brain {
         process.standardOutput = output
         process.standardError = errors
 
-        // Read as async bytes, not with a readabilityHandler: that handler fires again and again
-        // with empty data once the pipe reaches end-of-file, spinning a core until someone clears it.
+        // Each pipe on a reader thread of its own: see PipeReader for why not `FileHandle.bytes`.
         let stderr = Tail()
         let stderrReader = Task.detached {
-            var buffer = Data()
-            for try await byte in errors.fileHandleForReading.bytes {
-                buffer.append(byte)
-                if buffer.count >= 512 { stderr.append(buffer); buffer.removeAll(keepingCapacity: true) }
-            }
-            stderr.append(buffer)
+            for await chunk in PipeReader.chunks(errors.fileHandleForReading) { stderr.append(chunk) }
         }
         let exit = AsyncStream.makeStream(of: Int32.self)
         let exited = Atomic(false)
@@ -120,25 +114,21 @@ public struct HarnessBrain: Brain {
                 // Split on "\n" bytes ourselves. `bytes.lines` also breaks at U+2028 and U+2029,
                 // which JSON may carry raw inside a string, and half a JSON line is no line at all.
                 var line: [UInt8] = []
-                for try await byte in output.fileHandleForReading.bytes {
-                    guard byte == UInt8(ascii: "\n") else { line.append(byte); continue }
-                    emit(line)
-                    line.removeAll(keepingCapacity: true)
+                for await chunk in PipeReader.chunks(output.fileHandleForReading) {
+                    for byte in chunk {
+                        guard byte == UInt8(ascii: "\n") else { line.append(byte); continue }
+                        emit(line)
+                        line.removeAll(keepingCapacity: true)
+                    }
                 }
                 emit(line)
-            } catch {}
+            }
             var status: Int32 = 0
             for await code in exit.stream { status = code }
-            _ = await stderrReader.result
+            _ = await stderrReader.value
             if let finishedSchema { try? FileManager.default.removeItem(at: finishedSchema) }
             if !ended {
                 let said = stderr.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                // A clean exit with nothing said is the CLI finishing; only its last line went missing.
-                if status == 0 && said.isEmpty {
-                    continuation.yield(.done)
-                    continuation.finish()
-                    return
-                }
                 continuation.yield(.failed(said.isEmpty
                     ? String(localized: "\(kind.displayName) stopped before finishing (exit code \(status)).")
                     : said))

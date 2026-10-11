@@ -72,6 +72,18 @@ public enum Palette {
 
     private static let claude = dynamic(0xD97757, 0xE08A6E)
 
+    /// Text-art wallpaper inks: bright on dark, deeper on light so they still read.
+    public static func asciiInk(_ ink: AsciiArt.Ink) -> Color {
+        switch ink {
+        case .mint: dynamic(0x1F8A5B, 0x7CF2B0)
+        case .amber: dynamic(0xA8610A, 0xFFC56B)
+        case .rose: dynamic(0xB8325A, 0xFF8FB1)
+        case .sky: dynamic(0x1F67B8, 0x8CCBFF)
+        case .violet: dynamic(0x6A44C6, 0xC2A8FF)
+        case .snow: dynamic(0x3A3F48, 0xEEF1F6)
+        }
+    }
+
     private static func dynamic(_ light: UInt32, _ dark: UInt32, alpha: (CGFloat, CGFloat) = (1, 1)) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua

@@ -63,7 +63,7 @@ public enum Metrics {
     public static let toolTile: CGFloat = 52
     public static let settingsWidth: CGFloat = 520
     /// A wallpaper choice in Settings › Appearance: the window's proportions, small.
-    public static let wallpaperThumb = CGSize(width: 96, height: 60)
+    public static let wallpaperThumb = CGSize(width: 76, height: 50)
     /// An app icon choice in Settings › Appearance.
     public static let appIconChoice: CGFloat = 64
     /// Abilities: the page's width, a row's icon tile, the switch column, the search field.
@@ -74,6 +74,8 @@ public enum Metrics {
     /// Browse and other large sheets.
     public static let sheetWidth: CGFloat = 640
     public static let sheetHeight: CGFloat = 560
+    /// The randomizer's preview of a drawn wallpaper.
+    public static let asciiPreviewHeight: CGFloat = 170
     /// Terminal windows: their title bar, and the shell's type size.
     public static let terminalTitleBar: CGFloat = 30
     public static let terminalFont: CGFloat = 12

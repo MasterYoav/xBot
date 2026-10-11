@@ -55,7 +55,7 @@ public final class Workspace {
     let store: Store
     /// Chat → the message holding its plan, while a plan turn runs.
     var planTurns: [UUID: UUID] = [:]
-    private let inbox: URL
+    let inbox: URL
     private let discover: @Sendable () async -> [HarnessKind: any Brain]
     private let loadCodexModels: @Sendable () -> [ModelOption]
     /// Codex's limits, read from its newest session log.

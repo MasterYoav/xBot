@@ -6,7 +6,9 @@ import XBotCore
 /// Settings › Appearance: light or dark, the wallpaper behind the main screen, the app icon and the
 /// typeface.
 struct AppearanceSettings: View {
+    let workspace: Workspace
     @Bindable private var appearance = Appearance.shared
+    @State private var randomizing = false
     @State private var choosingPicture = false
     @State private var problem: String?
     private let families = Appearance.fontFamilies()
@@ -21,10 +23,11 @@ struct AppearanceSettings: View {
             }
 
             Section(String(localized: "Wallpaper")) {
-                HStack(spacing: Space.m) {
+                HStack(spacing: Space.s) {
                     tile(.sunset, title: String(localized: "Sunset"))
                     tile(.desktop, title: String(localized: "Desktop"))
                     customTile
+                    randomTile
                     tile(.none, title: String(localized: "None"))
                 }
                 .padding(.vertical, Space.xs)
@@ -62,6 +65,7 @@ struct AppearanceSettings: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $randomizing) { AsciiWallpaperSheet(workspace: workspace) }
         .fileImporter(isPresented: $choosingPicture, allowedContentTypes: [.image]) { result in
             guard case .success(let url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
@@ -83,6 +87,33 @@ struct AppearanceSettings: View {
                       selected: appearance.wallpaper == wallpaper, systemImage: wallpaper == .none ? "slash.circle" : nil)
         }
         .buttonStyle(.plain)
+    }
+
+    /// Text art an agent draws: shows the current one; clicking opens the randomizer.
+    private var randomTile: some View {
+        Button { randomizing = true } label: {
+            let art: AsciiArt? = if case .ascii(let url) = appearance.wallpaper {
+                AsciiCache.art(at: url, revision: appearance.asciiRevision)
+            } else { nil }
+            VStack(spacing: Space.xs) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radius.small, style: .continuous).fill(Palette.terminalBackground)
+                    if let art {
+                        AsciiArtView(art: art, wholePicture: true).padding(Space.xxs)
+                    } else {
+                        Image(systemName: "dice").font(Typography.title).foregroundStyle(Palette.textSecondary)
+                    }
+                }
+                .frame(width: Metrics.wallpaperThumb.width, height: Metrics.wallpaperThumb.height)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                    .strokeBorder(art != nil ? Palette.accent : Palette.hairline, lineWidth: art != nil ? 2 : 1))
+                Text(String(localized: "Randomize…")).captionText()
+                    .foregroundStyle(art != nil ? Palette.textPrimary : Palette.textSecondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .help(String(localized: "Have an agent draw a text-art wallpaper, still or moving"))
     }
 
     /// The person's own picture: shows it once chosen; clicking it again picks another.

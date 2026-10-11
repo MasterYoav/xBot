@@ -63,10 +63,7 @@ public enum HarnessLocator {
             try await Task.sleep(for: .seconds(5))
             kill(pid, SIGKILL)
         }
-        var data = Data()
-        do {
-            for try await byte in output.fileHandleForReading.bytes { data.append(byte) }
-        } catch {}
+        let data = await PipeReader.readAll(output.fileHandleForReading)
         timeout.cancel()
         let parts = String(decoding: data, as: UTF8.self).components(separatedBy: marker)
         return parts.count >= 3 && !parts[1].isEmpty ? parts[1] : nil
