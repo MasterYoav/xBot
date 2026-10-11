@@ -26,6 +26,8 @@ targets:
     dependencies:
       - package: XBot
         product: XBotRemote
+    scheme:
+      testTargets: [XBotMobileUITests]
     entitlements:
       path: XBotMobile.entitlements
       properties:
@@ -53,6 +55,16 @@ targets:
           - CFBundleURLName: dev.xbot.pair
             CFBundleURLSchemes: [xbot]
         UILaunchScreen: {}
+  XBotMobileUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: XBotMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.xbot.mobile.uitests
+        GENERATE_INFOPLIST_FILE: YES
   # Not shipped: gives the Mac app (built with SwiftPM, bundle dev.xbot.app) a provisioning
   # profile with the same iCloud container and push, which scripts/sign-mac-remote.sh embeds.
   XBotMacSigning:

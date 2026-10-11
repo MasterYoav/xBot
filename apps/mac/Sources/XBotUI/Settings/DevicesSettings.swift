@@ -16,7 +16,13 @@ struct DevicesSettings: View {
                 Text(String(localized: "Keep working from your iPhone or iPad: your chats live, and the agents still run here. On the same Wi-Fi it connects directly; away, through your iCloud."))
                     .captionText().foregroundStyle(Palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button(String(localized: "Pair an iPhone or iPad…")) { invite = remote?.invite(host: LocalAddress.ipv4) }
+                Button(String(localized: "Pair an iPhone or iPad…")) {
+                    invite = remote?.invite(host: LocalAddress.ipv4)
+                    #if DEBUG
+                    // For the simulator, which has no camera: `xcrun simctl openurl booted <this>`.
+                    if let invite { print("XBOT_PAIRING_URL \(invite.url.absoluteString)") }
+                    #endif
+                }
                     .disabled(remote == nil)
             }
             if let remote {
@@ -98,8 +104,9 @@ private struct PairingSheet: View {
             } else if let image = QRCode.image(invite.url.absoluteString) {
                 Image(nsImage: image).interpolation(.none).resizable().frame(width: 220, height: 220)
                     .accessibilityLabel(String(localized: "Pairing code"))
-                Text(String(localized: "The code works once, for one device. Keep it to yourself: it's the key to this Mac."))
+                Text(String(localized: "The code pairs one device. Keep it to yourself: it's the key to this Mac."))
                     .captionText().foregroundStyle(Palette.textTertiary).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
                 Spacer()
