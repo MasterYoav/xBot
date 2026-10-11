@@ -1,16 +1,29 @@
 import SwiftUI
+import XBotCore
 
-/// The type scale: SF Pro, with SF Mono for metadata. Weight does the hierarchy; sizes stay close.
+/// The type scale: SF Pro by default, or the family chosen in Settings › Appearance; SF Mono for
+/// metadata and code whatever is chosen, because columns of code need a fixed width. Weight does
+/// the hierarchy; sizes stay close.
+///
+/// Computed, not stored: each read looks at `Appearance.shared`, and because the read happens while
+/// a view's body runs, Observation re-renders that view when the family changes. Stored tokens were
+/// fixed at first use and a new font only appeared after a relaunch.
+@MainActor
 public enum Typography {
-    public static let hero = Font.system(size: 26, weight: .semibold)
-    public static let title = Font.system(size: 15, weight: .semibold)
-    public static let body = Font.system(size: 13)
-    public static let reading = Font.system(size: 13.5)
-    public static let emphasis = Font.system(size: 13, weight: .medium)
-    public static let chip = Font.system(size: 12, weight: .medium)
-    public static let caption = Font.system(size: 11)
+    public static var hero: Font { face(26, .semibold) }
+    public static var title: Font { face(15, .semibold) }
+    public static var body: Font { face(13) }
+    public static var reading: Font { face(13.5) }
+    public static var emphasis: Font { face(13, .medium) }
+    public static var chip: Font { face(12, .medium) }
+    public static var caption: Font { face(11) }
     public static let label = Font.system(size: 10, weight: .medium, design: .monospaced)
     public static let mono = Font.system(size: 12, design: .monospaced)
+
+    private static func face(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        guard let family = Appearance.shared.fontFamily else { return .system(size: size, weight: weight) }
+        return .custom(family, fixedSize: size).weight(weight)
+    }
 }
 
 extension View {

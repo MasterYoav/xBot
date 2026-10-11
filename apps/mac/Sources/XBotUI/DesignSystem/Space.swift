@@ -63,6 +63,8 @@ public enum Metrics {
     public static let heatGap: CGFloat = 3
     public static let toolTile: CGFloat = 52
     public static let settingsWidth: CGFloat = 520
+    /// A wallpaper choice in Settings › Appearance: the window's proportions, small.
+    public static let wallpaperThumb = CGSize(width: 96, height: 60)
     /// How much of the content height the backdrop covers before it has faded out.
     public static let backdropHeight: CGFloat = 0.62
 }

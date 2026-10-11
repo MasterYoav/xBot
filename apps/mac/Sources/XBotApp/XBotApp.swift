@@ -15,6 +15,7 @@ struct XBotApp: App {
         Window("xBot", id: "main") {
             RootView(workspace: workspace)
                 .frame(minWidth: Metrics.minimumWindow.width, minHeight: Metrics.minimumWindow.height)
+                .followsAppearanceSetting()
         }
         .defaultSize(Metrics.defaultWindow)
         // Content runs to the top edge, the traffic lights float over the sidebar, and the top bar
