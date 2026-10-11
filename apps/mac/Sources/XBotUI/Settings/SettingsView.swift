@@ -99,6 +99,7 @@ private struct AgentSettings: View {
         switch kind {
         case .claude: ClaudeAccount.isSignedIn() ? String(localized: "Yes") : String(localized: "No")
         case .codex: workspace.usage[.codex]?.limits.plan != nil ? String(localized: "Yes") : String(localized: "Not seen yet")
+        case .antigravity, .copilot: String(localized: "Checked on the first turn")
         }
     }
 

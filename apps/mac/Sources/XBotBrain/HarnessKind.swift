@@ -4,12 +4,19 @@ import Foundation
 public enum HarnessKind: String, Codable, CaseIterable, Sendable {
     case claude
     case codex
+    /// Google's Antigravity CLI (`agy`): Gemini, and the other models Google offers in it. It
+    /// replaced Gemini CLI, which no longer works for personal Google accounts.
+    case antigravity
+    /// GitHub Copilot CLI: whichever models the person's Copilot plan includes.
+    case copilot
 
     /// Product names, so not localised.
     public var displayName: String {
         switch self {
         case .claude: "Claude Code"
         case .codex: "Codex"
+        case .antigravity: "Antigravity"
+        case .copilot: "GitHub Copilot"
         }
     }
 
@@ -17,6 +24,8 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .claude: "claude"
         case .codex: "codex"
+        case .antigravity: "agy"
+        case .copilot: "copilot"
         }
     }
 
@@ -24,9 +33,32 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
     public var models: [String?] {
         switch self {
         case .claude: [nil, "opus", "sonnet", "haiku"]
-        case .codex: [nil]
+        case .codex, .antigravity, .copilot: [nil]
         }
     }
+
+    /// Answers to a JSON schema (plan mode, drawn wallpapers). Antigravity's `--json-schema` came
+    /// back empty when tried, and Copilot has none.
+    public var givesStructuredAnswers: Bool { self == .claude || self == .codex }
+
+    /// No option for a system prompt: who the agent is goes ahead of the prompt.
+    public var needsInstructionsInPrompt: Bool { self == .antigravity || self == .copilot }
+
+    /// Run headless, Antigravity's edit mode refuses even to read, so "Edit files" has to use its
+    /// full permissions. The composer says so.
+    public var editingNeedsFullAccess: Bool { self == .antigravity }
+
+    /// The prompt as this CLI receives it: with who the agent is ahead of it when it can't take
+    /// that separately.
+    func promptText(for request: TurnRequest) -> String {
+        guard needsInstructionsInPrompt, let instructions = request.instructions, !instructions.isEmpty else {
+            return request.prompt
+        }
+        return "<instructions>\n\(instructions)\n</instructions>\n\n" + request.prompt
+    }
+
+    /// Whether the prompt goes on stdin. Antigravity and Copilot read it only from their flag.
+    var readsPromptFromStdin: Bool { self == .claude || self == .codex }
 
     /// Never the prompt: it goes on stdin, because a prompt starting with "-" would be read as a
     /// flag and argv has a length limit. Codex reads a schema from a file, which the caller writes.
@@ -71,6 +103,34 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             if let resume = request.resumeID { arguments.append(resume) }
             arguments.append("-")
             return arguments
+
+        // Neither reads a prompt from stdin. Attached to its flag ("--prompt=…") a prompt that
+        // starts with "-" can't be taken for an option.
+        case .copilot:
+            var arguments = ["--prompt=" + promptText(for: request), "--output-format", "json", "--no-color"]
+            switch (request.planning, request.mode) {
+            case (true, _), (false, .readOnly): break   // reads are allowed; anything else is denied headless
+            case (false, .editFiles): arguments += ["--allow-tool", "write"]
+            case (false, .fullAccess): arguments.append("--allow-all-tools")
+            }
+            if let model = request.model { arguments += ["--model", model] }
+            if let effort = request.effort { arguments += ["--reasoning-effort", effort.claudeValue] }
+            if let resume = request.resumeID { arguments += ["--resume", resume] }
+            return arguments
+
+        case .antigravity:
+            var arguments = ["--print=" + promptText(for: request), "--output-format", "stream-json"]
+            switch (request.planning, request.mode) {
+            case (true, _), (false, .readOnly): arguments += ["--mode", "plan"]
+            case (false, .editFiles), (false, .fullAccess): arguments.append("--dangerously-skip-permissions")
+            }
+            if let model = request.model { arguments += ["--model", model] }
+            if let effort = request.effort {
+                let level = switch effort { case .low: "low"; case .medium: "medium"; default: "high" }
+                arguments += ["--effort", level]
+            }
+            if let resume = request.resumeID { arguments += ["--conversation", resume] }
+            return arguments
         }
     }
 
@@ -96,6 +156,8 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .claude: ClaudeStream.events(from: line)
         case .codex: CodexStream.events(from: line)
+        case .copilot: CopilotStream.events(from: line)
+        case .antigravity: AntigravityStream.events(from: line)
         }
     }
 }

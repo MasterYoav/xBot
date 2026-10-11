@@ -91,7 +91,8 @@ public struct HarnessBrain: Brain {
         // raises SIGPIPE, whose default action ends the whole app. With this the write just fails,
         // and the turn reports the CLI's own complaint from stderr.
         _ = fcntl(writer.fileDescriptor, F_SETNOSIGPIPE, 1)
-        let prompt = Data(request.prompt.utf8)
+        // Antigravity and Copilot take it from their flag; they get an empty stdin, closed at once.
+        let prompt = Data((kind.readsPromptFromStdin ? request.prompt : "").utf8)
         Task.detached {
             try? writer.write(contentsOf: prompt)
             try? writer.close()

@@ -10,7 +10,9 @@ func jsonObject(_ line: String) -> [String: Any]? {
 /// What a tool call is about, on one line: its file, command, pattern or address.
 func summary(of input: Any?) -> String {
     guard let input = input as? [String: Any] else { return "" }
-    for key in ["file_path", "path", "command", "pattern", "url", "query", "description"] {
+    // Claude Code and Codex use snake case; Antigravity's tools use PascalCase.
+    for key in ["file_path", "path", "command", "pattern", "url", "query", "description",
+                "AbsolutePath", "TargetFile", "CommandLine", "DirectoryPath", "SearchPath", "Query", "Url"] {
         if let value = input[key] as? String { return oneLine(value) }
     }
     return ""
