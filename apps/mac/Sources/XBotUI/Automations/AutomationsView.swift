@@ -72,7 +72,7 @@ struct AutomationsView: View {
     /// Off by default; turning it on installs the background helper, off removes it.
     private var helperToggle: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
-            Toggle(isOn: Binding(get: { helperOn }, set: setHelper)) {
+            Toggle(isOn: Binding(get: { helperOn }, set: { setHelper($0) })) {
                 Text(String(localized: "Run when xBot is closed")).bodyText().foregroundStyle(Palette.textPrimary)
             }
             .toggleStyle(.switch)
