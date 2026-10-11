@@ -1,0 +1,74 @@
+name: XBotMobile
+options:
+  bundleIdPrefix: dev.xbot
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: N6883L5366
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  XBot:
+    path: ../mac
+targets:
+  XBotMobile:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: ../../xBot.icon
+        buildPhase: resources
+    dependencies:
+      - package: XBot
+        product: XBotRemote
+    entitlements:
+      path: XBotMobile.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers: [iCloud.dev.xbot]
+        com.apple.developer.icloud-services: [CloudKit]
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.xbot.mobile
+        PRODUCT_NAME: xBot
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: xBot
+        INFOPLIST_KEY_CFBundleDisplayName: xBot
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+    info:
+      path: Info.plist
+      properties:
+        NSLocalNetworkUsageDescription: xBot connects straight to your Mac when you're on the same network.
+        NSBonjourServices: [_xbot._tcp]
+        NSCameraUsageDescription: Scan the pairing code on your Mac.
+        UIBackgroundModes: [remote-notification]
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.xbot.pair
+            CFBundleURLSchemes: [xbot]
+        UILaunchScreen: {}
+  # Not shipped: gives the Mac app (built with SwiftPM, bundle dev.xbot.app) a provisioning
+  # profile with the same iCloud container and push, which scripts/sign-mac-remote.sh embeds.
+  XBotMacSigning:
+    type: application
+    platform: macOS
+    sources:
+      - path: MacSigning
+    entitlements:
+      path: MacSigning/XBotMacSigning.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers: [iCloud.dev.xbot]
+        com.apple.developer.icloud-services: [CloudKit]
+        com.apple.developer.aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.xbot.app
+        PRODUCT_NAME: XBotMacSigning
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_HARDENED_RUNTIME: YES
