@@ -142,6 +142,8 @@ private struct ProjectNotesView: View {
                     }
                 }
                 .padding(.horizontal, Space.l)
+                // Clear of the files-and-changes button floating at the top right.
+                .padding(.trailing, Metrics.titleBar)
                 .padding(.vertical, Space.s)
                 if previewing {
                     ScrollView {

@@ -1,0 +1,9 @@
+{"type":"thread.started","thread_id":"01a129e1-c79a-7403-8b2a-b6fc3ac09318"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Codex is ignoring 2 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/me/.codex/config.toml): `profiles.ollama-launch.forced_login_method` is ignored.\n  user (/Users/me/.codex/config.toml): `profiles.ollama-launch.openai_base_url` is ignored."}}
+{"type":"item.completed","item":{"id":"item_1","type":"error","message":"Codex is ignoring 2 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/me/.codex/config.toml): `profiles.ollama-launch.forced_login_method` is ignored.\n  user (/Users/me/.codex/config.toml): `profiles.ollama-launch.openai_base_url` is ignored."}}
+{"type":"item.completed","item":{"id":"item_2","type":"error","message":"clamping SessionEnd hook timeout to 3s in /Users/me/.codex/hooks.json"}}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_3","type":"mcp_tool_call","server":"node_repl","tool":"js","arguments":{"code":"nodeRepl.write(6*7)","title":"Evaluate 6*7"},"result":null,"error":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_3","type":"mcp_tool_call","server":"node_repl","tool":"js","arguments":{"code":"nodeRepl.write(6*7)","title":"Evaluate 6*7"},"result":{"content":[{"type":"text","text":"42"}],"_meta":{"codex/nodeReplExecutionDurationMs":0},"structured_content":null},"error":null,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_4","type":"agent_message","text":"42"}}
+{"type":"turn.completed","usage":{"input_tokens":58406,"cached_input_tokens":51456,"cache_write_input_tokens":0,"output_tokens":78,"reasoning_output_tokens":0}}

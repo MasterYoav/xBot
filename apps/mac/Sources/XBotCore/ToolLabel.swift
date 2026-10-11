@@ -4,6 +4,10 @@ import Foundation
 /// returned, and a one-line summary of a step's tools.
 public enum ToolLabel {
     public static func verb(_ name: String, running: Bool) -> String {
+        if let (server, tool) = connector(name) {
+            let what = tool.map { "\(server): \($0)" } ?? server
+            return running ? String(localized: "Using \(what)") : String(localized: "Used \(what)")
+        }
         let (doing, did) = switch name {
         case "Read": (String(localized: "Reading"), String(localized: "Read"))
         case "Write": (String(localized: "Creating"), String(localized: "Created"))
@@ -19,8 +23,17 @@ public enum ToolLabel {
         return running ? doing : did
     }
 
+    /// `mcp__server__tool` → (server, tool).
+    static func connector(_ name: String) -> (String, String?)? {
+        guard name.hasPrefix("mcp__") else { return nil }
+        let rest = name.dropFirst(5)
+        guard let split = rest.range(of: "__") else { return (String(rest), nil) }
+        return (String(rest[..<split.lowerBound]), String(rest[split.upperBound...]))
+    }
+
     public static func symbol(_ name: String) -> String {
-        switch name {
+        if connector(name) != nil { return "point.3.connected.trianglepath.dotted" }
+        return switch name {
         case "Read", "Write", "Edit", "MultiEdit", "apply_patch": "doc.text"
         case "Bash", "Shell", "shell", "exec", "exec_command": "terminal"
         case "Skill": "sparkles"
@@ -59,8 +72,10 @@ public enum ToolLabel {
 
     private enum Group: Hashable {
         case read, created, edited, ran, searchedCode, searchedWeb, opened, listed, other
+        case connector(String)
 
         init(_ name: String) {
+            if let (server, _) = ToolLabel.connector(name) { self = .connector(server); return }
             self = switch name {
             case "Read": .read
             case "Write": .created
@@ -85,6 +100,9 @@ public enum ToolLabel {
             case .opened: n == 1 ? String(localized: "opened a page") : String(localized: "opened \(n) pages")
             case .listed: n == 1 ? String(localized: "listed a folder") : String(localized: "listed \(n) folders")
             case .other: n == 1 ? String(localized: "used 1 other tool") : String(localized: "used \(n) other tools")
+            case .connector(let server):
+                n == 1 ? String(localized: "used \(server) once")
+                    : n == 2 ? String(localized: "used \(server) twice") : String(localized: "used \(server) \(n) times")
             }
         }
     }

@@ -12,8 +12,14 @@ enum CodexStream {
             return (object["thread_id"] as? String).map { [.session($0)] } ?? []
 
         case "item.started":
-            guard item?["type"] as? String == "command_execution" else { return [] }
-            return [.toolCall(id: id, name: "Shell", summary: command(item?["command"]))]
+            switch item?["type"] as? String {
+            case "command_execution":
+                return [.toolCall(id: id, name: "Shell", summary: command(item?["command"]))]
+            case "mcp_tool_call":
+                return [.toolCall(id: id, name: mcpName(item), summary: summary(of: item?["arguments"] as? [String: Any] ?? [:]))]
+            default:
+                return []
+            }
 
         case "item.completed":
             switch item?["type"] as? String {
@@ -31,6 +37,13 @@ enum CodexStream {
                     .toolCall(id: id, name: "Edit", summary: oneLine(paths.joined(separator: ", "))),
                     .toolResult(id: id, output: "", isError: item?["status"] as? String == "failed"),
                 ]
+            case "mcp_tool_call":
+                if let error = item?["error"] as? [String: Any] {
+                    return [.toolResult(id: id, output: error["message"] as? String ?? "", isError: true)]
+                }
+                let content = (item?["result"] as? [String: Any])?["content"] as? [[String: Any]] ?? []
+                let text = content.compactMap { $0["text"] as? String }.joined(separator: "\n")
+                return [.toolResult(id: id, output: text, isError: item?["status"] as? String == "failed")]
             case "error":
                 return (item?["message"] as? String).map { [.notice(oneLine($0))] } ?? []
             default:
@@ -51,6 +64,11 @@ enum CodexStream {
         default:
             return []
         }
+    }
+
+    /// Connector calls named as Claude Code names them: `mcp__<server>__<tool>`.
+    private static func mcpName(_ item: [String: Any]?) -> String {
+        "mcp__\(item?["server"] as? String ?? "server")__\(item?["tool"] as? String ?? "tool")"
     }
 
     /// Codex wraps every command in the login shell (`/bin/zsh -lc '…'`). Show what it ran.

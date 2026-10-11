@@ -81,7 +81,10 @@ import Testing
         #expect(!read.contains("--allow-all-tools") && !read.contains("--allow-tool"))
         let edit = HarnessKind.copilot.arguments(for: request(.editFiles))
         #expect(edit.contains("--allow-tool") && edit.contains("write") && !edit.contains("--allow-all-tools"))
-        #expect(HarnessKind.copilot.arguments(for: request(.fullAccess)).contains("--allow-all-tools"))
+        // Full access reaches any path too: without it Copilot refuses to write outside the folder.
+        let full = HarnessKind.copilot.arguments(for: request(.fullAccess))
+        #expect(full.contains("--allow-all-tools") && full.contains("--allow-all-paths"))
+        #expect(!edit.contains("--allow-all-paths"))
     }
 
     /// Antigravity's plan mode reads but doesn't edit; its edit mode can't even read headless, so
@@ -112,5 +115,21 @@ import Testing
     @Test func onlyClaudeAndCodexGiveStructuredAnswers() {
         #expect(HarnessKind.claude.givesStructuredAnswers && HarnessKind.codex.givesStructuredAnswers)
         #expect(!HarnessKind.copilot.givesStructuredAnswers && !HarnessKind.antigravity.givesStructuredAnswers)
+    }
+}
+
+/// Codex 0.162 reports connector (MCP) calls as `mcp_tool_call` items; recorded with node_repl.
+@Suite struct CodexMCPTests {
+    @Test func aConnectorCallIsATool() throws {
+        let events = try fixtureLines("codex-mcp-turn").flatMap(CodexStream.events(from:))
+        // Named as Claude Code names them, so the rest of xBot treats both alike.
+        #expect(events.contains { if case .toolCall("item_3", "mcp__node_repl__js", let s, _) = $0 { s.contains("6*7") } else { false } })
+        #expect(events.contains { if case .toolResult("item_3", "42", false) = $0 { true } else { false } })
+        #expect(events.contains(.text("42")))
+    }
+
+    @Test func aFailedConnectorCallIsAnError() {
+        let line = #"{"type":"item.completed","item":{"id":"i","type":"mcp_tool_call","server":"gh","tool":"x","arguments":{},"result":null,"error":{"message":"not connected"},"status":"failed"}}"#
+        #expect(CodexStream.events(from: line).contains(.toolResult(id: "i", output: "not connected", isError: true)))
     }
 }

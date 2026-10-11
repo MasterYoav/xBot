@@ -15,6 +15,9 @@ func summary(of input: Any?) -> String {
                 "AbsolutePath", "TargetFile", "CommandLine", "DirectoryPath", "SearchPath", "Query", "Url"] {
         if let value = input[key] as? String { return oneLine(value) }
     }
+    // A connector's own arguments: its title, else the first short text it was given.
+    if let title = input["title"] as? String { return oneLine(title) }
+    if let first = input.keys.sorted().lazy.compactMap({ input[$0] as? String }).first { return oneLine(first) }
     return ""
 }
 

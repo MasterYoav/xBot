@@ -21,6 +21,9 @@ public final class Workspace {
     var workplaceRevision = 0
     /// The crew, in their order. HeadMaster first.
     public internal(set) var agents: [Agent] = []
+    /// Automations, in their order.
+    public internal(set) var automations: [Automation] = []
+    @ObservationIgnored var automationClock: Task<Void, Never>?
     /// When each agent last finished a turn, and when the person last looked: Done in between.
     /// Set to ask the Agents page to open the editor on a new member; the page clears it.
     public var wantsToHire = false
@@ -98,6 +101,7 @@ public final class Workspace {
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
         agents = attempt { try store.agents() } ?? []
+        automations = attempt { try store.automations() } ?? []
         usage = attempt { try store.usage() } ?? [:]
         applyDraftDefaults()
     }

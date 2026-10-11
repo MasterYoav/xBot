@@ -76,6 +76,19 @@ public final class Store {
             }
             try db.execute("PRAGMA user_version = 4")
         }
+        if version < 5 {
+            // Automations (2026-10-11), replacing the Inbox; a chat can be one's run.
+            try db.execute("""
+                CREATE TABLE IF NOT EXISTS automations (
+                  id TEXT PRIMARY KEY, name TEXT NOT NULL, trigger TEXT, steps TEXT NOT NULL,
+                  harness TEXT NOT NULL, model TEXT, effort TEXT, project_id TEXT,
+                  enabled INTEGER NOT NULL DEFAULT 1, last_run_at REAL, sort_index INTEGER NOT NULL DEFAULT 0,
+                  created_at REAL NOT NULL)
+                """)
+            let columns = try db.rows("PRAGMA table_info(chats)").compactMap { $0[1].string }
+            if !columns.contains("automation_id") { try db.execute("ALTER TABLE chats ADD COLUMN automation_id TEXT") }
+            try db.execute("PRAGMA user_version = 5")
+        }
     }
 
     /// `~/Library/Application Support/xBot/xbot.sqlite`.
@@ -153,12 +166,93 @@ public final class Store {
         try db.execute("UPDATE chats SET agent_id = NULL WHERE agent_id = ?", [.text(id.uuidString)])
     }
 
+    // MARK: Automations
+
+    public func automations() throws -> [Automation] {
+        try db.rows("""
+            SELECT id, name, trigger, steps, harness, model, effort, project_id, enabled, last_run_at, sort_index,
+              created_at
+            FROM automations ORDER BY sort_index, created_at
+            """).compactMap { r in
+            guard let id = r[0].uuid, let name = r[1].string,
+                  let harness = r[4].string.flatMap(HarnessKind.init(rawValue:)) else { return nil }
+            let trigger: Automation.Trigger = r[2].string
+                .flatMap { try? decoder.decode(AutomationSchedule.self, from: Data($0.utf8)) }
+                .map(Automation.Trigger.schedule) ?? .manual
+            // Step by step, so one that can't be read loses only itself.
+            let raw = r[3].string.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [[String: Any]] ?? []
+            let steps = raw.compactMap { s -> AutomationStep? in
+                guard let app = (s["app"] as? String).flatMap(AutomationApp.init(storageKey:)) else { return nil }
+                let id = (s["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
+                return AutomationStep(id: id, app: app, text: s["text"] as? String ?? "")
+            }
+            return Automation(
+                id: id, name: name, trigger: trigger, steps: steps, harness: harness, model: r[5].string,
+                effort: r[6].string.flatMap(Effort.init(rawValue:)), projectID: r[7].uuid, isEnabled: r[8].bool,
+                lastRunAt: r[9].isNull ? nil : r[9].date, createdAt: r[11].date, sortIndex: Int(r[10].number)
+            )
+        }
+    }
+
+    private struct StoredStep: Codable {
+        var id: UUID
+        var app: String
+        var text: String
+    }
+
+    public func save(_ automation: Automation) throws {
+        var trigger: String?
+        if case .schedule(let schedule) = automation.trigger {
+            trigger = String(decoding: try encoder.encode(schedule), as: UTF8.self)
+        }
+        let steps = String(decoding: try encoder.encode(automation.steps.map {
+            StoredStep(id: $0.id, app: $0.app.storageKey, text: $0.text)
+        }), as: UTF8.self)
+        try db.execute("""
+            INSERT INTO automations (id, name, trigger, steps, harness, model, effort, project_id, enabled,
+              last_run_at, sort_index, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name, trigger = excluded.trigger, steps = excluded.steps,
+              harness = excluded.harness, model = excluded.model, effort = excluded.effort,
+              project_id = excluded.project_id, enabled = excluded.enabled, sort_index = excluded.sort_index
+            """, [
+                .text(automation.id.uuidString), .text(automation.name), trigger.sql, .text(steps),
+                .text(automation.harness.rawValue), automation.model.sql, (automation.effort?.rawValue).sql,
+                (automation.projectID?.uuidString).sql, .bool(automation.isEnabled),
+                automation.lastRunAt.map(Database.Value.date) ?? .null, .real(Double(automation.sortIndex)),
+                .date(automation.createdAt),
+            ])
+    }
+
+    /// Marks a run as started, only if nobody else has since `expected` (the last run this process
+    /// saw). The app and the background helper both tick; whichever claims first runs it.
+    public func claim(_ id: UUID, expected: Date?, at now: Date) throws -> Bool {
+        let rows = try db.rows("SELECT last_run_at FROM automations WHERE id = ?", [.text(id.uuidString)])
+        guard let row = rows.first else { return false }
+        let current: Date? = row[0].isNull ? nil : row[0].date
+        guard current?.timeIntervalSinceReferenceDate == expected?.timeIntervalSinceReferenceDate else { return false }
+        if let expected {
+            try db.execute("UPDATE automations SET last_run_at = ? WHERE id = ? AND last_run_at = ?",
+                           [.date(now), .text(id.uuidString), .date(expected)])
+        } else {
+            try db.execute("UPDATE automations SET last_run_at = ? WHERE id = ? AND last_run_at IS NULL",
+                           [.date(now), .text(id.uuidString)])
+        }
+        return try db.changes() == 1
+    }
+
+    /// Its runs stay, as plain chats.
+    public func deleteAutomation(_ id: UUID) throws {
+        try db.execute("DELETE FROM automations WHERE id = ?", [.text(id.uuidString)])
+        try db.execute("UPDATE chats SET automation_id = NULL WHERE automation_id = ?", [.text(id.uuidString)])
+    }
+
     // MARK: Chats
 
     public func chats() throws -> [Chat] {
         try db.rows("""
             SELECT id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan, effort, agent_id
+              plan_mode, review_plan, effort, agent_id, automation_id
             FROM chats ORDER BY updated_at DESC
             """).compactMap { r in
             // A row from a newer xBot with a harness this one does not know is skipped, not fatal.
@@ -169,7 +263,7 @@ public final class Store {
                 id: id, projectID: r[1].uuid, title: title, harness: harness, model: r[4].string,
                 mode: mode, sessionID: r[6].string, planMode: r[9].bool, reviewPlan: r[10].bool,
                 effort: r[11].string.flatMap(Effort.init(rawValue:)), agentID: r[12].uuid,
-                createdAt: r[7].date, updatedAt: r[8].date
+                automationID: r[13].uuid, createdAt: r[7].date, updatedAt: r[8].date
             )
         }
     }
@@ -179,19 +273,19 @@ public final class Store {
     public func save(_ chat: Chat) throws {
         try db.execute("""
             INSERT INTO chats (id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan, effort, agent_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              plan_mode, review_plan, effort, agent_id, automation_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET project_id = excluded.project_id, title = excluded.title,
               harness = excluded.harness, model = excluded.model, mode = excluded.mode,
               session_id = excluded.session_id, updated_at = excluded.updated_at,
               plan_mode = excluded.plan_mode, review_plan = excluded.review_plan, effort = excluded.effort,
-              agent_id = excluded.agent_id
+              agent_id = excluded.agent_id, automation_id = excluded.automation_id
             """, [
                 .text(chat.id.uuidString), (chat.projectID?.uuidString).sql, .text(chat.title),
                 .text(chat.harness.rawValue), chat.model.sql, .text(chat.mode.rawValue),
                 chat.sessionID.sql, .date(chat.createdAt), .date(chat.updatedAt),
                 .bool(chat.planMode), .bool(chat.reviewPlan), (chat.effort?.rawValue).sql,
-                (chat.agentID?.uuidString).sql,
+                (chat.agentID?.uuidString).sql, (chat.automationID?.uuidString).sql,
             ])
     }
 

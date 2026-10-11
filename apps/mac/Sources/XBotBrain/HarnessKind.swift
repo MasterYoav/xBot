@@ -111,7 +111,7 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             switch (request.planning, request.mode) {
             case (true, _), (false, .readOnly): break   // reads are allowed; anything else is denied headless
             case (false, .editFiles): arguments += ["--allow-tool", "write"]
-            case (false, .fullAccess): arguments.append("--allow-all-tools")
+            case (false, .fullAccess): arguments += ["--allow-all-tools", "--allow-all-paths"]
             }
             if let model = request.model { arguments += ["--model", model] }
             if let effort = request.effort { arguments += ["--reasoning-effort", effort.claudeValue] }

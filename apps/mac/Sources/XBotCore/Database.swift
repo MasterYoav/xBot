@@ -78,6 +78,9 @@ public final class Database {
         }
     }
 
+    /// Rows the last INSERT, UPDATE or DELETE changed.
+    public func changes() -> Int { Int(sqlite3_changes(handle)) }
+
     private var message: String { String(cString: sqlite3_errmsg(handle)) }
 }
 
@@ -90,6 +93,8 @@ extension Database.Value {
     }
 
     static func date(_ date: Date) -> Self { .real(date.timeIntervalSinceReferenceDate) }
+
+    var isNull: Bool { self == .null }
 
     var number: Double { if case .real(let n) = self { n } else { 0 } }
 
