@@ -23,3 +23,11 @@ import Testing
         #expect(ToolLabel.summary(of: [tool("mcp__a__x"), tool("mcp__b__y"), tool("mcp__a__z")]) == "Used a twice, used b once")
     }
 }
+
+@Suite struct PageTabsTests {
+    /// Abilities, Notes, Automations and Agents are pages of their own: no chat tabs above them.
+    @Test func tabsShowOnlyOnChatPages() {
+        for page: Page in [.abilities, .notes, .automations, .agents] { #expect(!page.showsTabs, "\(page)") }
+        #expect(Page.main.showsTabs && Page.profile.showsTabs)
+    }
+}

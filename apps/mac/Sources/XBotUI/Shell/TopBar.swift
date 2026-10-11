@@ -29,6 +29,26 @@ struct TopBar: View {
                 IconButton("sidebar.left", help: String(localized: "Show sidebar (⌃⌘S)"), action: showSidebar)
                     .padding(.trailing, Space.xs)
             }
+            if workspace.page.showsTabs { tabs }
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .gesture(WindowDragGesture())
+            IconButton(
+                "sidebar.right",
+                help: inspectorAvailable
+                    ? String(localized: "Files and changes (⌥⌘0)")
+                    : String(localized: "Choose a project to see its files and changes.")
+            ) { inspectorShown.toggle() }
+            .disabled(!inspectorAvailable)
+            .padding(.trailing, Space.s)
+        }
+        .frame(height: Metrics.titleBar)
+        .animation(Motion.panel, value: workspace.openChatIDs)
+    }
+
+    /// The open chats, the unsent one, and +.
+    @ViewBuilder private var tabs: some View {
             ForEach(Array(workspace.openChatIDs.enumerated()), id: \.element) { index, id in
                 if let chat = workspace.chat(id) {
                     let dragging = drag?.id == id
@@ -49,21 +69,6 @@ struct TopBar: View {
                 workspace.startDraft(in: workspace.selectedChatID.flatMap { workspace.chat($0)?.projectID })
             }
             .padding(.horizontal, Space.xs)
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .gesture(WindowDragGesture())
-            IconButton(
-                "sidebar.right",
-                help: inspectorAvailable
-                    ? String(localized: "Files and changes (⌥⌘0)")
-                    : String(localized: "Choose a project to see its files and changes.")
-            ) { inspectorShown.toggle() }
-            .disabled(!inspectorAvailable)
-            .padding(.trailing, Space.s)
-        }
-        .frame(height: Metrics.titleBar)
-        .animation(Motion.panel, value: workspace.openChatIDs)
     }
 
     private func offset(for id: UUID) -> CGFloat {

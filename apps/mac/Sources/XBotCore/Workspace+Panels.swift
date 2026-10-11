@@ -61,6 +61,15 @@ extension Workspace {
 public enum Page: Equatable, Sendable {
     case main, profile, abilities, notes, agents, automations
     case diff(projectID: UUID, file: GitFile)
+
+    /// Whether the chat tabs show above it. Abilities, Notes, Automations and Agents are places
+    /// of their own, so the strip hides there.
+    public var showsTabs: Bool {
+        switch self {
+        case .abilities, .notes, .automations, .agents: false
+        case .main, .profile, .diff: true
+        }
+    }
 }
 
 extension Workspace {
