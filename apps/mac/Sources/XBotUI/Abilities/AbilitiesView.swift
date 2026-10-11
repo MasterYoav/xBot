@@ -263,7 +263,7 @@ private struct AbilityRow: View {
         if busy {
             ProgressView().controlSize(.small).frame(width: Metrics.toggleWidth)
         } else if let enabled = ability.enabled, ability.toggle != nil {
-            Toggle(isOn: Binding(get: { enabled }, set: toggle)) { EmptyView() }
+            Toggle(isOn: Binding(get: { enabled }, set: { toggle($0) })) { EmptyView() }
                 .toggleStyle(.switch)
                 .tint(Palette.accent)
                 .labelsHidden()
