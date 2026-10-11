@@ -145,7 +145,7 @@ struct Composer: View {
 
     private var planChip: some View {
         Menu {
-            Toggle(String(localized: "Review plan first"), isOn: Binding(get: { reviewPlan }, set: setReview))
+            Toggle(String(localized: "Review plan first"), isOn: Binding(get: { reviewPlan }, set: { setReview($0) }))
         } label: {
             Chip(String(localized: "Plan"), systemImage: "list.bullet.clipboard",
                  detail: planMode && !reviewPlan ? String(localized: "· runs at once") : nil, isOn: planMode)
