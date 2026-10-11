@@ -1,0 +1,168 @@
+[
+  {
+    "id": "frontend-design@claude-plugins-official",
+    "version": "b8e53f1c05df",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/claude-plugins-official/frontend-design/b8e53f1c05df",
+    "installedAt": "2026-06-24T04:58:03.593Z",
+    "lastUpdated": "2026-10-10T03:56:13.110Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "frontend-design@claude-plugins-official",
+    "version": "fa59bc903774",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/claude-plugins-official/frontend-design/fa59bc903774",
+    "installedAt": "2026-08-27T17:56:48.555Z",
+    "lastUpdated": "2026-09-27T05:22:44.424Z",
+    "projectPath": "/Users/me/Developer",
+    "projectEnabled": false
+  },
+  {
+    "id": "impeccable@impeccable",
+    "version": "3.8.0",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/impeccable/impeccable/3.8.0",
+    "installedAt": "2026-06-24T04:58:48.713Z",
+    "lastUpdated": "2026-06-24T04:58:48.713Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "impeccable@impeccable",
+    "version": "3.8.0",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/impeccable/impeccable/3.8.0",
+    "installedAt": "2026-08-27T17:56:48.555Z",
+    "lastUpdated": "2026-08-27T17:56:48.555Z",
+    "projectPath": "/Users/me/Developer",
+    "projectEnabled": false
+  },
+  {
+    "id": "ponytail@ponytail",
+    "version": "4.8.3",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/ponytail/ponytail/4.8.3",
+    "installedAt": "2026-06-24T06:00:01.618Z",
+    "lastUpdated": "2026-06-24T06:00:01.618Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "ponytail@ponytail",
+    "version": "4.8.3",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/ponytail/ponytail/4.8.3",
+    "installedAt": "2026-08-27T17:56:48.555Z",
+    "lastUpdated": "2026-08-27T17:56:48.555Z",
+    "projectPath": "/Users/me/Developer",
+    "projectEnabled": false
+  },
+  {
+    "id": "scroll-world@scroll-world",
+    "version": "0.2.0",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/scroll-world/scroll-world/0.2.0",
+    "installedAt": "2026-07-14T09:58:41.666Z",
+    "lastUpdated": "2026-07-14T09:58:41.666Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "scroll-world@scroll-world",
+    "version": "0.2.0",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/scroll-world/scroll-world/0.2.0",
+    "installedAt": "2026-08-27T17:56:48.555Z",
+    "lastUpdated": "2026-08-27T17:56:48.555Z",
+    "projectPath": "/Users/me/Developer",
+    "projectEnabled": false
+  },
+  {
+    "id": "superpowers@claude-plugins-official",
+    "version": "6.4.1",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1",
+    "installedAt": "2026-08-03T07:48:33.312Z",
+    "lastUpdated": "2026-09-23T19:27:32.355Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "superpowers@claude-plugins-official",
+    "version": "6.4.1",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1",
+    "installedAt": "2026-08-27T17:56:48.555Z",
+    "lastUpdated": "2026-09-27T05:22:49.317Z",
+    "projectPath": "/Users/me/Developer",
+    "projectEnabled": false
+  },
+  {
+    "id": "swift-lsp@claude-plugins-official",
+    "version": "1.0.0",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/claude-plugins-official/swift-lsp/1.0.0",
+    "installedAt": "2026-07-20T14:38:44.448Z",
+    "lastUpdated": "2026-07-20T14:38:44.448Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "swift-lsp@claude-plugins-official",
+    "version": "1.0.0",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/claude-plugins-official/swift-lsp/1.0.0",
+    "installedAt": "2026-08-27T17:56:48.555Z",
+    "lastUpdated": "2026-08-27T17:56:48.555Z",
+    "projectPath": "/Users/me/Developer",
+    "projectEnabled": false
+  },
+  {
+    "id": "typesafe@typesafe-ai",
+    "version": "0.5.7",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/cache/typesafe-ai/typesafe/0.5.7",
+    "installedAt": "2026-09-27T05:29:03.685Z",
+    "lastUpdated": "2026-09-27T05:29:03.685Z",
+    "projectEnabled": false
+  },
+  {
+    "id": "cowork-plugin-management@synced",
+    "version": "0.2.2",
+    "scope": "synced",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/synced/c77ab82d-3cf1-43f1-89a0-9260a2549c25_e0b831a8-d7c7-450a-a9de-bffd7d9386e0/cowork-plugin-management"
+  },
+  {
+    "id": "qdrant@synced",
+    "version": "1.0.0",
+    "scope": "synced",
+    "enabled": true,
+    "installPath": "/Users/me/.claude/plugins/synced/c77ab82d-3cf1-43f1-89a0-9260a2549c25_e0b831a8-d7c7-450a-a9de-bffd7d9386e0/qdrant-skills~g2"
+  },
+  {
+    "id": "superpowers@synced",
+    "version": "unknown",
+    "scope": "synced",
+    "enabled": true,
+    "installPath": "",
+    "notes": [
+      "\"superpowers@synced\" from claude.ai not loaded \u2014 \"superpowers@claude-plugins-official\" on this machine has the same name and takes precedence"
+    ],
+    "noteDetails": [
+      {
+        "type": "synced-plugin-shadowed",
+        "related": "superpowers@claude-plugins-official"
+      }
+    ]
+  }
+]

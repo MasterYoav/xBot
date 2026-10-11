@@ -1,0 +1,526 @@
+{
+  "installed": [
+    {
+      "pluginId": "documents@openai-primary-runtime",
+      "name": "documents",
+      "marketplaceName": "openai-primary-runtime",
+      "version": "26.1007.11041",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime/plugins/documents"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "pdf@openai-primary-runtime",
+      "name": "pdf",
+      "marketplaceName": "openai-primary-runtime",
+      "version": "26.1007.11041",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime/plugins/pdf"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "spreadsheets@openai-primary-runtime",
+      "name": "spreadsheets",
+      "marketplaceName": "openai-primary-runtime",
+      "version": "26.1007.11041",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime/plugins/spreadsheets"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "presentations@openai-primary-runtime",
+      "name": "presentations",
+      "marketplaceName": "openai-primary-runtime",
+      "version": "26.1007.11041",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime/plugins/presentations"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "template-creator@openai-primary-runtime",
+      "name": "template-creator",
+      "marketplaceName": "openai-primary-runtime",
+      "version": "26.1007.11041",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime/plugins/template-creator"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "codex-app-tools@openai-bundled",
+      "name": "codex-app-tools",
+      "marketplaceName": "openai-bundled",
+      "version": "0.1.6",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/codex-app-tools"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "browser@openai-bundled",
+      "name": "browser",
+      "marketplaceName": "openai-bundled",
+      "version": "26.1007.21159",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/browser"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "unified-computer-use@openai-bundled",
+      "name": "unified-computer-use",
+      "marketplaceName": "openai-bundled",
+      "version": "26.1007.21159",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/unified-computer-use"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "computer-use@openai-bundled",
+      "name": "computer-use",
+      "marketplaceName": "openai-bundled",
+      "version": "1.0.1001425",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/computer-use"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "code-review@openai-bundled",
+      "name": "code-review",
+      "marketplaceName": "openai-bundled",
+      "version": "26.1007.21159",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/code-review"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "visualize@openai-bundled",
+      "name": "visualize",
+      "marketplaceName": "openai-bundled",
+      "version": "1.0.49",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/visualize"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "frontend-design@claude-plugins-official",
+      "name": "frontend-design",
+      "marketplaceName": "claude-plugins-official",
+      "version": "local",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/marketplaces/claude-plugins-official/plugins/frontend-design"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/anthropics/claude-plugins-official.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "superpowers@claude-plugins-official",
+      "name": "superpowers",
+      "marketplaceName": "claude-plugins-official",
+      "version": "6.4.1",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "git",
+        "url": "https://github.com/obra/superpowers.git",
+        "sha": "5bf4e78011075bcfc0dc295f0724994cd123ee71"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/anthropics/claude-plugins-official.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "swift-lsp@claude-plugins-official",
+      "name": "swift-lsp",
+      "marketplaceName": "claude-plugins-official",
+      "version": "1.0.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/marketplaces/claude-plugins-official/plugins/swift-lsp"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/anthropics/claude-plugins-official.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "impeccable@impeccable",
+      "name": "impeccable",
+      "marketplaceName": "impeccable",
+      "version": "4.5.2",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/marketplaces/impeccable/plugin"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/pbakaus/impeccable.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "ponytail@ponytail",
+      "name": "ponytail",
+      "marketplaceName": "ponytail",
+      "version": "5.1.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "git",
+        "url": "https://github.com/DietrichGebert/ponytail.git",
+        "ref": "main"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/DietrichGebert/ponytail.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "scroll-world@scroll-world",
+      "name": "scroll-world",
+      "marketplaceName": "scroll-world",
+      "version": "0.8.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/marketplaces/scroll-world"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/oso95/scroll-world.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "gmail@openai-curated-remote",
+      "name": "gmail",
+      "marketplaceName": "openai-curated-remote",
+      "version": "0.1.10",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "remote",
+        "id": "plugin_connector_1p_95d39881713c8191931482a62d6edff9"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "github@openai-curated-remote",
+      "name": "github",
+      "marketplaceName": "openai-curated-remote",
+      "version": "0.1.12-5f7cd798dc99",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "remote",
+        "id": "plugin_connector_1p_1a69035c238881919c4190932b2df699"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "data-analytics@openai-curated-remote",
+      "name": "data-analytics",
+      "marketplaceName": "openai-curated-remote",
+      "version": "0.2.10-13ceeea1f599",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "remote",
+        "id": "Plugin_fc9843a6fb34819195d6c7802398a8a7"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "openai-templates@openai-curated-remote",
+      "name": "openai-templates",
+      "marketplaceName": "openai-curated-remote",
+      "version": "0.1.1",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "remote",
+        "id": "plugin_connector_1p_2330815c823c8191941e5dc465bb899f"
+      },
+      "installPolicy": "INSTALLED_BY_DEFAULT",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "sites@openai-curated-remote",
+      "name": "sites",
+      "marketplaceName": "openai-curated-remote",
+      "version": "1.0.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "remote",
+        "id": "plugin_connector_1p_689987207de08191979cf68eca2941c6"
+      },
+      "installPolicy": "INSTALLED_BY_DEFAULT",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "plugin-management@openai-curated-remote",
+      "name": "plugin-management",
+      "marketplaceName": "openai-curated-remote",
+      "version": "0.1.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "remote",
+        "id": "plugin_connector_1p_b3438d6beb9081918fba3625bc988128"
+      },
+      "installPolicy": "INSTALLED_BY_DEFAULT",
+      "authPolicy": "ON_USE"
+    },
+    {
+      "pluginId": "work-pets@openai-curated-remote",
+      "name": "work-pets",
+      "marketplaceName": "openai-curated-remote",
+      "version": "0.1.6",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "remote",
+        "id": "plugin_connector_1p_bccf6c8660c08191ae4470d9ae4877fa"
+      },
+      "installPolicy": "INSTALLED_BY_DEFAULT",
+      "authPolicy": "ON_USE"
+    }
+  ],
+  "available": [
+    {
+      "pluginId": "chrome@openai-bundled",
+      "name": "chrome",
+      "marketplaceName": "openai-bundled",
+      "version": "26.1007.21159",
+      "installed": false,
+      "enabled": false,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/chrome"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "messages@openai-bundled",
+      "name": "messages",
+      "marketplaceName": "openai-bundled",
+      "version": "1.0.1001425",
+      "installed": false,
+      "enabled": false,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/messages"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "record-and-replay@openai-bundled",
+      "name": "record-and-replay",
+      "marketplaceName": "openai-bundled",
+      "version": "1.0.1001425",
+      "installed": false,
+      "enabled": false,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/record-and-replay"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "latex@openai-bundled",
+      "name": "latex",
+      "marketplaceName": "openai-bundled",
+      "version": "0.2.8",
+      "installed": false,
+      "enabled": false,
+      "source": {
+        "source": "local",
+        "path": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled/plugins/latex"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "42crunch-api-security-testing@claude-plugins-official",
+      "name": "42crunch-api-security-testing",
+      "marketplaceName": "claude-plugins-official",
+      "version": null,
+      "installed": false,
+      "enabled": false,
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/42Crunch-AI/claude-plugins.git",
+        "path": "plugins/api-security-testing",
+        "ref": "v1.5.5",
+        "sha": "faf5305385de8afed9468904e8639be737aff39e"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/anthropics/claude-plugins-official.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "adobe-for-creativity@claude-plugins-official",
+      "name": "adobe-for-creativity",
+      "marketplaceName": "claude-plugins-official",
+      "version": null,
+      "installed": false,
+      "enabled": false,
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/adobe/skills.git",
+        "path": "plugins/creative-cloud/adobe-for-creativity",
+        "ref": "main",
+        "sha": "acb6d76475e6c522a5b109d2df7c8a794ee74ea7"
+      },
+      "marketplaceSource": {
+        "sourceType": "git",
+        "source": "https://github.com/anthropics/claude-plugins-official.git"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    }
+  ]
+}

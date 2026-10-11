@@ -41,7 +41,6 @@ public enum Metrics {
     /// A transcript line longer than this is hard to read; wider windows add margin, not width.
     public static let readingWidth: CGFloat = 720
     public static let tabMaxWidth: CGFloat = 230
-    public static let suggestionHeight: CGFloat = 96
     public static let minimumWindow = CGSize(width: 900, height: 600)
     public static let defaultWindow = CGSize(width: 1280, height: 820)
     public static let toolOutputMaxHeight: CGFloat = 240
@@ -67,6 +66,16 @@ public enum Metrics {
     public static let wallpaperThumb = CGSize(width: 96, height: 60)
     /// An app icon choice in Settings › Appearance.
     public static let appIconChoice: CGFloat = 64
+    /// Abilities: the page's width, a row's icon tile, the switch column, the search field.
+    public static let abilitiesWidth: CGFloat = 880
+    public static let abilityIcon: CGFloat = 44
+    public static let toggleWidth: CGFloat = 76
+    public static let searchWidth: CGFloat = 260
+    /// Browse and other large sheets.
+    public static let sheetWidth: CGFloat = 640
+    public static let sheetHeight: CGFloat = 560
+    /// Notes: the list of notes beside the editor.
+    public static let notesListWidth: CGFloat = 240
     /// How much of the content height the backdrop covers before it has faded out.
     public static let backdropHeight: CGFloat = 0.62
 }

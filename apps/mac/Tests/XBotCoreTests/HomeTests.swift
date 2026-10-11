@@ -58,15 +58,6 @@ import XBotBrain
         #expect(w.chat(try #require(w.selectedChatID))?.projectID == nil)
     }
 
-    @Test func aSuggestionFillsTheDraftAndMayTurnOnPlan() async {
-        let w = await workspace()
-        w.use(.explain)
-        #expect(w.draft.text == Suggestion.explain.prompt && !w.draft.planMode)
-        w.use(.plan)
-        #expect(w.draft.planMode)
-        #expect(w.composerFocusRequest == 2)
-    }
-
     @Test func workedForRunsFromTheQuestionToTheReply() async throws {
         let w = await workspace(SequenceBrain([[.textDelta("ok"), .done]]))
         let chat = try #require(w.newChat(in: nil))

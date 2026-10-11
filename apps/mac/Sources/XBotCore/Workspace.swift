@@ -12,6 +12,11 @@ public final class Workspace {
     public var selectedChatID: UUID?
     /// What the main area shows instead of Home or the chat: the profile, or a file's diff.
     public var page: Page = .main
+    /// The project the Notes page shows. Nil: the one in context, else the first.
+    public var notesProjectID: UUID?
+    /// Connectors, plugins, skills and MCP servers, read from the agents' own CLIs.
+    @ObservationIgnored public private(set) lazy var abilities: AbilityCatalog = makeAbilities()
+    @ObservationIgnored var projectNotes: [UUID: ProjectNotes] = [:]
     /// The reply being written right now, per chat. Saved as a message when the turn ends.
     public private(set) var live: [UUID: [Part]] = [:]
     /// True until the installed CLIs have been looked for. Nothing claims one is missing before then.

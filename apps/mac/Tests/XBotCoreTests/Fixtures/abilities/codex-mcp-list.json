@@ -1,0 +1,198 @@
+[
+  {
+    "name": "code-review",
+    "enabled": false,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": [
+        "-c",
+        "exec \"$CODEX_MCP_NODE_PATH\" ./server.mjs \"$@\"",
+        "--"
+      ],
+      "env": null,
+      "env_vars": [
+        "PATH",
+        "GH_CONFIG_DIR",
+        "GH_ENTERPRISE_TOKEN",
+        "GH_HOST",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "CODEX_API_KEY",
+        "CODEX_API_BASE_URL",
+        "CODEX_API_ENDPOINT",
+        "CODEX_HOME",
+        "CODEX_CLI_PATH",
+        "CODEX_MCP_NODE_PATH",
+        "CODEX_MANAGED_PACKAGE_ROOT",
+        "GITHUB_PROVIDER_URL",
+        "GITHUB_READ_INDEX",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "SSL_CERT_FILE",
+        "NODE_EXTRA_CA_CERTS"
+      ],
+      "cwd": "/Users/me/.codex/plugins/cache/openai-bundled/code-review/26.1007.21159/."
+    },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": 120.0,
+    "auth_status": "unsupported"
+  },
+  {
+    "name": "codex_app",
+    "enabled": false,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "/Users/me/.codex/plugins/cache/openai-bundled/codex-app-tools/0.1.6/scripts/launch_codex_app_tools_mcp",
+      "args": [
+        "./server.mjs"
+      ],
+      "env": {
+        "CODEX_APP_TOOLS_DEFERRED": "<redacted>"
+      },
+      "env_vars": [
+        "CODEX_APP_TOOLS_PIPE_PATH",
+        "CODEX_MCP_NODE_PATH",
+        "CODEX_BROWSER_USE_NODE_PATH",
+        "CODEX_ELECTRON_RESOURCES_PATH",
+        "CODEX_CLI_PATH",
+        "XDG_CACHE_HOME",
+        "HOME",
+        "USERPROFILE",
+        "LOCALAPPDATA",
+        "PATH"
+      ],
+      "cwd": "/Users/me/.codex/plugins/cache/openai-bundled/codex-app-tools/0.1.6"
+    },
+    "startup_timeout_sec": 10.0,
+    "tool_timeout_sec": 3600.0,
+    "auth_status": "unsupported"
+  },
+  {
+    "name": "computer-use",
+    "enabled": false,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "./Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
+      "args": [
+        "mcp"
+      ],
+      "env": null,
+      "env_vars": [],
+      "cwd": "."
+    },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  },
+  {
+    "name": "cua_repl",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "args": [
+        "/Applications/ChatGPT.app/Contents/Resources/cua_node/lib/node_modules/@oai/cua-repl/bin/cua-repl.mjs"
+      ],
+      "env": {
+        "BROWSER_USE_AVAILABLE_BACKENDS": "<redacted>",
+        "NODE_REPL_NODE_MODULE_DIRS": "<redacted>",
+        "CUA_REPL_ENABLED_SURFACES": "<redacted>",
+        "CODEX_HOME": "<redacted>",
+        "NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME": "<redacted>",
+        "BROWSER_USE_TINYSKY_ENABLED": "<redacted>",
+        "NODE_REPL_TRUSTED_CODE_PATHS": "<redacted>",
+        "NODE_REPL_NODE_PATH": "<redacted>",
+        "BROWSER_USE_CODEX_APP_VERSION": "<redacted>",
+        "SKY_CUA_SERVICE_PATH": "<redacted>",
+        "NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER": "<redacted>",
+        "NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS": "<redacted>",
+        "CUA_REPL_NODE_REPL_PATH": "<redacted>",
+        "NODE_REPL_TRUSTED_SERVICES": "<redacted>",
+        "BROWSER_USE_CODEX_APP_BUILD_FLAVOR": "<redacted>",
+        "NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE": "<redacted>",
+        "CODEX_CLI_PATH": "<redacted>"
+      },
+      "env_vars": [],
+      "cwd": null
+    },
+    "startup_timeout_sec": 120.0,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  },
+  {
+    "name": "headroom",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "headroom",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": null,
+      "env_vars": [],
+      "cwd": null
+    },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  },
+  {
+    "name": "node_repl",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "args": [],
+      "env": {
+        "NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER": "<redacted>",
+        "CODEX_CLI_PATH": "<redacted>",
+        "BROWSER_USE_AVAILABLE_BACKENDS": "<redacted>",
+        "BROWSER_USE_TINYSKY_ENABLED": "<redacted>",
+        "BROWSER_USE_CODEX_APP_BUILD_FLAVOR": "<redacted>",
+        "NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE": "<redacted>",
+        "NODE_REPL_NODE_MODULE_DIRS": "<redacted>",
+        "NODE_REPL_TRUSTED_CODE_PATHS": "<redacted>",
+        "CODEX_HOME": "<redacted>",
+        "SKY_CUA_SERVICE_PATH": "<redacted>",
+        "BROWSER_USE_CODEX_APP_VERSION": "<redacted>",
+        "NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME": "<redacted>",
+        "NODE_REPL_TRUSTED_SERVICES": "<redacted>",
+        "NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS": "<redacted>",
+        "NODE_REPL_NODE_PATH": "<redacted>"
+      },
+      "env_vars": [],
+      "cwd": null
+    },
+    "startup_timeout_sec": 120.0,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  },
+  {
+    "name": "tokensave",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "/Users/me/.local/bin/tokensave",
+      "args": [
+        "serve"
+      ],
+      "env": null,
+      "env_vars": [],
+      "cwd": null
+    },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  }
+]
