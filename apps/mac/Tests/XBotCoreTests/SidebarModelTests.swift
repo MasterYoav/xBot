@@ -27,18 +27,20 @@ import Testing
         #expect(model.groups.map(\.isRunning) == [false, true])
     }
 
-    @Test func recentIsTheFiveNewestEverywhereAndInboxIsTheLooseOnes() {
-        let chats = [chat("a", in: site, ago: 1), chat("b", in: nil, ago: 2), chat("c", in: api, ago: 3),
-                     chat("d", in: nil, ago: 4), chat("e", in: site, ago: 5), chat("f", in: site, ago: 6)]
+    /// The Inbox is gone: chats without a project are Recent, five at a time, then "Show all".
+    @Test func recentHoldsTheChatsWithoutAProject() {
+        let chats = [chat("a", in: site, ago: 1)] + (0..<7).map { chat("l\($0)", in: nil, ago: Double($0 + 2)) }
         let model = SidebarModel(projects: [site, api], chats: chats.shuffled(), running: [])
-        #expect(model.recent.map(\.title) == ["a", "b", "c", "d", "e"])
-        #expect(model.inbox.map(\.title) == ["b", "d"])
+        #expect(model.recent.map(\.title) == ["l0", "l1", "l2", "l3", "l4"])
+        #expect(model.hiddenRecent == 2)
+        let all = SidebarModel(projects: [site, api], chats: chats, running: [], showsAllRecent: true)
+        #expect(all.recent.count == 7 && all.hiddenRecent == 0)
     }
 
     @Test func searchIgnoresCaseAndAccents() {
-        let chats = [chat("Café menu", in: site, ago: 1), chat("Billing", in: api, ago: 2)]
+        let chats = [chat("Café menu", in: site, ago: 1), chat("Billing", in: api, ago: 2), chat("cafe idea", in: nil, ago: 3)]
         let model = SidebarModel(projects: [site, api], chats: chats, running: [], query: "CAFE")
-        #expect(model.recent.map(\.title) == ["Café menu"])
+        #expect(model.recent.map(\.title) == ["cafe idea"])
         #expect(model.groups.map(\.project.name) == ["site"])
     }
 }

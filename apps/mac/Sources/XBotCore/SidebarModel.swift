@@ -1,6 +1,6 @@
 import Foundation
 
-/// What the sidebar shows: projects with their newest chats, Recent, and the Inbox — all narrowed
+/// What the sidebar shows: projects with their newest chats, and Recent — all narrowed
 /// by the search field. Worked out here so the view only draws it.
 public struct SidebarModel: Equatable, Sendable {
     public struct Group: Equatable, Sendable, Identifiable {
@@ -17,14 +17,18 @@ public struct SidebarModel: Equatable, Sendable {
     public static let recentCount = 5
 
     public var groups: [Group]
+    /// Chats without a project, newest first; at most `recentCount` unless `showsAllRecent`.
     public var recent: [Chat]
-    public var inbox: [Chat]
+    public var hiddenRecent: Int
 
     public init(
-        projects: [Project], chats: [Chat], running: Set<UUID>, query: String = "", expanded: Set<UUID> = []
+        projects: [Project], chats: [Chat], running: Set<UUID>, query: String = "", expanded: Set<UUID> = [],
+        showsAllRecent: Bool = false
     ) {
         let needle = query.trimmingCharacters(in: .whitespaces)
+        // An automation's runs are its history, on its page, not the sidebar's.
         let shown = chats
+            .filter { $0.automationID == nil }
             .filter { needle.isEmpty || $0.title.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
             .sorted { $0.updatedAt > $1.updatedAt }
         groups = projects.compactMap { project in
@@ -38,7 +42,9 @@ public struct SidebarModel: Equatable, Sendable {
                 isRunning: chats.contains { $0.projectID == project.id && running.contains($0.id) }
             )
         }
-        inbox = shown.filter { $0.projectID == nil }
-        recent = Array(shown.prefix(Self.recentCount))
+        let loose = shown.filter { $0.projectID == nil }
+        let limit = showsAllRecent || !needle.isEmpty ? loose.count : Self.recentCount
+        recent = Array(loose.prefix(limit))
+        hiddenRecent = max(0, loose.count - limit)
     }
 }

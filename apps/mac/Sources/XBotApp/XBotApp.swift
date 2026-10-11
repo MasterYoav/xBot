@@ -4,7 +4,41 @@ import XBotBrain
 import XBotCore
 import XBotUI
 
+/// `XBot --automations-tick` (the background helper's LaunchAgent): run what's due, headless, and
+/// quit. Anything else: the app.
 @main
+enum XBotEntry {
+    static func main() {
+        guard CommandLine.arguments.contains(AutomationHelper.tickArgument) else {
+            XBotApp.main()
+            return
+        }
+        Task { @MainActor in
+            await AutomationTick.run()
+            exit(0)
+        }
+        dispatchMain()
+    }
+}
+
+@MainActor
+enum AutomationTick {
+    static func run() async {
+        // The app runs them itself while it's open.
+        let me = ProcessInfo.processInfo.processIdentifier
+        let appOpen = NSRunningApplication.runningApplications(withBundleIdentifier: "dev.xbot.app")
+            .contains { $0.processIdentifier != me }
+        guard !appOpen, let store = try? Store.live() else { return }
+        let due = (try? store.automations())?.contains { $0.isDue(at: .now) } ?? false
+        guard due else { return }
+        let inbox = Store.supportDirectory.appending(path: "Inbox", directoryHint: .isDirectory)
+        let workspace = Workspace(store: store, inbox: inbox, discover: { await HarnessLocator.installed() })
+        await workspace.refreshHarnesses()
+        workspace.runDueAutomations()
+        await workspace.waitForTurns()
+    }
+}
+
 struct XBotApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let appUpdates = SparkleAppUpdateController()
@@ -82,6 +116,7 @@ struct XBotApp: App {
             )
         }
         AppDelegate.workspace = workspace
+        workspace.startAutomationClock()
         return workspace
     }
 }

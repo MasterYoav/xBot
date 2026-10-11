@@ -59,7 +59,7 @@ extension Workspace {
 // MARK: Pages
 
 public enum Page: Equatable, Sendable {
-    case main, profile, abilities, notes, agents
+    case main, profile, abilities, notes, agents, automations
     case diff(projectID: UUID, file: GitFile)
 }
 

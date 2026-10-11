@@ -1,7 +1,7 @@
 import SwiftUI
 import XBotCore
 
-/// Search, Abilities, Notes and Inbox, projects with their chats, Recent, and the account button.
+/// Search, Abilities, Notes and Automations, projects with their chats, Recent, and the account button.
 struct Sidebar: View {
     let workspace: Workspace
     let addProject: () -> Void
@@ -9,14 +9,14 @@ struct Sidebar: View {
     @State private var query = ""
     @State private var expanded: Set<UUID> = []
     @State private var collapsed: Set<UUID> = []
-    @State private var inboxOpen = true
+    @State private var showsAllRecent = false
     @State private var renaming: UUID?
     @State private var renameText = ""
     @FocusState private var searchFocused: Bool
 
     private var model: SidebarModel {
         SidebarModel(projects: workspace.projects, chats: workspace.chats, running: workspace.runningChatIDs,
-                     query: query, expanded: expanded)
+                     query: query, expanded: expanded, showsAllRecent: showsAllRecent)
     }
 
     var body: some View {
@@ -35,15 +35,15 @@ struct Sidebar: View {
                         SidebarRow(String(localized: "Notes"), systemImage: "note.text", isSelected: workspace.page == .notes)
                     }
                     .buttonStyle(.plain)
-                    Button { inboxOpen.toggle() } label: {
-                        SidebarRow(String(localized: "Inbox"), systemImage: "tray") {
-                            if !model.inbox.isEmpty { MonoLabel("\(model.inbox.count)") }
+                    Button { workspace.showAutomations() } label: {
+                        SidebarRow(String(localized: "Automations"), systemImage: "wand.and.stars",
+                                   isSelected: workspace.page == .automations) {
+                            if workspace.automations.contains(where: { workspace.isRunning(automation: $0.id) }) {
+                                ProgressView().controlSize(.mini)
+                            }
                         }
                     }
                     .buttonStyle(.plain)
-                    if inboxOpen || !query.isEmpty {
-                        ForEach(model.inbox.prefix(SidebarModel.chatsPerProject)) { chatRow($0) }
-                    }
 
                     if query.isEmpty { AgentsSidebarSection(workspace: workspace) }
 
@@ -59,6 +59,15 @@ struct Sidebar: View {
                     if !model.recent.isEmpty {
                         sectionHeader(String(localized: "Recent"), add: nil)
                         ForEach(model.recent) { chatRow($0, indent: false) }
+                        if model.hiddenRecent > 0 || showsAllRecent {
+                            Button { showsAllRecent.toggle() } label: {
+                                Text(showsAllRecent ? String(localized: "Show less")
+                                                    : String(localized: "Show all \(model.recent.count + model.hiddenRecent)"))
+                                    .captionText().foregroundStyle(Palette.textTertiary)
+                                    .padding(.horizontal, Space.s).padding(.vertical, Space.xxs)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
                 .padding(.horizontal, Space.s)

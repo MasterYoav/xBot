@@ -10,6 +10,12 @@
 	<string>xBot</string>
 	<key>CFBundleIconName</key>
 	<string>xBot</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Your automations and agents control apps like Mail, Calendar, Notes and Reminders when you ask them to.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Your automations can read and add calendar events when you ask them to.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Your automations can read and add reminders when you ask them to.</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.xbot.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>

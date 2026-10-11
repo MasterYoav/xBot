@@ -66,7 +66,7 @@ struct Composer: View {
     private var contextStrip: some View {
         HStack(spacing: Space.s) {
             Menu {
-                Button(String(localized: "Inbox")) { chooseProject(nil) }
+                Button(String(localized: "No project")) { chooseProject(nil) }
                 ForEach(workspace.projects) { project in
                     Button(project.name) { chooseProject(project.id) }
                 }
@@ -207,7 +207,7 @@ struct Composer: View {
     private var projectID: UUID? { chat?.projectID ?? (target == .draft ? workspace.draft.projectID : nil) }
 
     private var projectName: String {
-        workspace.projects.first { $0.id == projectID }?.name ?? String(localized: "Inbox")
+        workspace.projects.first { $0.id == projectID }?.name ?? String(localized: "No project")
     }
 
     private var harness: HarnessKind? { chat?.harness ?? workspace.draftHarness }

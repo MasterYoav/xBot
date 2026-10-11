@@ -35,15 +35,19 @@ public struct Chat: Identifiable, Equatable, Sendable {
     public var effort: Effort?
     /// The crew member this chat is with. Nil: a plain chat.
     public var agentID: UUID?
+    /// The automation this chat is a run of. Nil: a chat the person started.
+    public var automationID: UUID?
     public var createdAt: Date
     public var updatedAt: Date
 
     public init(
         id: UUID = UUID(), projectID: UUID?, title: String, harness: HarnessKind, model: String? = nil,
         mode: PermissionMode, sessionID: String? = nil, planMode: Bool = false, reviewPlan: Bool = true,
-        effort: Effort? = nil, agentID: UUID? = nil, createdAt: Date = .now, updatedAt: Date = .now
+        effort: Effort? = nil, agentID: UUID? = nil, automationID: UUID? = nil, createdAt: Date = .now,
+        updatedAt: Date = .now
     ) {
         self.agentID = agentID
+        self.automationID = automationID
         self.id = id
         self.projectID = projectID
         self.title = title

@@ -62,6 +62,8 @@ public struct RootView: View {
                                 AgentsView(workspace: workspace, stageBottomChanged: { worldStageBottom = $0 })
                             case .abilities:
                                 AbilitiesView(workspace: workspace)
+                            case .automations:
+                                AutomationsView(workspace: workspace)
                             case .notes:
                                 NotesView(workspace: workspace, addProject: { addingProject = true })
                             case .main:
