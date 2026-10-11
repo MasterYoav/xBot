@@ -27,7 +27,7 @@ The Mac app must cost the same as today when no phone is attached, and very litt
 | State | Budget on the Mac | How |
 |---|---|---|
 | No phone paired | nothing | No listener, no CloudKit; the feature is off until the first pairing. |
-| Paired, no phone attached | < 0.1% CPU idle, < 3 MB | A Bonjour listener (kernel-woken, no polling) and one CloudKit subscription (push-woken). No timers. |
+| Paired, no phone attached | < 0.1% CPU idle, < 3 MB | A Bonjour listener (kernel-woken) and one CloudKit subscription (push-woken), plus one small CloudKit read every 15 s (pushes alone proved unreliable on the Mac; see below). |
 | Phone attached, nothing running | < 0.5% CPU | Changes are pushed as small diffs when the workspace changes; no polling, no snapshots on a timer. |
 | Phone attached, agent streaming | < 2% CPU over the turn's own cost | Live text is coalesced: at most 10 sends/s on the local network and 1 write/s (per running chat) through iCloud. |
 
@@ -37,8 +37,13 @@ Rules that hold it there:
   never polls. iCloud is used only when a phone says it is away (a heartbeat record, renewed every
   60 s while the phone app is open), so a phone at home costs no CloudKit writes.
 - The phone receives the chat list once, then diffs; a transcript only when opened, then diffs.
-- Nothing new draws on the Mac. The motion gate (PR #30) keeps the Mac's animations paused while
-  you work from the phone.
+- Nothing new draws on the Mac. The motion gate (`motionGate()`, `\.motionPaused`) pauses every
+  looping animation (wallpaper, the agents' world, sprites, the effort knob) while xBot isn't the
+  active app, so a Mac serving a phone, or just sitting behind other apps, draws nothing.
+- iCloud pushes are best-effort (APNs throttles and coalesces silent pushes, and on the Mac they
+  didn't arrive at all in the first live test), so they only make things quicker. The Mac reads
+  the mailbox itself: every 2 s while a phone is attached through iCloud (as the phone reads the
+  Mac), every 15 s otherwise, to notice a phone that just went away.
 - Measured before merge on the installed release build, each row of the table, with the numbers in
   the PR.
 
@@ -99,3 +104,28 @@ apps/ios  (Xcode project, iOS/iPadOS 26)          SwiftUI: chat list, chat, comp
 - Budget: a test that a host with no clients does no work per workspace change.
 - Live: the real iPhone 15 Pro, on the same Wi-Fi and then on cellular (iCloud path): open a chat,
   send, watch it stream, stop, approve a plan; CPU/RAM on the Mac measured for each budget row.
+
+## Measured (installed release build, 2026-10-11)
+
+| State | CPU | Memory |
+|---|---|---|
+| Paired, no phone attached, xBot in the background | 0.01% avg (max 0.1%) over 60 s | 63 MB |
+| Same, before the motion gate (Sky Realm wallpaper looping off-screen) | 17.3% avg | 212 MB |
+| xBot in front, wallpaper animating (not the remote's cost) | ~12% | |
+
+A 5 s `sample` of the paired, idle Mac put CloudKit at 20 of 2,778 main-thread samples (< 1%).
+
+Live on the real iPhone 15 Pro (iOS 27): paired by scanning the QR; same Wi-Fi ("· same Wi-Fi"),
+chats listed; Wi-Fi off, "· through iCloud", a new Codex chat sent from the phone answered through
+iCloud. Simulators (iPhone 17 Pro, iPad Pro 13" M5): `LiveRemoteUITests` pairs with a debug Mac
+build, starts a Codex chat, gets "pong", sends a follow-up, gets "ping".
+
+## Mac signing for iCloud
+
+iCloud and push are restricted entitlements, so the Mac app needs a provisioning profile.
+`apps/ios/project.yml` has a helper target, `XBotMacSigning` (bundle `dev.xbot.app`, same
+container), that Xcode's automatic signing provisions; `scripts/sign-mac-remote.sh` builds it,
+embeds its profile in XBot.app and signs with the same identity and entitlements. That is
+development signing (this team's Macs). A Developer ID release needs a Developer ID profile with
+iCloud from the developer portal; without one, the release falls back to the local lane and says so
+in Settings › Devices.

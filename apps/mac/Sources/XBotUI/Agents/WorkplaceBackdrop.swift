@@ -8,13 +8,14 @@ struct WorkplaceBackdrop: View {
     let stageBottom: CGFloat
     @State private var stillDate = Date.now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
         GeometryReader { geometry in
             let sceneHeight = WorkplaceBackdropLayout.sceneHeight(
                 stageBottom: stageBottom, viewportHeight: geometry.size.height
             )
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { clock in
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion || motionPaused)) { clock in
                 let date = reduceMotion ? stillDate : clock.date
                 ZStack(alignment: .topLeading) {
                     WorldGround(setting: setting, horizon: sceneHeight, date: date)

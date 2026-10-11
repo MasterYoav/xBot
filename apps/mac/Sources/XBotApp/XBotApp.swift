@@ -48,6 +48,7 @@ struct XBotApp: App {
     var body: some Scene {
         Window("xBot", id: "main") {
             RootView(workspace: workspace)
+                .motionGate()
                 .frame(minWidth: Metrics.minimumWindow.width, minHeight: Metrics.minimumWindow.height)
                 .followsAppearanceSetting()
                 .windowMovesOnlyFromDragAreas()

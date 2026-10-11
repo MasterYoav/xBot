@@ -6,9 +6,10 @@ import XBotCore
 struct AgentsSidebarSection: View {
     let workspace: Workspace
     @State private var hovered: UUID?
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
+        TimelineView(.animation(minimumInterval: 1, paused: motionPaused)) { _ in
             let crew = workspace.agents
             if !crew.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s) {
@@ -87,12 +88,13 @@ private struct SidebarWorldBackdrop: View {
     let setting: WorkplaceSetting
     @State private var stillDate = Date.now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
         GeometryReader { geometry in
             let scale = max(0.01, geometry.size.height / WorkplaceScene.height)
             let artWidth = geometry.size.width / scale
-            TimelineView(.animation(minimumInterval: 0.1, paused: reduceMotion)) { clock in
+            TimelineView(.animation(minimumInterval: 0.1, paused: reduceMotion || motionPaused)) { clock in
                 WorldScenery(setting: setting, date: reduceMotion ? stillDate : clock.date, width: artWidth)
                     .frame(width: artWidth, height: WorkplaceScene.height)
                     .scaleEffect(scale, anchor: .topLeading)

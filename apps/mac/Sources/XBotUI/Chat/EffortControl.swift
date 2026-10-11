@@ -154,11 +154,12 @@ struct EffortTrack: View {
 private struct Knob: View {
     let galaxy: Bool
     let animated: Bool
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
         ZStack {
             if galaxy {
-                TimelineView(.animation(minimumInterval: 1 / 30, paused: !animated)) { context in
+                TimelineView(.animation(minimumInterval: 1 / 30, paused: !animated || motionPaused)) { context in
                     Canvas { canvas, size in
                         let t = context.date.timeIntervalSinceReferenceDate
                         let centre = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -187,9 +188,10 @@ private struct Knob: View {
 /// Galaxy's track: small square pixels, brighter and busier toward the right, twinkling.
 private struct GalaxyPixels: View {
     let animated: Bool
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 12, paused: !animated)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 12, paused: !animated || motionPaused)) { context in
             Canvas { canvas, size in
                 let cell: CGFloat = 3.5
                 let frame = Int(context.date.timeIntervalSinceReferenceDate * 6)
