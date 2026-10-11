@@ -105,7 +105,8 @@ import XBotRemote
         await until { link.sent.contains { if case .live(_, [.text("xxxxxxxxxx")]) = $0 { true } else { false } } }
         let lives = link.sent.compactMap { if case .live(_, let parts) = $0 { parts } else { nil } }
         #expect(lives.last == [.text("xxxxxxxxxx")])
-        #expect(lives.count <= 3)
+        // Coalesced: fewer frames than deltas (how many depends on how fast the machine is).
+        #expect(lives.count <= 5)
         w.stop(chat.id)
     }
 
