@@ -2,7 +2,8 @@ import AppKit
 import Foundation
 import Observation
 
-/// Settings › Appearance: light or dark, the picture behind the main screen, and the typeface.
+/// Settings › Appearance: light or dark, the picture behind the main screen, the typeface and the
+/// app icon.
 ///
 /// One shared, observable object, because the window, the Settings window and the design system's
 /// type scale all read it, and a change has to reach all three at once.
@@ -39,6 +40,22 @@ public final class Appearance {
         case none
     }
 
+    /// The app icon: one colour of xBot.icon. Ink is the one the app ships with.
+    public enum AppIcon: String, CaseIterable, Sendable {
+        case ink, rose, sunset, plum
+
+        public var title: String {
+            switch self {
+            case .ink: String(localized: "Ink")
+            case .rose: String(localized: "Rose")
+            case .sunset: String(localized: "Sunset")
+            case .plum: String(localized: "Plum")
+            }
+        }
+
+        public var isDefault: Bool { self == .ink }
+    }
+
     public static let shared = Appearance()
 
     public var theme: Theme { didSet { defaults.set(theme.rawValue, forKey: Keys.theme) } }
@@ -56,6 +73,8 @@ public final class Appearance {
         }
     }
 
+    public var appIcon: AppIcon { didSet { defaults.set(appIcon.rawValue, forKey: Keys.appIcon) } }
+
     /// A family from the Mac's own fonts. Nil is the system font, SF Pro.
     public var fontFamily: String? { didSet { defaults.set(fontFamily, forKey: Keys.fontFamily) } }
 
@@ -67,6 +86,7 @@ public final class Appearance {
         static let wallpaper = "wallpaper"
         static let customFile = "wallpaperFile"
         static let fontFamily = "fontFamily"
+        static let appIcon = "appIcon"
         /// Settings › General › Background picture, before Appearance existed.
         static let legacyBackdrop = "showBackdrop"
     }
@@ -79,6 +99,7 @@ public final class Appearance {
         self.defaults = defaults
         self.folder = folder
         theme = defaults.string(forKey: Keys.theme).flatMap(Theme.init(rawValue:)) ?? .dark
+        appIcon = defaults.string(forKey: Keys.appIcon).flatMap(AppIcon.init(rawValue:)) ?? .ink
 
         switch defaults.string(forKey: Keys.wallpaper) {
         case "desktop": wallpaper = .desktop

@@ -30,3 +30,4 @@ Icon?
 
 # Sparkle signing key. Never commit it: whoever holds it can sign updates every install accepts.
 sparkle-private.key
+apps/mac/Sources/XBotUI/Resources/AppIcons/

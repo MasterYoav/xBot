@@ -3,7 +3,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 import XBotCore
 
-/// Settings › Appearance: light or dark, the wallpaper behind the main screen, and the typeface.
+/// Settings › Appearance: light or dark, the wallpaper behind the main screen, the app icon and the
+/// typeface.
 struct AppearanceSettings: View {
     @Bindable private var appearance = Appearance.shared
     @State private var choosingPicture = false
@@ -30,6 +31,19 @@ struct AppearanceSettings: View {
                 if let problem {
                     Text(problem).captionText().foregroundStyle(Palette.failure)
                 }
+            }
+
+            Section(String(localized: "App icon")) {
+                HStack(spacing: Space.m) {
+                    ForEach(Appearance.AppIcon.allCases, id: \.self) { icon in
+                        Button { appearance.appIcon = icon } label: {
+                            IconChoice(image: AppIconApplier.image(for: icon), title: icon.title,
+                                       selected: appearance.appIcon == icon)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, Space.xs)
             }
 
             Section(String(localized: "Font")) {
@@ -81,6 +95,35 @@ struct AppearanceSettings: View {
         }
         .buttonStyle(.plain)
         .help(String(localized: "Use a picture of your own"))
+    }
+}
+
+private struct IconChoice: View {
+    let image: NSImage?
+    let title: String
+    let selected: Bool
+
+    var body: some View {
+        VStack(spacing: Space.xs) {
+            Group {
+                if let image { Image(nsImage: image).resizable().interpolation(.high) }
+                else { RoundedRectangle(cornerRadius: Radius.large, style: .continuous).fill(Palette.inset) }
+            }
+            .frame(width: Metrics.appIconChoice, height: Metrics.appIconChoice)
+            .padding(Space.xxs)
+            .background(selected ? Palette.accentTint : .clear,
+                        in: RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.large, style: .continuous)
+                    .strokeBorder(selected ? Palette.accent : .clear, lineWidth: 2)
+            )
+            Text(title).captionText().foregroundStyle(selected ? Palette.textPrimary : Palette.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "\(title) app icon"))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

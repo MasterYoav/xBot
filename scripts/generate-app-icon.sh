@@ -43,6 +43,35 @@ cp "${STAGING}/Assets.car" "${OUT_APP}/Assets.car"
 cp "${STAGING}/xBot.icns" "${OUT_APP}/xBot.icns"
 cp "${STAGING}/xBot.icns" "${OUT_UI}/xBot.icns"
 
+# The alternate app icons (Settings › Appearance › App icon). Each is the same pack with one colour
+# layer shown and the rest hidden, so xBot.icon stays the only source of every icon.
+# name:layer image — must match Appearance.AppIcon in XBotCore.
+VARIANTS_OUT="${OUT_UI}/AppIcons"
+rm -rf "${VARIANTS_OUT}"
+mkdir -p "${VARIANTS_OUT}"
+for variant in "ink:Image 2.png" "rose:Image 3.png" "sunset:Image 4.png" "plum:Image 5.png"; do
+  name="${variant%%:*}"
+  layer="${variant#*:}"
+  work="${STAGING}/variant-${name}"
+  mkdir -p "${work}/out"
+  cp -R "${ICON}" "${work}/xBot.icon"
+  /usr/bin/python3 - "${work}/xBot.icon/icon.json" "${layer}" <<'PY'
+import json, sys
+path, layer = sys.argv[1], sys.argv[2]
+icon = json.load(open(path))
+layers = [l for g in icon["groups"] for l in g["layers"]]
+if not any(l["image-name"] == layer for l in layers):
+    sys.exit(f"xBot.icon has no layer named {layer!r}")
+for l in layers:
+    l["hidden"] = l["image-name"] != layer
+json.dump(icon, open(path, "w"), indent=2)
+PY
+  actool "${work}/xBot.icon" --compile "${work}/out" --app-icon xBot \
+    --output-partial-info-plist "${work}/out/info.plist" --platform macosx --target-device mac \
+    --minimum-deployment-target 14.0 --include-all-app-icons >/dev/null
+  cp "${work}/out/xBot.icns" "${VARIANTS_OUT}/${name}.icns"
+done
+
 # Drop legacy PNG raster fallbacks if they exist.
 rm -f "${OUT_APP}/AppIcon.png" "${OUT_APP}/AppIcon.icns" "${OUT_UI}/AppIcon.png"
 

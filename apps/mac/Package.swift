@@ -27,7 +27,7 @@ let package = Package(
         .target(
             name: "XBotUI",
             dependencies: ["XBotCore"],
-            resources: [.copy("Resources/xBot.icns"), .copy("Resources/sunset.jpg")],
+            resources: [.copy("Resources/xBot.icns"), .copy("Resources/sunset.jpg"), .copy("Resources/AppIcons")],
             swiftSettings: strict
         ),
         .executableTarget(
