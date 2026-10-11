@@ -36,6 +36,12 @@ import XBotRemote
     /// Lets coalesced flushes and turns run.
     func pump(_ ms: Int = 120) async { try? await Task.sleep(for: .milliseconds(ms)) }
 
+    /// Waits for `done` (up to 5 s): fixed sleeps are too short when the whole suite runs at once.
+    func until(_ done: () -> Bool) async {
+        let end = Date.now.addingTimeInterval(5)
+        while !done(), Date.now < end { try? await Task.sleep(for: .milliseconds(10)) }
+    }
+
     @Test func aPhoneGetsHelloAndTheChatListOnConnect() async throws {
         let (w, host) = await setUp()
         let project = w.addProject(at: FileManager.default.temporaryDirectory)
@@ -70,7 +76,7 @@ import XBotRemote
         link.say(.open(chatID: chat.id))
         let request = UUID()
         link.say(.send(requestID: request, chatID: chat.id, text: "say hello"))
-        await pump()
+        await until { link.sent.contains { if case .live(chat.id, [.text("hello")]) = $0 { true } else { false } } }
         #expect(link.replies().contains { $0.0 == request && $0.1 })
         #expect(brain.requests.withLock { $0.last?.prompt } == "say hello")
         // The person's message, then the live reply, coalesced into the whole of it so far.
@@ -80,7 +86,7 @@ import XBotRemote
         #expect(link.sent.contains { if case .chat(let c) = $0 { c.id == chat.id && c.isRunning } else { false } })
         // Stop from the phone: the turn ends, the reply is saved and the live one cleared.
         link.say(.stop(requestID: UUID(), chatID: chat.id))
-        await pump()
+        await until { link.sent.last { if case .live = $0 { true } else { false } } == .live(chatID: chat.id, parts: []) }
         #expect(!w.isRunning(chat.id))
         #expect(link.sent.contains { if case .message(chat.id, let m) = $0 { m.role == "assistant" } else { false } })
         #expect(lives.isEmpty == false && link.sent.last { if case .live = $0 { true } else { false } } == .live(chatID: chat.id, parts: []))
@@ -95,7 +101,7 @@ import XBotRemote
         host.attach(link)
         link.say(.open(chatID: chat.id))
         link.say(.send(requestID: UUID(), chatID: chat.id, text: "go"))
-        await pump(200)
+        await until { link.sent.contains { if case .live(_, [.text("xxxxxxxxxx")]) = $0 { true } else { false } } }
         let lives = link.sent.compactMap { if case .live(_, let parts) = $0 { parts } else { nil } }
         #expect(lives.last == [.text("xxxxxxxxxx")])
         #expect(lives.count <= 3)
@@ -109,6 +115,7 @@ import XBotRemote
         let link = FakeLink()
         host.attach(link)
         _ = w.send("go", in: chat.id)
+        await until { link.sent.contains { if case .chat(let c) = $0 { c.isRunning } else { false } } }
         await pump()
         #expect(!link.sent.contains { if case .live = $0 { true } else if case .message = $0 { true } else { false } })
         // The list still learns it's running.
@@ -120,7 +127,7 @@ import XBotRemote
         let (w, host) = await setUp()
         let chat = try #require(w.newChat(in: nil))
         _ = w.send("hi", in: chat.id)
-        await pump()
+        await until { !w.isRunning(chat.id) && w.messages(in: chat.id).count == 2 }
         w.close(chat.id)
         // As after a relaunch: not loaded.
         w.transcripts[chat.id] = nil
@@ -141,7 +148,7 @@ import XBotRemote
         let request = UUID()
         link.say(.newChat(requestID: request, projectID: nil, text: "start",
                           settings: RemoteChatSettings(agent: "codex", model: Choice("gpt-5"), mode: "readOnly", effort: Choice("low"))))
-        await pump()
+        await until { link.replies().contains { $0.0 == request } && codex.requests.withLock { !$0.isEmpty } }
         let reply = try #require(link.replies().first { $0.0 == request })
         let chat = try #require(reply.3.flatMap(w.chat))
         #expect(reply.1 && chat.harness == .codex && chat.model == "gpt-5" && chat.mode == .readOnly && chat.effort == .low)
@@ -173,13 +180,13 @@ import XBotRemote
         let (w, host) = await setUp([.claude: brain])
         let chat = try #require(w.newChat(in: nil))
         _ = w.send("first", in: chat.id)
-        await pump()
+        await until { !w.isRunning(chat.id) && w.messages(in: chat.id).count == 2 }
         let first = try #require(w.messages(in: chat.id).first)
         let link = FakeLink()
         host.attach(link)
         link.say(.open(chatID: chat.id))
         link.say(.edit(requestID: UUID(), chatID: chat.id, messageID: first.id, text: "second"))
-        await pump()
+        await until { link.sent.contains(.messageRemoved(chatID: chat.id, messageID: first.id)) }
         #expect(w.messages(in: chat.id).first?.parts == [.text("second")])
         #expect(link.sent.contains(.messageRemoved(chatID: chat.id, messageID: first.id)))
     }
@@ -193,12 +200,12 @@ import XBotRemote
         host.attach(link)
         link.say(.open(chatID: chat.id))
         link.say(.send(requestID: UUID(), chatID: chat.id, text: "do it"))
-        await pump(200)
+        await until { w.latestPlan(in: chat.id)?.plan.status == .review && link.sent.contains { if case .message(_, let m) = $0 { m.parts.contains { if case .plan(let p) = $0 { p.status == "review" } else { false } } } else { false } } }
         let (messageID, drafted) = try #require(w.latestPlan(in: chat.id))
         #expect(drafted.status == .review)
         #expect(link.sent.contains { if case .message(_, let m) = $0 { m.parts.contains { if case .plan(let p) = $0 { p.status == "review" && p.steps.count == 2 } else { false } } } else { false } })
         link.say(.runPlan(requestID: UUID(), chatID: chat.id, messageID: messageID))
-        await pump(300)
+        await until { w.latestPlan(in: chat.id)?.plan.startedAt != nil }
         #expect(w.latestPlan(in: chat.id)?.plan.startedAt != nil)
     }
 
@@ -233,7 +240,7 @@ import XBotRemote
             w.receive(.textDelta("\(i)"), in: chat.id, turn: try #require(w.turns[chat.id]?.token))
             await pump(25)
         }
-        await pump(250)
+        await until { cloud.sent.last { if case .live = $0 { true } else { false } } == .live(chatID: chat.id, parts: [.text("0123456789")]) }
         let count = { (l: FakeLink) in l.sent.filter { if case .live = $0 { true } else { false } }.count }
         #expect(count(cloud) < count(local))
         #expect(cloud.sent.last { if case .live = $0 { true } else { false } } == .live(chatID: chat.id, parts: [.text("0123456789")]))
@@ -251,7 +258,7 @@ import XBotRemote
         let chat = try #require(w.newChat(in: nil))
         _ = w.send("go", in: chat.id)
         link.hangUp()
-        await pump()
+        await until { w.isRunning(chat.id) }
         #expect(awake.last == true)   // a turn is still running
         w.stop(chat.id)
         host.refreshAwake()

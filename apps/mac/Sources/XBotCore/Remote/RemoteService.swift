@@ -200,8 +200,21 @@ public final class RemoteService {
         await cloudPushed()
     }
 
+    @ObservationIgnored private var cloudPass: Task<Void, Never>?
+
     /// A push said the mailbox changed (or the app just started): read it once for every device.
+    /// One read at a time: a push during a read waits for it, then reads again.
     public func cloudPushed() async {
+        let previous = cloudPass
+        let pass = Task { [weak self] in
+            await previous?.value
+            await self?.readCloud()
+        }
+        cloudPass = pass
+        await pass.value
+    }
+
+    private func readCloud() async {
         guard let mailbox, let fetched = try? await mailbox.fetchNew(), !fetched.isEmpty else { return }
         for id in Set(fetched.filter { $0.to == "mac" }.map(\.from)) where channels[id] == nil {
             guard let secret = secrets.secret(for: id) else { continue }
