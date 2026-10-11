@@ -81,7 +81,8 @@ struct ChatListView: View {
                     Text(subtitle(chat)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Text(chat.updatedAt, format: .relative(presentation: .named)).font(.caption).foregroundStyle(.tertiary)
+                Text(chat.updatedAt, format: .relative(presentation: .numeric, unitsStyle: .narrow)).font(.caption).foregroundStyle(.tertiary)
+                    .lineLimit(1).fixedSize()
             }
             .padding(.vertical, 2)
         }

@@ -64,10 +64,28 @@ public final class RemoteService {
     /// A phone away from home that hasn't written for this long is let go.
     @ObservationIgnored let cloudTimeout: Duration
 
+    /// How often the Mac reads iCloud on its own. Pushes are best-effort (Apple throttles and
+    /// coalesces them), so they only make it quicker: a phone attached through iCloud is read
+    /// every couple of seconds, like the phone reads the Mac; otherwise a slow check finds a phone
+    /// that just went away. Each check is one small CloudKit request.
+    public struct CloudChecks: Sendable {
+        public var attached: Duration
+        public var idle: Duration
+        public init(attached: Duration = .seconds(2), idle: Duration = .seconds(15)) {
+            self.attached = attached
+            self.idle = idle
+        }
+    }
+
+    @ObservationIgnored let cloudChecks: CloudChecks
+    @ObservationIgnored private var cloudClock: Task<Void, Never>?
+
     public init(workspace: Workspace, secrets: any PairingSecrets = KeychainPairingSecrets(),
                 defaults: UserDefaults = .standard, macName: String = Host.current().localizedName ?? "Mac",
-                mailbox: (any CloudMailbox)? = nil, advertise: Bool = true, cloudTimeout: Duration = .seconds(150)) {
+                mailbox: (any CloudMailbox)? = nil, advertise: Bool = true, cloudTimeout: Duration = .seconds(150),
+                cloudChecks: CloudChecks = .init()) {
         self.secrets = secrets
+        self.cloudChecks = cloudChecks
         self.defaults = defaults
         self.advertise = advertise
         self.cloudTimeout = cloudTimeout
@@ -117,7 +135,7 @@ public final class RemoteService {
         for link in localLinks.values where link.deviceID == id { link.close() }
         channels[id] = nil
         restartListener()
-        if devices.isEmpty { listener.stop(); port = nil }
+        if devices.isEmpty && pending.isEmpty { listener.stop(); port = nil; stopCloudClock() }
     }
 
     private func keys(including extra: PairingKey? = nil) -> [PairingKey] {
@@ -200,7 +218,26 @@ public final class RemoteService {
                 return
             }
         }
+        startCloudClock()
         await cloudPushed()
+    }
+
+    private func startCloudClock() {
+        guard cloudClock == nil else { return }
+        cloudClock = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let wait = self.cloudLinks.isEmpty ? self.cloudChecks.idle : self.cloudChecks.attached
+                try? await Task.sleep(for: wait)
+                guard !Task.isCancelled else { return }
+                await self.cloudPushed()
+            }
+        }
+    }
+
+    private func stopCloudClock() {
+        cloudClock?.cancel()
+        cloudClock = nil
     }
 
     @ObservationIgnored private var cloudPass: Task<Void, Never>?

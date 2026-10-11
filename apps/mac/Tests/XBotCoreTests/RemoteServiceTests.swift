@@ -23,12 +23,13 @@ final class MemoryMailbox: CloudMailbox {
 @MainActor @Suite(.serialized) struct RemoteServiceTests {
     let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
 
-    func make(mailbox: (any CloudMailbox)? = nil, timeout: Duration = .seconds(150)) async -> (Workspace, RemoteService) {
+    func make(mailbox: (any CloudMailbox)? = nil, timeout: Duration = .seconds(150),
+              checks: RemoteService.CloudChecks = .init(attached: .seconds(60), idle: .seconds(60))) async -> (Workspace, RemoteService) {
         let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
         await w.refreshHarnesses()
         let defaults = UserDefaults(suiteName: "remote-\(UUID().uuidString)")!
         return (w, RemoteService(workspace: w, secrets: MemorySecrets(), defaults: defaults, macName: "Test Mac",
-                                 mailbox: mailbox, advertise: false, cloudTimeout: timeout))
+                                 mailbox: mailbox, advertise: false, cloudTimeout: timeout, cloudChecks: checks))
     }
 
     func waitFor(_ seconds: Double = 5, _ done: () -> Bool) async {
@@ -106,5 +107,30 @@ final class MemoryMailbox: CloudMailbox {
         try await phone.send([.hello(version: 1, deviceID: stranger.identity, deviceName: "Stranger")])
         await service.cloudPushed()
         #expect(service.attached.isEmpty && service.devices.isEmpty)
+    }
+
+    /// Pushes don't always come: with no push at all, the Mac still finds a phone that went away
+    /// (the slow check) and then answers it quickly (the fast one).
+    @Test func iCloudWorksWithoutPushes() async throws {
+        let box = MemoryMailbox()
+        let (_, service) = await make(mailbox: box, checks: .init(attached: .milliseconds(50), idle: .milliseconds(200)))
+        let invite = service.invite()
+        let phone = CloudChannel<ClientMessage, HostMessage>(me: invite.key.identity, peer: "mac", secret: invite.key.secret, mailbox: box)
+        try await phone.send([.hello(version: Wire.version, deviceID: invite.key.identity, deviceName: "Yoav's iPhone"), .away])
+        await waitFor(3) { service.attached[invite.key.identity] == .cloud }
+        #expect(service.attached[invite.key.identity] == .cloud)
+        _ = try await phone.poll()
+
+        // A request, answered without a push.
+        let request = UUID()
+        try await phone.send([.stop(requestID: request, chatID: UUID())])
+        var replies: [HostMessage] = []
+        let end = Date.now.addingTimeInterval(2)
+        while Date.now < end, !replies.contains(where: { if case .reply(request, _, _, _) = $0 { true } else { false } }) {
+            replies += try await phone.poll()
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+        #expect(replies.contains { if case .reply(request, _, _, _) = $0 { true } else { false } })
+        service.remove(invite.key.identity)
     }
 }
