@@ -32,7 +32,7 @@ final class MemoryMailbox: CloudMailbox {
                                  mailbox: mailbox, advertise: false, cloudTimeout: timeout, cloudChecks: checks))
     }
 
-    func waitFor(_ seconds: Double = 5, _ done: () -> Bool) async {
+    func waitFor(_ seconds: Double = 20, _ done: () -> Bool) async {
         let end = Date.now.addingTimeInterval(seconds)
         while !done(), Date.now < end { try? await Task.sleep(for: .milliseconds(20)) }
     }

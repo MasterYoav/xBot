@@ -36,9 +36,10 @@ import XBotRemote
     /// Lets coalesced flushes and turns run.
     func pump(_ ms: Int = 120) async { try? await Task.sleep(for: .milliseconds(ms)) }
 
-    /// Waits for `done` (up to 5 s): fixed sleeps are too short when the whole suite runs at once.
+    /// Waits for `done` (up to 30 s; it returns as soon as it holds): fixed sleeps, and 5 s, were too
+    /// short on CI's slower runners with the whole suite running at once.
     func until(_ done: () -> Bool) async {
-        let end = Date.now.addingTimeInterval(5)
+        let end = Date.now.addingTimeInterval(30)
         while !done(), Date.now < end { try? await Task.sleep(for: .milliseconds(10)) }
     }
 
