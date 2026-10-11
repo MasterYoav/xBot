@@ -35,6 +35,8 @@ public final class Workspace {
 
     /// Small messages at the bottom of the window.
     public let toasts = ToastCenter()
+    /// Each chat's floating terminal windows.
+    public let terminals = TerminalDeck()
     /// What Home's composer holds before a chat exists.
     public var draft = ChatDraft()
     /// Bumped to ask the sidebar's search field for focus (⌘K).
@@ -198,6 +200,7 @@ public final class Workspace {
     public func deleteChat(_ id: UUID) -> DeletedChat? {
         guard let chat = chat(id) else { return nil }
         stop(id)
+        terminals.closeAll(id)
         let messages = transcripts[id] ?? attempt { try store.messages(in: id) } ?? []
         let wasOpen = openChatIDs.contains(id)
         attempt { try store.deleteChat(id) }

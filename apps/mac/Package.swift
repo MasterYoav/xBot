@@ -20,13 +20,15 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+        // The in-app terminal: a full VT emulator (vim, htop and the agents' own TUIs work in it).
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", .upToNextMinor(from: "1.20.0")),
     ],
     targets: [
         .target(name: "XBotBrain", swiftSettings: strict),
         .target(name: "XBotCore", dependencies: ["XBotBrain"], swiftSettings: strict),
         .target(
             name: "XBotUI",
-            dependencies: ["XBotCore"],
+            dependencies: ["XBotCore", .product(name: "SwiftTerm", package: "SwiftTerm")],
             resources: [.copy("Resources/xBot.icns"), .copy("Resources/sunset.jpg"), .copy("Resources/AppIcons")],
             swiftSettings: strict
         ),

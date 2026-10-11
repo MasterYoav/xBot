@@ -32,6 +32,10 @@ jobs:
       # So they exist on the machine of anyone who has run it and on no fresh checkout, and
       # `swift build` fails outright with "missing inputs". This job had never run on a push until
       # the branch trigger was fixed, which is why nothing had reported it.
+      # SwiftTerm (the in-app terminal) compiles a Metal shader; Xcode 26 ships without the Metal
+      # toolchain until it is downloaded.
+      - name: Metal toolchain
+        run: xcrun metal --version >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
       - name: Generate icon
         working-directory: .
         run: scripts/generate-app-icon.sh

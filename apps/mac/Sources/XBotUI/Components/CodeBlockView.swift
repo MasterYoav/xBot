@@ -10,6 +10,9 @@ import XBotCore
 struct CodeBlockView: View {
     let code: String
     let language: String?
+    /// Set in a chat: runs a command in its terminal. Nil elsewhere (Notes), so no Run button.
+    @Environment(\.runInTerminal) private var runInTerminal
+    @State private var ran = false
 
     @State private var copied = false
     @State private var hovering = false
@@ -24,6 +27,9 @@ struct CodeBlockView: View {
                         .foregroundStyle(Palette.textTertiary)
                 }
                 Spacer(minLength: 0)
+                if let runInTerminal, let command = RunnableCode.command(from: code, language: language) {
+                    runButton(command, runInTerminal)
+                }
                 copyButton
                     // Always present for VoiceOver and for a pointer that has not arrived yet;
                     // faded rather than absent so the block does not resize when hovered.
@@ -50,6 +56,32 @@ struct CodeBlockView: View {
             in: RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
         )
         .onHover { hovering = $0 }
+    }
+
+    /// Always visible, unlike Copy: it's the thing the block is for.
+    private func runButton(_ command: String, _ run: @escaping @MainActor (String) -> Void) -> some View {
+        Button {
+            run(command)
+            ran = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                ran = false
+            }
+        } label: {
+            Label(ran ? String(localized: "Sent to terminal") : String(localized: "Run"),
+                  systemImage: ran ? "checkmark" : "play.fill")
+                .captionText()
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(ran ? Palette.success : Palette.accent)
+                .padding(.horizontal, Space.s)
+                .padding(.vertical, Space.xxs)
+                .background(Capsule().fill(Palette.accent.opacity(ran ? 0 : 0.12)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .motion(Motion.quick, value: ran)
+        .help(String(localized: "Run in this chat's terminal"))
+        .accessibilityLabel(String(localized: "Run in terminal"))
     }
 
     private var copyButton: some View {
@@ -92,4 +124,9 @@ struct CodeBlockView: View {
         case .number: Palette.codeNumber
         }
     }
+}
+
+extension EnvironmentValues {
+    /// Runs a command in the current chat's terminal; set by the chat, nil elsewhere.
+    @Entry var runInTerminal: (@MainActor (String) -> Void)? = nil
 }

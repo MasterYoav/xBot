@@ -44,6 +44,10 @@ jobs:
 
       # First: the icon is a build input, not a packaging step. Package.swift declares the
       # compiled artifacts as resources, so neither the test nor the build can run without them.
+      # SwiftTerm (the in-app terminal) compiles a Metal shader; Xcode 26 ships without the Metal
+      # toolchain until it is downloaded.
+      - name: Metal toolchain
+        run: xcrun metal --version >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
       - name: Generate icon
         run: scripts/generate-app-icon.sh
 
