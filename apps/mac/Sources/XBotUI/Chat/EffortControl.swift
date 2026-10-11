@@ -158,7 +158,7 @@ private struct Knob: View {
     var body: some View {
         ZStack {
             if galaxy {
-                TimelineView(.animation(minimumInterval: 1 / 30, paused: !animated)) { context in
+                TimelineView(.animation(minimumInterval: 1 / 30, paused: !animated || !MotionGate.shared.isLive)) { context in
                     Canvas { canvas, size in
                         let t = context.date.timeIntervalSinceReferenceDate
                         let centre = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -189,7 +189,7 @@ private struct GalaxyPixels: View {
     let animated: Bool
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 12, paused: !animated)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 12, paused: !animated || !MotionGate.shared.isLive)) { context in
             Canvas { canvas, size in
                 let cell: CGFloat = 3.5
                 let frame = Int(context.date.timeIntervalSinceReferenceDate * 6)

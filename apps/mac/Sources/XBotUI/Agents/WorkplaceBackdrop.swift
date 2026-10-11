@@ -14,7 +14,7 @@ struct WorkplaceBackdrop: View {
             let sceneHeight = WorkplaceBackdropLayout.sceneHeight(
                 stageBottom: stageBottom, viewportHeight: geometry.size.height
             )
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { clock in
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion || !MotionGate.shared.isLive)) { clock in
                 let date = reduceMotion ? stillDate : clock.date
                 ZStack(alignment: .topLeading) {
                     WorldGround(setting: setting, horizon: sceneHeight, date: date)

@@ -119,7 +119,7 @@ struct AsciiArtView: View {
             let byHeight = geometry.size.height / (CGFloat(max(art.rows, 1)) * 0.88)
             let size = max(2, wholePicture ? min(byWidth, byHeight) : byWidth)
             let still = art.frames.count < 2 || reduceMotion
-            TimelineView(.animation(minimumInterval: 1 / art.fps, paused: still)) { context in
+            TimelineView(.animation(minimumInterval: 1 / art.fps, paused: still || !MotionGate.shared.isLive)) { context in
                 let index = still ? 0 : Int(context.date.timeIntervalSinceReferenceDate * art.fps) % art.frames.count
                 Text(verbatim: art.frames[index])
                     .font(.system(size: size, design: .monospaced))

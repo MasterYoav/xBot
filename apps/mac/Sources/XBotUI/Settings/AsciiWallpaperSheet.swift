@@ -123,7 +123,7 @@ struct AsciiWallpaperSheet: View {
             }
             if drawing != nil {
                 Rectangle().fill(.black.opacity(0.35))
-                TimelineView(.periodic(from: .now, by: 1)) { context in
+                TimelineView(.animation(minimumInterval: 1, paused: !MotionGate.shared.isLive)) { context in
                     HStack(spacing: Space.s) {
                         ProgressView().controlSize(.small)
                         Text(String(localized: "\(harness?.displayName ?? "") is drawing… \(Int(context.date.timeIntervalSince(started ?? context.date)))s"))

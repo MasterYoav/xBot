@@ -18,7 +18,7 @@ struct WorkplaceScene: View {
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: false)) { context in
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !MotionGate.shared.isLive)) { context in
                 let agents = workspace.agents
                 let statuses = Dictionary(uniqueKeysWithValues: agents.map { ($0.id, workspace.status(of: $0.id)) })
                 let world = model.advance(to: context.date, width: width, ids: agents.map(\.id),

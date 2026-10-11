@@ -9,7 +9,7 @@ struct Elapsed: View {
         if let end {
             Text(Self.format(end.timeIntervalSince(start)))
         } else {
-            TimelineView(.periodic(from: start, by: 1)) { context in
+            TimelineView(.animation(minimumInterval: 1, paused: !MotionGate.shared.isLive)) { context in
                 Text(Self.format(context.date.timeIntervalSince(start)))
             }
         }

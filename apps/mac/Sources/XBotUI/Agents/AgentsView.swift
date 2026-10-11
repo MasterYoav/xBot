@@ -15,7 +15,7 @@ struct AgentsView: View {
                     .onGeometryChange(for: CGFloat.self) { geometry in
                         geometry.frame(in: .named("workplaceBackdrop")).maxY
                     } action: { stageBottomChanged($0) }
-                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                TimelineView(.animation(minimumInterval: 1, paused: !MotionGate.shared.isLive)) { _ in
                     cards
                 }
             }

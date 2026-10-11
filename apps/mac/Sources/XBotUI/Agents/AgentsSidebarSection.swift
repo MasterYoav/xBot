@@ -8,7 +8,7 @@ struct AgentsSidebarSection: View {
     @State private var hovered: UUID?
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
+        TimelineView(.animation(minimumInterval: 1, paused: !MotionGate.shared.isLive)) { _ in
             let crew = workspace.agents
             if !crew.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s) {
@@ -92,7 +92,7 @@ private struct SidebarWorldBackdrop: View {
         GeometryReader { geometry in
             let scale = max(0.01, geometry.size.height / WorkplaceScene.height)
             let artWidth = geometry.size.width / scale
-            TimelineView(.animation(minimumInterval: 0.1, paused: reduceMotion)) { clock in
+            TimelineView(.animation(minimumInterval: 0.1, paused: reduceMotion || !MotionGate.shared.isLive)) { clock in
                 WorldScenery(setting: setting, date: reduceMotion ? stillDate : clock.date, width: artWidth)
                     .frame(width: artWidth, height: WorkplaceScene.height)
                     .scaleEffect(scale, anchor: .topLeading)

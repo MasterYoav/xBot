@@ -4,7 +4,7 @@ import XBotCore
 /// An agent's original pixel-art chibi, in the MapleStory Classic manner: a big head, a small body,
 /// a dark outline. Built from a template per part on a 16×24 grid, then outlined. Faces right; the
 /// world mirrors it to face left.
-struct AvatarSprite: View {
+struct AvatarSprite: View, Equatable {
     struct Frame: Hashable {
         var breathe = false
         var blink = false
@@ -25,10 +25,16 @@ struct AvatarSprite: View {
 
     var body: some View {
         let map = PixelMap.make(avatar, frame)
+        // One path per colour, not one fill per pixel: a few fills a frame instead of hundreds.
+        let byColor = Dictionary(grouping: map.pixels, by: \.value)
         Canvas { context, _ in
-            for (point, color) in map.pixels {
-                context.fill(Path(CGRect(x: CGFloat(point.x - map.minX) * pixel, y: CGFloat(point.y - map.minY) * pixel,
-                                         width: pixel, height: pixel)), with: .color(color))
+            for (color, pixels) in byColor {
+                var path = Path()
+                for (point, _) in pixels {
+                    path.addRect(CGRect(x: CGFloat(point.x - map.minX) * pixel, y: CGFloat(point.y - map.minY) * pixel,
+                                        width: pixel, height: pixel))
+                }
+                context.fill(path, with: .color(color))
             }
         }
         .frame(width: CGFloat(map.width) * pixel, height: CGFloat(map.height) * pixel)
@@ -47,9 +53,12 @@ struct LivingAvatar: View {
     var seed = 0
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1.0 / 12)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 12, paused: !MotionGate.shared.isLive)) { context in
+            // Equatable: the clock ticks 12 times a second, but a face only redraws when its frame
+            // changes (a blink, a breath), a few times a second.
             AvatarSprite(avatar: avatar, frame: Self.frame(at: context.date, seed: seed, legs: legs,
                                                            talking: talking, headOnly: headOnly), pixel: pixel)
+                .equatable()
         }
     }
 
@@ -109,7 +118,7 @@ struct AgentFace: View {
 private struct WorkingRing: View {
     let size: CGFloat
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !MotionGate.shared.isLive)) { context in
             let angle = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4 * 360
             Circle()
                 .trim(from: 0, to: 0.3)
