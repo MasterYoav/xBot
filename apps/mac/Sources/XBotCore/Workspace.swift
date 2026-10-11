@@ -154,6 +154,14 @@ public final class Workspace {
         page = .main
     }
 
+    /// Moves an open tab to `index` among the open tabs (clamped to the ends): a tab dragged along
+    /// the top bar. The selection stays with the chat, and ⌘-numbers follow the new positions.
+    public func moveTab(_ id: UUID, to index: Int) {
+        guard let from = openChatIDs.firstIndex(of: id) else { return }
+        openChatIDs.remove(at: from)
+        openChatIDs.insert(id, at: min(max(index, 0), openChatIDs.count))
+    }
+
     /// Closes the tab. A running turn keeps going; the chat is still in the sidebar.
     public func close(_ id: UUID) {
         guard let index = openChatIDs.firstIndex(of: id) else { return }

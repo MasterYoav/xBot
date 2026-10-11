@@ -11,6 +11,16 @@ struct TopBar: View {
     let showSidebar: () -> Void
     @Binding var inspectorShown: Bool
     let inspectorAvailable: Bool
+    /// Where each tab is laid out in the strip, measured, for reordering by drag.
+    @State private var frames: [UUID: CGRect] = [:]
+    @State private var drag: TabDrag?
+
+    /// A tab being dragged: which one, and where in it the pointer took hold.
+    private struct TabDrag: Equatable {
+        let id: UUID
+        let grab: CGFloat
+        var pointer: CGFloat
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -21,7 +31,14 @@ struct TopBar: View {
             }
             ForEach(Array(workspace.openChatIDs.enumerated()), id: \.element) { index, id in
                 if let chat = workspace.chat(id) {
-                    Tab(workspace: workspace, chat: chat, number: index + 1)
+                    let dragging = drag?.id == id
+                    Tab(workspace: workspace, chat: chat, number: index + 1, lifted: dragging)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frames[id] = $0 }
+                        // Under the pointer while dragged; measured from where the tab is laid out
+                        // now, so it stays put under the pointer as its neighbours move past it.
+                        .offset(x: dragging ? offset(for: id) : 0)
+                        .zIndex(dragging ? 1 : 0)
+                        .gesture(reorder(id))
                 }
             }
             IconButton("plus", help: String(localized: "New chat (⌘N)")) {
@@ -42,12 +59,47 @@ struct TopBar: View {
             .padding(.trailing, Space.s)
         }
         .frame(height: Metrics.titleBar)
+        .animation(Motion.panel, value: workspace.openChatIDs)
+    }
+
+    private func offset(for id: UUID) -> CGFloat {
+        guard let drag, let frame = frames[id] else { return 0 }
+        return drag.pointer - drag.grab - frame.minX
+    }
+
+    /**
+     Hold a tab and drag it along the strip to move it. Its neighbours slide aside as its middle
+     passes theirs, so the order is always the one that would land on release. A few points of
+     travel before it starts, so a click still just selects the tab.
+     */
+    private func reorder(_ id: UUID) -> some Gesture {
+        // Global, not a space named on the strip: measured in one, the dragged tab's own offset fed
+        // back into the pointer's position and it stayed put however far the pointer went.
+        DragGesture(minimumDistance: Space.xs, coordinateSpace: .global)
+            .onChanged { value in
+                guard let frame = frames[id] else { return }
+                if drag?.id != id {
+                    drag = TabDrag(id: id, grab: value.startLocation.x - frame.minX, pointer: value.location.x)
+                }
+                drag?.pointer = value.location.x
+                guard let drag else { return }
+                let middle = drag.pointer - drag.grab + frame.width / 2
+                let others = workspace.openChatIDs.filter { $0 != id }
+                let target = others.filter { (frames[$0]?.midX ?? .infinity) < middle }.count
+                if workspace.openChatIDs.firstIndex(of: id) != target {
+                    workspace.moveTab(id, to: target)
+                }
+            }
+            .onEnded { _ in
+                withAnimation(Motion.panel) { drag = nil }
+            }
     }
 
     private struct Tab: View {
         let workspace: Workspace
         let chat: Chat
         let number: Int
+        var lifted = false
         @State private var hovering = false
 
         var body: some View {
@@ -95,6 +147,9 @@ struct TopBar: View {
                 .accessibilityLabel(String(localized: "Close \(chat.title)"))
             }
             .onHover { hovering = $0 }
+            // Lifted off the strip while dragged.
+            .shadow(color: .black.opacity(lifted ? 0.10 : 0), radius: 12, y: 8)
+            .scaleEffect(lifted ? 1.03 : 1)
             .motion(Motion.quick, value: selected)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(chat.title)
