@@ -47,10 +47,10 @@
           "image-name" : "Image 2.png",
           "name" : "Image 2",
           "position" : {
-            "scale" : 1,
+            "scale" : 0.96,
             "translation-in-points" : [
-              -56,
-              -46
+              -80,
+              -53.07999999999993
             ]
           }
         }
