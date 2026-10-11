@@ -178,7 +178,8 @@ public enum HostMessage: Codable, Equatable, Sendable {
 
 /// Phone → Mac.
 public enum ClientMessage: Codable, Equatable, Sendable {
-    case hello(version: Int, deviceName: String)
+    /// `deviceID`: the pairing key's identity (only a device holding that key gets this far).
+    case hello(version: Int, deviceID: String, deviceName: String)
     /// Start receiving this chat's transcript and live reply; `close` stops it.
     case open(chatID: UUID)
     case close(chatID: UUID)

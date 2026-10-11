@@ -79,11 +79,11 @@ final class FakeMailbox: CloudMailbox {
         let p2 = CloudChannel<ClientMessage, HostMessage>(me: "p2", peer: "mac", secret: secret, mailbox: box)
         let mac1 = CloudChannel<HostMessage, ClientMessage>(me: "mac", peer: "p1", secret: secret, mailbox: box)
         let mac2 = CloudChannel<HostMessage, ClientMessage>(me: "mac", peer: "p2", secret: secret, mailbox: box)
-        try await p1.send([.hello(version: 1, deviceName: "one")])
-        try await p2.send([.hello(version: 1, deviceName: "two")])
+        try await p1.send([.hello(version: 1, deviceID: "dev", deviceName: "one")])
+        try await p2.send([.hello(version: 1, deviceID: "dev", deviceName: "two")])
         let fetched = try await box.fetchNew()
-        #expect(await mac1.receive(fetched) == [.hello(version: 1, deviceName: "one")])
-        #expect(await mac2.receive(fetched) == [.hello(version: 1, deviceName: "two")])
+        #expect(await mac1.receive(fetched) == [.hello(version: 1, deviceID: "dev", deviceName: "one")])
+        #expect(await mac2.receive(fetched) == [.hello(version: 1, deviceID: "dev", deviceName: "two")])
     }
 
     @Test func nothingToSendPostsNothing() async throws {

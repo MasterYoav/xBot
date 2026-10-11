@@ -29,7 +29,7 @@ import Testing
     var everyClientMessage: [ClientMessage] {
         let settings = RemoteChatSettings(agent: "codex", model: Choice(nil), mode: "readOnly", effort: Choice("low"), planMode: false)
         return [
-            .hello(version: 1, deviceName: "iPhone"), .open(chatID: chatID), .close(chatID: chatID),
+            .hello(version: 1, deviceID: "dev", deviceName: "iPhone"), .open(chatID: chatID), .close(chatID: chatID),
             .send(requestID: UUID(), chatID: chatID, text: "go"),
             .newChat(requestID: UUID(), projectID: nil, text: "hi", settings: settings),
             .stop(requestID: UUID(), chatID: chatID), .edit(requestID: UUID(), chatID: chatID, messageID: UUID(), text: "again"),

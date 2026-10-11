@@ -32,9 +32,9 @@ import Testing
         phone.start()
         await waitFor { ready }
         #expect(ready)
-        phone.send([ClientMessage.hello(version: 1, deviceName: "Test iPhone")])
+        phone.send([ClientMessage.hello(version: 1, deviceID: "dev", deviceName: "Test iPhone")])
         await waitFor { !phoneGot.isEmpty }
-        #expect(macGot == [.hello(version: 1, deviceName: "Test iPhone")])
+        #expect(macGot == [.hello(version: 1, deviceID: "dev", deviceName: "Test iPhone")])
         #expect(phoneGot.count == 1)
         phone.cancel(); macSide?.cancel(); listener.stop()
     }
