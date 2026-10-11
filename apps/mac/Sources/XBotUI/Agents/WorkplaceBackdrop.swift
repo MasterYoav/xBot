@@ -38,7 +38,8 @@ enum WorkplaceBackdropLayout {
     }
 }
 
-private struct WorldScenery: View {
+/// Shared full-size artwork, also used by the sidebar's miniature world.
+struct WorldScenery: View {
     let setting: WorkplaceSetting
     let date: Date
     let width: CGFloat
