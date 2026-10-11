@@ -13,7 +13,7 @@ XBotApp ── XBotUI ── XBotCore ── XBotBrain   (Foundation only)
 | Module | Owns |
 | --- | --- |
 | `XBotBrain` | `Brain`, `BrainEvent`, `TurnRequest`; `HarnessKind` (arguments and stream parsing per CLI); `HarnessBrain` (one process per turn); `HarnessLocator` (finding CLIs and the login-shell `PATH`) |
-| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite); `Workspace`, the `@MainActor @Observable` object the window talks to; `AbilityCatalog` (connectors, plugins, skills, MCPs through the agents' CLIs) and `ProjectNotes` (`<project>/notes/*.md`). Re-exports `XBotBrain`. |
+| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite); `Workspace`, the `@MainActor @Observable` object the window talks to; `AbilityCatalog` (connectors, plugins, skills, MCPs through the agents' CLIs), `ProjectNotes` (`<project>/notes/*.md`), and the crew: `Agent` (a persona over a CLI, with a pixel `AgentAvatar` and role instructions sent on every turn), HeadMaster's hand-offs, and `WorkplaceWorld` (the Agents page's map). Re-exports `XBotBrain`. |
 | `XBotUI` | The design system; `RootView`, the sidebar, chat tabs, transcript and composer |
 | `XBotApp` | `@main`, menus, Sparkle, quitting cleanly (`AppDelegate` stops running turns so their replies are saved) |
 

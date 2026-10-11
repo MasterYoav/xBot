@@ -49,6 +49,7 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             if let effort = request.effort { arguments += ["--effort", effort.claudeValue] }
             if let resume = request.resumeID { arguments += ["--resume", resume] }
             if let schema = request.schema { arguments += ["--json-schema", schema] }
+            if let instructions = request.instructions { arguments += ["--append-system-prompt", instructions] }
             return arguments
 
         case .codex:
@@ -64,10 +65,31 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             if let model = request.model { arguments += ["-m", model] }
             if let effort = request.effort { arguments += ["-c", "model_reasoning_effort=\"\(effort.codexValue)\""] }
             if let schemaFile { arguments += ["--output-schema", schemaFile.path] }
+            if let instructions = request.instructions {
+                arguments += ["-c", "developer_instructions=\(Self.tomlString(instructions))"]
+            }
             if let resume = request.resumeID { arguments.append(resume) }
             arguments.append("-")
             return arguments
         }
+    }
+
+    /// A TOML basic string, as `-c key=value` parses its value.
+    static func tomlString(_ text: String) -> String {
+        var out = "\""
+        for scalar in text.unicodeScalars {
+            switch scalar {
+            case "\"": out += "\\\""
+            case "\\": out += "\\\\"
+            case "\n": out += "\\n"
+            case "\r": out += "\\r"
+            case "\t": out += "\\t"
+            case _ where scalar.value < 0x20 || scalar.value == 0x7F:
+                out += String(format: "\\u%04X", scalar.value)
+            default: out.unicodeScalars.append(scalar)
+            }
+        }
+        return out + "\""
     }
 
     public func events(from line: String) -> [BrainEvent] {

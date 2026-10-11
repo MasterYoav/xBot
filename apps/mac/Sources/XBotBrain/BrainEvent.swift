@@ -53,6 +53,8 @@ public struct TurnRequest: Equatable, Sendable {
     public var schema: String?
     /// Investigate only. Forces the CLI's read-only mode whatever `mode` says.
     public var planning: Bool
+    /// Who the agent is and how it works, added to the CLI's own system prompt. Nil: none.
+    public var instructions: String?
 
     public init(
         prompt: String,
@@ -62,8 +64,10 @@ public struct TurnRequest: Equatable, Sendable {
         resumeID: String? = nil,
         effort: Effort? = nil,
         schema: String? = nil,
-        planning: Bool = false
+        planning: Bool = false,
+        instructions: String? = nil
     ) {
+        self.instructions = instructions
         self.prompt = prompt
         self.directory = directory
         self.model = model

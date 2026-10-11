@@ -53,6 +53,8 @@ public struct RootView: View {
                                 }
                             case .profile:
                                 ProfileView(workspace: workspace)
+                            case .agents:
+                                AgentsView(workspace: workspace)
                             case .abilities:
                                 AbilitiesView(workspace: workspace)
                             case .notes:

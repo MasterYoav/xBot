@@ -45,6 +45,8 @@ struct Sidebar: View {
                         ForEach(model.inbox.prefix(SidebarModel.chatsPerProject)) { chatRow($0) }
                     }
 
+                    if query.isEmpty { AgentsSidebarSection(workspace: workspace) }
+
                     sectionHeader(String(localized: "Projects"), add: addProject)
                     if model.groups.isEmpty && query.isEmpty {
                         Button(action: addProject) {
@@ -162,7 +164,10 @@ struct Sidebar: View {
             } else {
                 Button { workspace.open(chat.id) } label: {
                     SidebarRow(chat.title, isSelected: workspace.selectedChatID == chat.id) {
-                        if workspace.isRunning(chat.id) { ProgressView().controlSize(.mini) }
+                        if let agent = workspace.agent(chat.agentID) {
+                            AgentFace(agent: agent, size: 16,
+                                      status: workspace.isRunning(chat.id) ? .working(activity: nil, since: .now) : .idle)
+                        } else if workspace.isRunning(chat.id) { ProgressView().controlSize(.mini) }
                     }
                 }
                 .buttonStyle(.plain)
