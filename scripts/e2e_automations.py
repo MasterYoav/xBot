@@ -105,6 +105,24 @@ def main():
                   f"Use the node_repl tools (not the shell) to evaluate 6*7 in JavaScript, then write only the result to {out}/connector.txt.",
                   lambda: (file("connector.txt") == "42" and "node_repl" in tools_used.get("connector-node_repl", ""),
                            f'{file("connector.txt")}, tools: {tools_used.get("connector-node_repl", "")[:120]}')))
+    # Claude Code, and its claude.ai connectors (read-only).
+    cases.append(("agent-claude", "terminal", f"Write the word claude to {out}/claude.txt.",
+                  lambda: (file("claude.txt") == "claude", file("claude.txt"))))
+    cases.append(("connector-gmail", "connector:Gmail",
+                  f"Using the Gmail connector's tools (not Mail.app, not the shell), search for my most recent email thread, "
+                  f"without sending, changing or archiving anything, and write only the word found to {out}/gmail.txt.",
+                  lambda: (file("gmail.txt") == "found" and "mcp__claude_ai_Gmail__" in tools_used.get("connector-gmail", ""),
+                           f'{file("gmail.txt")}, gmail tools used: {"mcp__claude_ai_Gmail__" in tools_used.get("connector-gmail", "")}')))
+    cases.append(("connector-claude-docs", "connector:Claude Docs",
+                  f"Call the Claude Docs connector's guide tool (read only, change nothing), "
+                  f"then write only the word documented to {out}/docs.txt.",
+                  lambda: (file("docs.txt") == "documented" and "mcp__claude_ai_Claude_Docs__" in tools_used.get("connector-claude-docs", ""),
+                           f'{file("docs.txt")}, tools: {sorted(set(__import__("re").findall(r"mcp__[A-Za-z_]+?__", tools_used.get("connector-claude-docs", ""))))}')))
+    cases.append(("connector-supabase", "connector:Supabase",
+                  f"Using the Supabase connector's tools, list my organizations or projects (read only, change nothing), "
+                  f"then write only the number of projects to {out}/supabase.txt.",
+                  lambda: ((file("supabase.txt") or "x").isdigit() and "mcp__claude_ai_Supabase__" in tools_used.get("connector-supabase", ""),
+                           file("supabase.txt"))))
     tools_used = {}
     # Two steps in order: the second needs the first.
     cases.append(("two-steps", "terminal", None, lambda: (file("order.txt") == "one two", file("order.txt"))))
@@ -126,7 +144,8 @@ def main():
     trigger = json.dumps({"daily": {"hour": hour_ago.tm_hour, "minute": hour_ago.tm_min}})
     ids = {}
     for i, (name, app, text, _) in enumerate(cases):
-        harness = name.split("-", 1)[1] if name.startswith("agent-") else args.agent
+        harness = (name.split("-", 1)[1] if name.startswith("agent-")
+                   else "claude" if name in ("connector-gmail", "connector-claude-docs", "connector-supabase") else args.agent)
         if name == "two-steps":
             steps = [{"id": str(uuid.uuid4()).upper(), "app": "terminal", "text": f"Write the word one to {out}/order.txt."},
                      {"id": str(uuid.uuid4()).upper(), "app": "anything", "text": f"Append a space and the word two to the single line in {out}/order.txt, so it reads: one two"}]

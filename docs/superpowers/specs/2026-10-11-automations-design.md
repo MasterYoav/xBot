@@ -58,7 +58,8 @@ runs, deletion, and the helper and app never both running one.
 Live (`scripts/e2e_automations.py`, xBot closed): seeds a sandbox library with one due automation
 per app, per agent and for a connector, has launchd start the installed app headless, checks each
 effect from outside xBot (and Reminders through xBot), then checks a second tick runs nothing, and
-removes what it made. Last result: 20/20.
+removes what it made. Last result: 20/20, plus Claude Code and its claude.ai connectors
+(Claude Docs, Supabase) 3/3. Gmail reached its tools but its connector lacks mail read scope.
 
 Schedules (next run for each kind, edges: past times, weekdays over a weekend, hourly rollover);
 the prompt (order, apps, how-to lines only for apps used, connectors); store round trip and
