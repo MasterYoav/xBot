@@ -8,6 +8,7 @@ struct WorkplaceScene: View {
     var edit: (Agent) -> Void = { _ in }
     @State private var model = WorldModel()
     @State private var hovered: UUID?
+    @State private var stillDate = Date.now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static let height: CGFloat = 320
@@ -24,30 +25,69 @@ struct WorkplaceScene: View {
                                           working: Set(statuses.filter { $0.value.isWorking }.map(\.key)),
                                           moving: !reduceMotion)
                 let floor = Self.height - Self.ground
+                let setting = workspace.workplace
+                let sceneDate = reduceMotion ? stillDate : context.date
                 ZStack(alignment: .topLeading) {
-                    Scenery(date: context.date, width: width)
-                    ForEach(agents) { agent in
-                        if let walker = world.walkers[agent.id] {
+                    ForEach(Array(agents.enumerated()), id: \.element.id) { index, agent in
+                        if setting != .village, let walker = world.walkers[agent.id] {
+                            rider(agent, walker, index: index, setting: setting, status: statuses[agent.id] ?? .idle, date: sceneDate,
+                                  tagDrop: Self.tagDrop(agent.id, in: world, order: agents.map(\.id)))
+                        } else if let walker = world.walkers[agent.id] {
                             let desk = world.desk(of: agent.id)
-                            Desk(working: statuses[agent.id]?.isWorking == true, date: context.date)
+                            Desk(working: statuses[agent.id]?.isWorking == true, date: sceneDate)
                                 .position(x: desk + 40, y: floor - 40)
                                 .zIndex(walker.pose == .sitting ? 1.5 : 0)
                             Chair().position(x: desk - 2, y: floor - 20)
-                            figure(agent, walker, status: statuses[agent.id] ?? .idle, date: context.date,
+                            figure(agent, walker, status: statuses[agent.id] ?? .idle, date: sceneDate,
                                    tagDrop: Self.tagDrop(agent.id, in: world, order: agents.map(\.id)))
                                 .position(x: walker.x, y: floor - 50 - (walker.pose == .sitting ? 10 : 0))
                                 .zIndex(hovered == agent.id ? 2 : 1)
                         }
                     }
+
                 }
                 .frame(width: width, height: Self.height)
             }
         }
         .frame(height: Self.height)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radius.large, style: .continuous).strokeBorder(Palette.hairline))
+        .clipped()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "The workplace"))
+        .accessibilityLabel(String(localized: "The workplace") + ", " + workspace.workplace.title)
+    }
+
+
+    @ViewBuilder
+    private func mount(_ setting: WorkplaceSetting, walker: WorkplaceWorld.Walker, date: Date) -> some View {
+        switch setting {
+        case .village: EmptyView()
+        case .skyRealm: Nimbus(moving: !reduceMotion && walker.pose == .walking, facing: walker.facing, date: date)
+        case .underwater: UnderwaterMount(moving: !reduceMotion && walker.pose == .walking, facing: walker.facing, date: date)
+        case .moonbase: MoonbaseMount(moving: !reduceMotion && walker.pose == .walking, facing: walker.facing, date: date)
+        case .enchantedForest: EnchantedForestMount(moving: !reduceMotion && walker.pose == .walking, facing: walker.facing, date: date)
+        }
+    }
+
+    /// In the Sky Realm: each agent on a golden cloud at an altitude of their own, bobbing. Working,
+    /// they sit on it with a floating screen in front of them.
+    @ViewBuilder
+    private func rider(_ agent: Agent, _ walker: WorkplaceWorld.Walker, index: Int, setting: WorkplaceSetting, status: AgentStatus, date: Date,
+                       tagDrop: CGFloat) -> some View {
+        let altitudes: [CGFloat] = [-30, 8, -12, 22, -40, 0, 14, -22]
+        let t = date.timeIntervalSinceReferenceDate
+        let bob = reduceMotion ? 0 : CGFloat(sin(t * 1.4 + Double(index) * 1.7)) * 5
+        let feet = Self.height * 0.6 + altitudes[index % altitudes.count] + bob
+        let sitting = walker.pose == .sitting
+        Group {
+            mount(setting, walker: walker, date: date)
+                .position(x: walker.x, y: feet + 10)
+            if sitting {
+                HoloScreen(date: date).position(x: walker.x + 44, y: feet - 46)
+            }
+            figure(agent, walker, status: status, date: date, tagDrop: tagDrop + 30)
+                .position(x: walker.x, y: feet - 40 - (sitting ? 6 : 0))
+        }
+        // Names, speech and work screens remain readable above near scenery.
+        .zIndex(hovered == agent.id ? 4.5 : 4)
     }
 
     /// Name tags of people standing close drop one below the other instead of overlapping.
@@ -241,7 +281,7 @@ private struct Chair: View {
 }
 
 /// Sky, sun or moon, clouds, hills, mushroom houses and the ground, in big pixels.
-private struct Scenery: View {
+struct Scenery: View {
     let date: Date
     let width: CGFloat
 

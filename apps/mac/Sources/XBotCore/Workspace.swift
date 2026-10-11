@@ -17,6 +17,8 @@ public final class Workspace {
     /// Connectors, plugins, skills and MCP servers, read from the agents' own CLIs.
     @ObservationIgnored public private(set) lazy var abilities: AbilityCatalog = makeAbilities()
     @ObservationIgnored var projectNotes: [UUID: ProjectNotes] = [:]
+    /// Bumped when the chosen workplace changes (it lives in UserDefaults, which isn't observed).
+    var workplaceRevision = 0
     /// The crew, in their order. HeadMaster first.
     public internal(set) var agents: [Agent] = []
     /// When each agent last finished a turn, and when the person last looked: Done in between.

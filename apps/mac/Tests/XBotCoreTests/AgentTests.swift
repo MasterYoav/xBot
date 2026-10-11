@@ -296,3 +296,43 @@ import XBotBrain
         #expect(world.walkers[id]!.pose != .sitting)
     }
 }
+
+@MainActor @Suite struct WorkplaceSettingTests {
+    @Test func allFiveWorldsAreAvailableInThePicker() {
+        #expect(WorkplaceSetting.allCases.map(\.rawValue) == ["village", "skyRealm", "underwater", "moonbase", "enchantedForest"])
+    }
+
+    @Test(arguments: WorkplaceSetting.allCases)
+    func everyWorldChoiceSurvivesReopening(_ world: WorkplaceSetting) async {
+        let suite = "world-choice-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+        let first = Workspace(store: .inMemory(), inbox: inbox, discover: { [:] }, defaults: defaults)
+        first.workplace = world
+        let reopened = Workspace(store: .inMemory(), inbox: inbox, discover: { [:] }, defaults: defaults)
+        #expect(reopened.workplace == world)
+        #expect(!world.title.isEmpty)
+        #expect(!world.symbol.isEmpty)
+    }
+
+    @Test func unknownSavedWorldFallsBackToVillage() async {
+        let suite = "unknown-world-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("a-future-world", forKey: "workplace")
+        let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+        let workspace = Workspace(store: .inMemory(), inbox: inbox, discover: { [:] }, defaults: defaults)
+        #expect(workspace.workplace == .village)
+    }
+
+    @Test func theVillageUntilAnotherIsChosenAndTheChoiceIsKept() async {
+        let defaults = UserDefaults(suiteName: "workplace-\(UUID().uuidString)")!
+        let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [:] }, defaults: defaults)
+        #expect(w.workplace == .village)
+        w.workplace = .skyRealm
+        let again = Workspace(store: .inMemory(), inbox: inbox, discover: { [:] }, defaults: defaults)
+        #expect(again.workplace == .skyRealm)
+    }
+}

@@ -124,3 +124,49 @@ public struct WorkplaceWorld: Sendable {
         }
     }
 }
+
+/// Where the crew lives. Chosen on the Agents page and remembered.
+public enum WorkplaceSetting: String, CaseIterable, Sendable {
+    /// Mushroom houses, grass and desks.
+    case village
+    /// High above the clouds among planets and rainbows; the crew rides golden clouds.
+    case skyRealm
+    case underwater
+    case moonbase
+    case enchantedForest
+
+    public var title: String {
+        switch self {
+        case .village: String(localized: "Village")
+        case .skyRealm: String(localized: "Sky Realm")
+        case .underwater: String(localized: "Underwater Kingdom")
+        case .moonbase: String(localized: "Moonbase")
+        case .enchantedForest: String(localized: "Enchanted Forest")
+        }
+    }
+
+    public var symbol: String {
+        switch self {
+        case .village: "house"
+        case .skyRealm: "cloud.sun"
+        case .underwater: "water.waves"
+        case .moonbase: "moon.stars"
+        case .enchantedForest: "tree"
+        }
+    }
+}
+
+extension Workspace {
+    static let workplaceKey = "workplace"
+
+    public var workplace: WorkplaceSetting {
+        get {
+            access(keyPath: \.workplaceRevision)
+            return defaults.string(forKey: Self.workplaceKey).flatMap(WorkplaceSetting.init(rawValue:)) ?? .village
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Self.workplaceKey)
+            workplaceRevision += 1
+        }
+    }
+}
