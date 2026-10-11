@@ -4,6 +4,7 @@ import PackageDescription
 // Dependencies point one way only:
 //
 //   XBotApp ── XBotUI ── XBotCore ── XBotBrain   (Foundation only)
+//                           └────── XBotRemote  (Foundation + Network; also builds for iOS)
 //
 // XBotBrain never imports SwiftUI. It spawns agent CLIs and parses what they print, and it is tested
 // against recorded output without a window.
@@ -14,9 +15,11 @@ let strict: [SwiftSetting] = [.swiftLanguageMode(.v6)]
 let package = Package(
     name: "XBot",
     // macOS 26: Apple's Containerization framework, which gives a bot its own machine, needs it.
-    platforms: [.macOS(.v26)],
+    // iOS 26: only XBotRemote (the wire to the iPhone/iPad app) builds for it.
+    platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
         .executable(name: "XBot", targets: ["XBotApp"]),
+        .library(name: "XBotRemote", targets: ["XBotRemote"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
@@ -25,7 +28,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "XBotBrain", swiftSettings: strict),
-        .target(name: "XBotCore", dependencies: ["XBotBrain"], swiftSettings: strict),
+        // The wire between the Mac and the iPhone/iPad app. Foundation and Network only.
+        .target(name: "XBotRemote", swiftSettings: strict),
+        .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotRemote"], swiftSettings: strict),
         .target(
             name: "XBotUI",
             dependencies: ["XBotCore", .product(name: "SwiftTerm", package: "SwiftTerm")],
@@ -55,6 +60,7 @@ let package = Package(
         .testTarget(
             name: "XBotCoreTests", dependencies: ["XBotCore"], resources: [.copy("Fixtures")], swiftSettings: strict
         ),
+        .testTarget(name: "XBotRemoteTests", dependencies: ["XBotRemote"], swiftSettings: strict),
         .testTarget(name: "XBotUITests", dependencies: ["XBotUI"], swiftSettings: strict),
     ]
 )

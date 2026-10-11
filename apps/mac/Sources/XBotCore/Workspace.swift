@@ -330,7 +330,7 @@ public final class Workspace {
 
     // MARK: Private
 
-    private func receive(_ event: BrainEvent, in id: UUID, turn token: UUID) {
+    func receive(_ event: BrainEvent, in id: UUID, turn token: UUID) {
         guard turns[id]?.token == token else { return }
         if case .session(let session) = event {
             update(id) { $0.sessionID = session }
