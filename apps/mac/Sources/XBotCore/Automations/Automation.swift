@@ -177,6 +177,35 @@ public enum AutomationApp: Hashable, Sendable {
     }
 }
 
+// MARK: Editing
+
+extension Automation {
+    /// What a palette tile or a step card carries when dragged.
+    public static func dragItem(for app: AutomationApp) -> String { "app:" + app.storageKey }
+    public static func dragItem(for step: AutomationStep) -> String { "step:" + step.id.uuidString }
+
+    /// A drop at `index` (0…steps.count): "app:mail" adds a step there, "step:<id>" moves that
+    /// step there. False when the item isn't one of these.
+    @discardableResult
+    public mutating func drop(_ item: String, at index: Int) -> Bool {
+        let index = min(max(index, 0), steps.count)
+        if item.hasPrefix("app:"), let app = AutomationApp(storageKey: String(item.dropFirst(4))) {
+            steps.insert(AutomationStep(app: app, text: ""), at: index)
+            return true
+        }
+        if item.hasPrefix("step:"), let id = UUID(uuidString: String(item.dropFirst(5))),
+           let from = steps.firstIndex(where: { $0.id == id }) {
+            let step = steps.remove(at: from)
+            steps.insert(step, at: min(from < index ? index - 1 : index, steps.count))
+            return true
+        }
+        return false
+    }
+
+    /// Something to run: at least one step that says something.
+    public var hasWork: Bool { steps.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+}
+
 /// The one turn an automation runs as.
 public enum AutomationPrompt {
     public static func make(_ automation: Automation) -> String {

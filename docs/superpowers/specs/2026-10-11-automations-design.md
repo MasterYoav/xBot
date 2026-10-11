@@ -49,6 +49,17 @@ removes it.
 
 ## Tests
 
+Unit (`swift test`): `AutomationTests.swift`, `AutomationSuiteTests.swift` — schedules and their
+edges (midnight, weekends, summer time, missed runs), editing by drag (add, move, refuse), every
+app's storage key, icon and how-to, storage round trips and the v4→v5 migration, unreadable steps,
+claims, guards (no work, no agent, disabled), agent/model/effort/project reaching the turn, failed
+runs, deletion, and the helper and app never both running one.
+
+Live (`scripts/e2e_automations.py`, xBot closed): seeds a sandbox library with one due automation
+per app, per agent and for a connector, has launchd start the installed app headless, checks each
+effect from outside xBot (and Reminders through xBot), then checks a second tick runs nothing, and
+removes what it made. Last result: 20/20.
+
 Schedules (next run for each kind, edges: past times, weekdays over a weekend, hourly rollover);
 the prompt (order, apps, how-to lines only for apps used, connectors); store round trip and
 migration; running creates a tagged chat with full access and the compiled prompt; claiming

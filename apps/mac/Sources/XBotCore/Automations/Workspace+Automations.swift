@@ -54,7 +54,7 @@ extension Workspace {
     public func runAutomation(_ id: UUID, at now: Date = .now) -> Chat? {
         reloadAutomations()
         guard let automation = automation(id), !isRunning(automation: id), brains[automation.harness] != nil,
-              automation.steps.contains(where: { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }),
+              automation.hasWork,
               attempt({ try store.claim(id, expected: automation.lastRunAt, at: now) }) == true
         else { return nil }
         if let index = automations.firstIndex(where: { $0.id == id }) { automations[index].lastRunAt = now }

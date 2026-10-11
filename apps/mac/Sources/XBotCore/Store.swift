@@ -179,8 +179,13 @@ public final class Store {
             let trigger: Automation.Trigger = r[2].string
                 .flatMap { try? decoder.decode(AutomationSchedule.self, from: Data($0.utf8)) }
                 .map(Automation.Trigger.schedule) ?? .manual
-            let steps = (r[3].string.flatMap { try? decoder.decode([StoredStep].self, from: Data($0.utf8)) } ?? [])
-                .compactMap { s in AutomationApp(storageKey: s.app).map { AutomationStep(id: s.id, app: $0, text: s.text) } }
+            // Step by step, so one that can't be read loses only itself.
+            let raw = r[3].string.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [[String: Any]] ?? []
+            let steps = raw.compactMap { s -> AutomationStep? in
+                guard let app = (s["app"] as? String).flatMap(AutomationApp.init(storageKey:)) else { return nil }
+                let id = (s["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
+                return AutomationStep(id: id, app: app, text: s["text"] as? String ?? "")
+            }
             return Automation(
                 id: id, name: name, trigger: trigger, steps: steps, harness: harness, model: r[5].string,
                 effort: r[6].string.flatMap(Effort.init(rawValue:)), projectID: r[7].uuid, isEnabled: r[8].bool,

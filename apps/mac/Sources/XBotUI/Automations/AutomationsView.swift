@@ -176,6 +176,7 @@ private struct AutomationEditor: View {
                 if let next = automation.isEnabled ? workspace.automation(automation.id)?.nextRun() : nil {
                     Text(String(localized: "Next: \(next.formatted(date: .abbreviated, time: .shortened))"))
                         .captionText().foregroundStyle(Palette.textTertiary)
+                        .lineLimit(1).fixedSize()
                 }
             }
         }
@@ -183,7 +184,7 @@ private struct AutomationEditor: View {
 
     private var runButton: some View {
         let running = workspace.isRunning(automation: automation.id)
-        let hasSteps = automation.steps.contains { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+        let hasSteps = automation.hasWork
         return Button {
             workspace.runAutomation(automation.id)
         } label: {
@@ -234,7 +235,7 @@ private struct AutomationEditor: View {
                     number: index + 1, step: binding(for: step.id),
                     remove: { automation.steps.removeAll { $0.id == step.id } }
                 )
-                .draggable("step:" + step.id.uuidString)
+                .draggable(Automation.dragItem(for: step))
                 .dropDestination(for: String.self) { items, _ in drop(items, at: index) } isTargeted: {
                     if $0 { dropTarget = index } else if dropTarget == index { dropTarget = nil }
                 }
@@ -274,25 +275,14 @@ private struct AutomationEditor: View {
         )
     }
 
-    /// "app:mail" adds a step there; "step:<id>" moves that step there.
     private func drop(_ items: [String], at index: Int) -> Bool {
         dropTarget = nil
         guard let item = items.first else { return false }
-        if item.hasPrefix("app:"), let app = AutomationApp(storageKey: String(item.dropFirst(4))) {
-            add(app, at: index)
-            return true
-        }
-        if item.hasPrefix("step:"), let id = UUID(uuidString: String(item.dropFirst(5))),
-           let from = automation.steps.firstIndex(where: { $0.id == id }) {
-            let step = automation.steps.remove(at: from)
-            automation.steps.insert(step, at: min(from < index ? index - 1 : index, automation.steps.count))
-            return true
-        }
-        return false
+        return automation.drop(item, at: index)
     }
 
     private func add(_ app: AutomationApp, at index: Int) {
-        automation.steps.insert(AutomationStep(app: app, text: ""), at: min(index, automation.steps.count))
+        automation.drop(Automation.dragItem(for: app), at: index)
     }
 }
 
@@ -474,7 +464,7 @@ private struct AppPalette: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
             ForEach(apps, id: \.self) { app in
                 PaletteTile(app: app) { add(app) }
-                    .draggable("app:" + app.storageKey) {
+                    .draggable(Automation.dragItem(for: app)) {
                         HStack { AppIcon(app: app, size: 22); Text(app.title).bodyText() }
                             .padding(Space.s)
                             .background(RoundedRectangle(cornerRadius: Radius.small).fill(Palette.raised))
