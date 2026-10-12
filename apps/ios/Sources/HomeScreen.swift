@@ -188,7 +188,8 @@ struct HomeScreen: View {
     private var places: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 18) {
-                ForEach(Tool.allCases) { tool in
+                // Workflows only while the Mac has Jev Workflows on.
+                ForEach(Tool.allCases.filter { $0 != .workflows || client.workflowsAvailable }) { tool in
                     Button { nav.tool = tool } label: {
                         VStack(spacing: 8) {
                             Image(systemName: tool.symbol)

@@ -28,6 +28,7 @@
 		9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */; };
 		9E8B818C85AA7B0CD2A76443 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 17B84BFA2CB7063ECDB8E94B /* SwiftTerm */; };
 		9FBEB32B75F9EF2F1DFD3E29 /* XBotWorld in Frameworks */ = {isa = PBXBuildFile; productRef = DCD2934EDAFC8E5D38A814BD /* XBotWorld */; };
+		BC9E555E1EADA41492ABEF09 /* WorkflowsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8331844719DAB00929DF99D3 /* WorkflowsScreen.swift */; };
 		C370272E29EF48D4D0D0DEA8 /* XBotRemote in Frameworks */ = {isa = PBXBuildFile; productRef = CFBABEF90EEA64CF4E933F25 /* XBotRemote */; };
 		CEA6EC2D9A2F2FE90309947F /* TerminalScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */; };
 		CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */; };
@@ -61,6 +62,7 @@
 		5413C960A83C6B9D79335838 /* XBotMacSigning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMacSigning.swift; sourceTree = "<group>"; };
 		77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AbilitiesScreen.swift; sourceTree = "<group>"; };
 		78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatScreen.swift; sourceTree = "<group>"; };
+		8331844719DAB00929DF99D3 /* WorkflowsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowsScreen.swift; sourceTree = "<group>"; };
 		8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClient.swift; sourceTree = "<group>"; };
 		894F7591A6E7774D0FDB41BD /* XBotMacSigning.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XBotMacSigning.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9017CA0C50D9D73A5DFD7399 /* AutomationsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationsScreen.swift; sourceTree = "<group>"; };
@@ -117,6 +119,7 @@
 				184C22B9CAB7DCB30B92CE23 /* SuggestedAgents.swift */,
 				0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */,
 				F5D4D0FE266D7C737CC991EC /* UsageBoard.swift */,
+				8331844719DAB00929DF99D3 /* WorkflowsScreen.swift */,
 				0A883A3922A318C099E51A12 /* XBotMobileApp.swift */,
 			);
 			path = Sources;
@@ -340,6 +343,7 @@
 				19CF38B125EC2345106BDCA1 /* SuggestedAgents.swift in Sources */,
 				CEA6EC2D9A2F2FE90309947F /* TerminalScreen.swift in Sources */,
 				92E7F5F78D3CC7A6E7DB2790 /* UsageBoard.swift in Sources */,
+				BC9E555E1EADA41492ABEF09 /* WorkflowsScreen.swift in Sources */,
 				3717B2F278EF1BCD207AE7AA /* XBotMobileApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
