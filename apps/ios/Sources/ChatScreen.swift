@@ -7,6 +7,9 @@ struct ChatScreen: View {
     let chatID: UUID
     @State private var text = ""
     @State private var editing: RemoteMessage?
+    @State private var renaming: RemoteChat?
+    @State private var deleting = false
+    @Environment(\.dismiss) private var dismiss
     @FocusState private var focused: Bool
 
     private var chat: RemoteChat? { client.chat(chatID) }
@@ -23,6 +26,13 @@ struct ChatScreen: View {
                     ForEach(messages) { message in
                         MessageRow(client: client, chatID: chatID, message: message, edit: { editing = message })
                             .id(message.id)
+                    }
+                    if canRetry {
+                        Button { Task { await client.retry(chatID) } } label: {
+                            Label(String(localized: "Try again"), systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
                     if !live.isEmpty || chat?.isRunning == true {
                         AssistantParts(client: client, chatID: chatID, messageID: nil, parts: live, writing: true)
@@ -56,6 +66,28 @@ struct ChatScreen: View {
                 }
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { renaming = chat } label: { Label(String(localized: "Rename"), systemImage: "pencil") }
+                    Button { Task { await client.retry(chatID) } } label: { Label(String(localized: "Ask again"), systemImage: "arrow.clockwise") }
+                        .disabled(chat?.isRunning == true || !messages.contains { $0.role == "user" })
+                    Button { UIPasteboard.general.string = transcriptText } label: { Label(String(localized: "Copy chat"), systemImage: "doc.on.doc") }
+                    Divider()
+                    Button(role: .destructive) { deleting = true } label: { Label(String(localized: "Delete"), systemImage: "trash") }
+                } label: { Image(systemName: "ellipsis.circle") }
+                .accessibilityLabel(String(localized: "Chat actions"))
+            }
+        }
+        .renameAlert(chat: $renaming, client: client)
+        .confirmationDialog(String(localized: "Delete this chat?"), isPresented: $deleting, titleVisibility: .visible) {
+            Button(String(localized: "Delete"), role: .destructive) {
+                dismiss()
+                Task { await client.delete(chatID) }
+            }
+        } message: {
+            Text(String(localized: "It's deleted on your Mac too. You can undo right after."))
+        }
         .onAppear { client.open(chatID) }
         .onDisappear { client.close(chatID) }
         .sheet(item: $editing) { message in
@@ -63,6 +95,18 @@ struct ChatScreen: View {
                 Task { await client.edit(message.id, to: edited, in: chatID) }
             }
         }
+    }
+}
+
+extension ChatScreen {
+    /// The last reply failed or stopped short: offer to ask again.
+    private var canRetry: Bool {
+        guard chat?.isRunning == false, let last = messages.last, last.role == "assistant" else { return false }
+        return last.parts.contains { if case .failure = $0 { true } else { false } }
+    }
+
+    private var transcriptText: String {
+        messages.map { ($0.role == "user" ? "> " : "") + $0.text }.joined(separator: "\n\n")
     }
 }
 
@@ -95,6 +139,12 @@ private struct MessageRow: View {
             }
         } else {
             AssistantParts(client: client, chatID: chatID, messageID: message.id, parts: message.parts, writing: false)
+                .contentShape(Rectangle())
+                .contextMenu {
+                    Button { UIPasteboard.general.string = message.text } label: { Label(String(localized: "Copy"), systemImage: "doc.on.doc") }
+                        .disabled(message.text.isEmpty)
+                    ShareLink(item: message.text) { Label(String(localized: "Share"), systemImage: "square.and.arrow.up") }
+                }
         }
     }
 }

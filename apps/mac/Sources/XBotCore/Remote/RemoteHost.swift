@@ -37,13 +37,15 @@ public final class RemoteHost {
     /// Bumped when a phone attaches or leaves, for Settings › Devices.
     public var onClientsChanged: (() -> Void)?
 
-    private let workspace: Workspace
+    let workspace: Workspace
     private let localInterval: Duration
     private let cloudInterval: Duration
     private var clients: [UUID: Client] = [:]
     private var watching = false
     private var flushTask: Task<Void, Never>?
     private var awake: Bool?
+    /// Chats deleted from a phone, so the phone can undo (the newest few).
+    private var deleted: [DeletedChat] = []
 
     private final class Client {
         let link: any RemoteLink
@@ -267,6 +269,33 @@ public final class RemoteHost {
         case .cancelPlan(let request, let chatID, let messageID):
             workspace.cancelPlan(messageID, in: chatID)
             answer(client, request, true, chatID: chatID)
+        case .rename(let request, let chatID, let title):
+            guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
+            guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return answer(client, request, refused: String(localized: "A chat needs a name."))
+            }
+            workspace.rename(chatID, to: title)
+            answer(client, request, true, chatID: chatID)
+        case .retry(let request, let chatID):
+            guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
+            if workspace.isRunning(chatID) { return answer(client, request, refused: String(localized: "It's still answering.")) }
+            if let reason = workspace.sendBlockedReason(chatID) { return answer(client, request, refused: reason) }
+            workspace.loadTranscript(chatID)
+            answer(client, request, workspace.retryLast(in: chatID), chatID: chatID)
+        case .delete(let request, let chatID):
+            workspace.loadTranscript(chatID)
+            guard let gone = workspace.deleteChat(chatID) else { return answer(client, request, refused: notFound) }
+            deleted.append(gone)
+            if deleted.count > 5 { deleted.removeFirst() }
+            answer(client, request, true, chatID: chatID)
+        case .undoDelete(let request, let chatID):
+            guard let index = deleted.lastIndex(where: { $0.chat.id == chatID }) else {
+                return answer(client, request, refused: String(localized: "That chat can't be brought back any more."))
+            }
+            workspace.restoreChat(deleted.remove(at: index))
+            answer(client, request, workspace.chat(chatID) != nil, chatID: chatID)
+        case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject:
+            handleProject(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
             if let reason = apply(settings, to: chatID) { return answer(client, request, refused: reason) }
@@ -309,7 +338,7 @@ public final class RemoteHost {
 
     // MARK: Mapping
 
-    private func remoteProjects() -> [RemoteProject] { workspace.projects.map { RemoteProject(id: $0.id, name: $0.name) } }
+    private func remoteProjects() -> [RemoteProject] { workspace.projects.map { RemoteProject(id: $0.id, name: $0.name, path: $0.path) } }
 
     private func remoteChats() -> [RemoteChat] {
         workspace.chats.filter { $0.automationID == nil }.map { chat in

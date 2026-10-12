@@ -19,7 +19,7 @@ final class RemoteClient {
         case unreachable(String)
     }
 
-    struct Answer: Sendable { var ok: Bool; var reason: String?; var chatID: UUID? }
+    struct Answer: Sendable { var ok: Bool; var reason: String?; var chatID: UUID?; var payload: HostMessage? = nil }
 
     private(set) var link: Link = .unpaired
     private(set) var macName: String?
@@ -208,6 +208,22 @@ final class RemoteClient {
         }
     }
 
+    /// A request answered with data (a folder, a file, git status…); nil when refused, with the
+    /// reason shown, unless `quiet`.
+    func call(quiet: Bool = false, _ make: (UUID) -> ClientMessage) async -> HostMessage? {
+        let answer = await request(make)
+        if !answer.ok, !quiet { notice = answer.reason }
+        return answer.payload
+    }
+
+    /// A request answered with ok or a reason; false (reason shown) when refused.
+    @discardableResult
+    func act(_ make: (UUID) -> ClientMessage) async -> Bool {
+        let answer = await request(make)
+        if !answer.ok { notice = answer.reason }
+        return answer.ok
+    }
+
     @discardableResult
     func send(_ text: String, in chatID: UUID) async -> Answer {
         let answer = await request { .send(requestID: $0, chatID: chatID, text: text) }
@@ -239,6 +255,45 @@ final class RemoteClient {
         let answer = await request { .setChat(requestID: $0, chatID: chatID, settings: settings) }
         if !answer.ok { notice = answer.reason }
     }
+
+    @discardableResult
+    func rename(_ chatID: UUID, to title: String) async -> Bool {
+        let answer = await request { .rename(requestID: $0, chatID: chatID, title: title) }
+        if !answer.ok { notice = answer.reason }
+        return answer.ok
+    }
+
+    func retry(_ chatID: UUID) async {
+        let answer = await request { .retry(requestID: $0, chatID: chatID) }
+        if !answer.ok { notice = answer.reason }
+    }
+
+    /// The chat just deleted, for the Undo banner.
+    private(set) var lastDeleted: RemoteChat?
+
+    func delete(_ chatID: UUID) async {
+        let chat = chats.first { $0.id == chatID }
+        // Gone from the list at once; back if the Mac says no.
+        chats.removeAll { $0.id == chatID }
+        let answer = await request { .delete(requestID: $0, chatID: chatID) }
+        if answer.ok {
+            lastDeleted = chat
+            transcripts[chatID] = nil
+            opened.remove(chatID)
+        } else {
+            if let chat, !chats.contains(where: { $0.id == chat.id }) { chats.append(chat); chats.sort { $0.updatedAt > $1.updatedAt } }
+            notice = answer.reason
+        }
+    }
+
+    func undoDelete() async {
+        guard let chat = lastDeleted else { return }
+        lastDeleted = nil
+        let answer = await request { .undoDelete(requestID: $0, chatID: chat.id) }
+        if !answer.ok { notice = answer.reason }
+    }
+
+    func forgetDeleted() { lastDeleted = nil }
 
     func open(_ chatID: UUID) {
         guard opened.insert(chatID).inserted else { return }
@@ -282,6 +337,9 @@ final class RemoteClient {
             live[chatID] = parts.isEmpty ? nil : parts
         case .reply(let requestID, let ok, let reason, let chatID):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: ok, reason: reason, chatID: chatID))
+        case .folder(let requestID, _), .file(let requestID, _), .git(let requestID, _), .diff(let requestID, _),
+             .macFolders(let requestID, _, _):
+            pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: true, reason: nil, chatID: nil, payload: message))
         }
     }
 

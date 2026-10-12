@@ -65,26 +65,61 @@ enum Theme {
     }
 }
 
+/// What the detail column shows.
+enum Destination: Hashable {
+    case chat(UUID)
+    case project(UUID)
+}
+
+/// A new chat to start, maybe in a project, maybe with text already in it.
+struct ComposeRequest: Identifiable {
+    let id = UUID()
+    var projectID: UUID?
+    var text = ""
+}
+
 struct RootView: View {
     let client: RemoteClient
-    @State private var selection: UUID?
+    @State private var selection: Destination?
     @State private var settings = false
+    @State private var compose: ComposeRequest?
+    @State private var addingProject = false
 
     var body: some View {
         if client.pairing == nil {
             PairView(client: client)
         } else {
             NavigationSplitView {
-                ChatListView(client: client, selection: $selection, showSettings: { settings = true })
+                ChatListView(client: client, selection: $selection, showSettings: { settings = true },
+                             compose: { compose = ComposeRequest(projectID: $0, text: $1) },
+                             addProject: { addingProject = true })
             } detail: {
-                if let id = selection, client.chat(id) != nil {
+                switch selection {
+                case .chat(let id) where client.chat(id) != nil:
                     ChatScreen(client: client, chatID: id).id(id)
-                } else {
+                case .project(let id) where client.project(id) != nil:
+                    ProjectScreen(client: client, projectID: id) { project, text in
+                        compose = ComposeRequest(projectID: project, text: text)
+                    }
+                    .id(id)
+                default:
                     ContentUnavailableView(String(localized: "Choose a chat"), systemImage: "bubble.left.and.text.bubble.right",
                                            description: Text(String(localized: "Or start a new one with ✎.")))
                 }
             }
             .sheet(isPresented: $settings) { SettingsSheet(client: client) }
+            .sheet(item: $compose) { request in
+                NewChatSheet(client: client, initialProject: request.projectID, initialText: request.text) { id in
+                    compose = nil
+                    selection = .chat(id)
+                }
+            }
+            .sheet(isPresented: $addingProject) {
+                AddProjectSheet(client: client) { id in
+                    addingProject = false
+                    if let id { selection = .project(id) }
+                }
+            }
             .alert(String(localized: "Your Mac said no"), isPresented: Binding(get: { client.notice != nil }, set: { if !$0 { client.notice = nil } })) {
                 Button(String(localized: "OK")) { client.notice = nil }
             } message: {

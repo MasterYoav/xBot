@@ -24,11 +24,12 @@ import XBotRemote
 @MainActor @Suite struct RemoteHostTests {
     let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
 
-    func setUp(_ brains: [HarnessKind: any Brain] = [.claude: ScriptedBrain([.textDelta("hel"), .textDelta("lo"), .done])])
+    func setUp(_ brains: [HarnessKind: any Brain] = [.claude: ScriptedBrain([.textDelta("hel"), .textDelta("lo"), .done])],
+               localInterval: Duration = .milliseconds(20))
         async -> (Workspace, RemoteHost) {
         let w = Workspace(store: .inMemory(), inbox: inbox, discover: { brains })
         await w.refreshHarnesses()
-        let host = RemoteHost(workspace: w, macName: "Mac mini", macID: UUID(), localInterval: .milliseconds(20),
+        let host = RemoteHost(workspace: w, macName: "Mac mini", macID: UUID(), localInterval: localInterval,
                               cloudInterval: .milliseconds(200))
         return (w, host)
     }
@@ -96,7 +97,8 @@ import XBotRemote
     /// Ten quick deltas reach a local phone as a few live frames, not ten.
     @Test func liveTextIsCoalesced() async throws {
         let brain = ScriptedBrain((0..<10).map { _ in .textDelta("x") }, hold: true)
-        let (w, host) = await setUp([.claude: brain])
+        // A window long enough that even a slow runner's ten deltas fall into one or two of them.
+        let (w, host) = await setUp([.claude: brain], localInterval: .milliseconds(400))
         let chat = try #require(w.newChat(in: nil))
         let link = FakeLink()
         host.attach(link)
@@ -105,8 +107,8 @@ import XBotRemote
         await until { link.sent.contains { if case .live(_, [.text("xxxxxxxxxx")]) = $0 { true } else { false } } }
         let lives = link.sent.compactMap { if case .live(_, let parts) = $0 { parts } else { nil } }
         #expect(lives.last == [.text("xxxxxxxxxx")])
-        // Coalesced: fewer frames than deltas (how many depends on how fast the machine is).
-        #expect(lives.count <= 5)
+        // Coalesced: a few frames, not ten.
+        #expect(lives.count <= 3)
         w.stop(chat.id)
     }
 
@@ -265,5 +267,54 @@ import XBotRemote
         w.stop(chat.id)
         host.refreshAwake()
         #expect(awake.last == false)
+    }
+
+    /// Chat management from the phone: rename, retry, delete, and undo the delete.
+    @Test func renameRetryDeleteAndUndoFromThePhone() async throws {
+        let brain = ScriptedBrain([.textDelta("ok"), .done])
+        let (w, host) = await setUp([.claude: brain])
+        let chat = try #require(w.newChat(in: nil))
+        _ = w.send("first", in: chat.id)
+        await until { !w.isRunning(chat.id) && w.messages(in: chat.id).count == 2 }
+        let link = FakeLink()
+        host.attach(link)
+
+        let rename = UUID()
+        link.say(.rename(requestID: rename, chatID: chat.id, title: "  Trip plans "))
+        await until { link.replies().contains { $0.0 == rename } }
+        #expect(w.chat(chat.id)?.title == "Trip plans")
+        #expect(link.replies().first { $0.0 == rename }?.1 == true)
+        await until { link.sent.contains { if case .chat(let c) = $0 { c.title == "Trip plans" } else { false } } }
+
+        let blank = UUID()
+        link.say(.rename(requestID: blank, chatID: chat.id, title: "   "))
+        await until { link.replies().contains { $0.0 == blank } }
+        #expect(link.replies().first { $0.0 == blank }?.1 == false)
+
+        let retry = UUID()
+        link.say(.retry(requestID: retry, chatID: chat.id))
+        await until { !w.isRunning(chat.id) && w.messages(in: chat.id).count == 4 }
+        #expect(link.replies().first { $0.0 == retry }?.1 == true)
+        #expect(brain.requests.withLock { $0.last?.prompt } == "first")
+
+        let delete = UUID()
+        link.say(.delete(requestID: delete, chatID: chat.id))
+        await until { link.sent.contains(.chatRemoved(chat.id)) }
+        #expect(w.chat(chat.id) == nil)
+        #expect(link.replies().first { $0.0 == delete }?.1 == true)
+
+        let undo = UUID()
+        link.say(.undoDelete(requestID: undo, chatID: chat.id))
+        await until { link.replies().contains { $0.0 == undo } }
+        #expect(link.replies().first { $0.0 == undo }?.1 == true)
+        #expect(w.chat(chat.id)?.title == "Trip plans")
+        #expect(w.messages(in: chat.id).count == 4)
+        await until { link.sent.contains { if case .chat(let c) = $0 { c.id == chat.id } else { false } } }
+
+        // Nothing left to undo.
+        let again = UUID()
+        link.say(.undoDelete(requestID: again, chatID: chat.id))
+        await until { link.replies().contains { $0.0 == again } }
+        #expect(link.replies().first { $0.0 == again }?.1 == false)
     }
 }
