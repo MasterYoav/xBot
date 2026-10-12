@@ -24,6 +24,7 @@ struct ChatListView: View {
                     NavigationLink(value: Destination.notes) { Label(String(localized: "Notes"), systemImage: "note.text") }
                     NavigationLink(value: Destination.automations) { Label(String(localized: "Automations"), systemImage: "bolt.horizontal") }
                     NavigationLink(value: Destination.agents) { Label(String(localized: "Agents"), systemImage: "person.3") }
+                    NavigationLink(value: Destination.abilities) { Label(String(localized: "Abilities"), systemImage: "puzzlepiece.extension") }
                 }
             }
             let loose = shown.filter { $0.projectID == nil }

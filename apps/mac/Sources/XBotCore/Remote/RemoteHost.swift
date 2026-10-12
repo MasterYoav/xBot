@@ -46,6 +46,7 @@ public final class RemoteHost {
     private var awake: Bool?
     /// Draws a crew member's sprite as PNG for phones; set by the app (the sprite lives in XBotUI).
     public var drawAvatar: (@MainActor (AgentAvatar) -> Data?)?
+    var abilityCatalogOverride: AbilityCatalog?
     /// Brings back the last crew member a phone let go.
     var undoCrewDelete: (@MainActor () -> Void)?
     /// The last note a phone deleted: where it was, and where the Trash put it.
@@ -303,7 +304,8 @@ public final class RemoteHost {
         case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject,
              .listNotes, .saveNote, .deleteNote, .undoDeleteNote,
              .listAutomations, .saveAutomation, .deleteAutomation, .runAutomation, .setAutomationHelper,
-             .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar:
+             .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar,
+             .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP:
             handleProject(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }

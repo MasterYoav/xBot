@@ -192,6 +192,8 @@ public enum HostMessage: Codable, Equatable, Sendable {
     case crew(requestID: UUID, members: [RemoteCrewMember], parts: [RemoteAvatarPart])
     /// A look drawn by the Mac (PNG), for the editor's preview.
     case avatarImage(requestID: UUID, image: Data?)
+    /// Every ability (`missing`: agents with no CLI on the Mac), and the marketplace once asked for.
+    case abilities(requestID: UUID, items: [RemoteAbility], missing: [String], plugins: [RemotePlugin]?)
 }
 
 /// Phone → Mac.
@@ -254,6 +256,14 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     /// A new chat with the member (in its home project), starting with `text`.
     case talkTo(requestID: UUID, memberID: UUID, text: String)
     case drawAvatar(requestID: UUID, avatar: RemoteAvatar)
+    // Abilities: each answered with `abilities`.
+    case listAbilities(requestID: UUID, refresh: Bool)
+    case setAbility(requestID: UUID, abilityID: String, enabled: Bool)
+    case removeAbility(requestID: UUID, abilityID: String)
+    case listPlugins(requestID: UUID)
+    case installPlugin(requestID: UUID, pluginID: String)
+    /// A server run by a command (`command` + `arguments`) or reached at `url`, for each agent in `agents`.
+    case addMCP(requestID: UUID, name: String, command: String?, arguments: [String], url: String?, agents: [String])
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }

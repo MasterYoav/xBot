@@ -20,6 +20,7 @@
 		9150F73FC8D9BEE039D1C682 /* xBot.icon in Resources */ = {isa = PBXBuildFile; fileRef = DE16AE4C9D778783F1CF8C3E /* xBot.icon */; };
 		9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */; };
 		C370272E29EF48D4D0D0DEA8 /* XBotRemote in Frameworks */ = {isa = PBXBuildFile; productRef = CFBABEF90EEA64CF4E933F25 /* XBotRemote */; };
+		CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */; };
 		D8C7B67994EAA18365C2AF79 /* PairView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B152A45009833C7A36A3E078 /* PairView.swift */; };
 /* End PBXBuildFile section */
 
@@ -40,6 +41,7 @@
 		36FEEA105889A9A3FB9EAD00 /* XBotMobileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = XBotMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B0EAB5C062853D055579E01 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
 		5413C960A83C6B9D79335838 /* XBotMacSigning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMacSigning.swift; sourceTree = "<group>"; };
+		77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AbilitiesScreen.swift; sourceTree = "<group>"; };
 		78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatScreen.swift; sourceTree = "<group>"; };
 		8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClient.swift; sourceTree = "<group>"; };
 		894F7591A6E7774D0FDB41BD /* XBotMacSigning.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XBotMacSigning.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -69,6 +71,7 @@
 		6686D09490E5AE080C4C2DB5 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */,
 				9017CA0C50D9D73A5DFD7399 /* AutomationsScreen.swift */,
 				AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */,
 				78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */,
@@ -277,6 +280,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */,
 				868AADDC29A115E6576D7071 /* AutomationsScreen.swift in Sources */,
 				8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */,
 				0AA3AC9BCD7CCBEDD0151A78 /* ChatScreen.swift in Sources */,

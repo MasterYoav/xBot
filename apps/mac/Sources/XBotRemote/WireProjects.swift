@@ -319,3 +319,57 @@ public struct RemoteCrewMember: Codable, Equatable, Sendable, Identifiable {
         self.image = image
     }
 }
+
+// MARK: Abilities
+
+/// A connector, plugin, skill or MCP server of one agent, as the Mac's Abilities page lists it.
+public struct RemoteAbility: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var agent: String
+    /// "connectors", "plugins", "skills", "mcps".
+    public var kind: String
+    public var title: String
+    public var source: String?
+    public var summary: String?
+    /// Nil: not something that's on or off.
+    public var enabled: Bool?
+    public var canSwitch: Bool
+    /// Why it can't be switched, when it can't.
+    public var fixedReason: String?
+    /// "connected", "needsSignIn", "failed", "pending".
+    public var status: String?
+    public var canRemove: Bool
+
+    public init(id: String, agent: String, kind: String, title: String, source: String? = nil, summary: String? = nil,
+                enabled: Bool? = nil, canSwitch: Bool = false, fixedReason: String? = nil, status: String? = nil, canRemove: Bool = false) {
+        self.id = id
+        self.agent = agent
+        self.kind = kind
+        self.title = title
+        self.source = source
+        self.summary = summary
+        self.enabled = enabled
+        self.canSwitch = canSwitch
+        self.fixedReason = fixedReason
+        self.status = status
+        self.canRemove = canRemove
+    }
+}
+
+public struct RemotePlugin: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var agent: String
+    public var name: String
+    public var marketplace: String
+    public var summary: String?
+    public var installed: Bool
+
+    public init(id: String, agent: String, name: String, marketplace: String, summary: String?, installed: Bool) {
+        self.id = id
+        self.agent = agent
+        self.name = name
+        self.marketplace = marketplace
+        self.summary = summary
+        self.installed = installed
+    }
+}

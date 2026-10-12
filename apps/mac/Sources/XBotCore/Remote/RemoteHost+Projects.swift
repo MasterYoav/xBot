@@ -156,6 +156,9 @@ extension RemoteHost {
             workspace.notes(for: project).reload()
             return (request, notesAnswer(request, project, saved: nil))
 
+        case .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP:
+            return await answerAbilities(message)
+
         default:
             return answerAutomations(message)
         }

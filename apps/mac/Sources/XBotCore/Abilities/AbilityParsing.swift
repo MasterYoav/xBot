@@ -194,11 +194,30 @@ public enum AbilityParsing {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else { return (nil, nil) }
         var name: String?, description: String?
-        for line in lines.dropFirst() {
+        let body = Array(lines.dropFirst())
+        var index = 0
+        while index < body.count {
+            let line = body[index]
+            index += 1
             if line.trimmingCharacters(in: .whitespaces) == "---" { break }
             guard let (key, value) = CodexConfig.assignment(line, separator: ":") else { continue }
-            if key == "name" { name = CodexConfig.unquote(value) }
-            if key == "description" { description = CodexConfig.unquote(value) }
+            var text = CodexConfig.unquote(value)
+            // A block scalar: the value is the indented lines below, joined (> folded) or kept (| literal).
+            let marker = value.trimmingCharacters(in: .whitespaces)
+            if let first = marker.first, first == ">" || first == "|", marker.count <= 3 {
+                var block: [String] = []
+                while index < body.count {
+                    let next = body[index]
+                    guard next.first == " " || next.first == "\t" || next.trimmingCharacters(in: .whitespaces).isEmpty,
+                          next.trimmingCharacters(in: .whitespaces) != "---" else { break }
+                    block.append(next.trimmingCharacters(in: .whitespaces))
+                    index += 1
+                }
+                while block.last?.isEmpty == true { block.removeLast() }
+                text = first == ">" ? block.joined(separator: " ") : block.joined(separator: "\n")
+            }
+            if key == "name" { name = text }
+            if key == "description" { description = text }
         }
         return (name, description)
     }
