@@ -24,11 +24,12 @@ import XBotRemote
 @MainActor @Suite struct RemoteHostTests {
     let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
 
-    func setUp(_ brains: [HarnessKind: any Brain] = [.claude: ScriptedBrain([.textDelta("hel"), .textDelta("lo"), .done])])
+    func setUp(_ brains: [HarnessKind: any Brain] = [.claude: ScriptedBrain([.textDelta("hel"), .textDelta("lo"), .done])],
+               localInterval: Duration = .milliseconds(20))
         async -> (Workspace, RemoteHost) {
         let w = Workspace(store: .inMemory(), inbox: inbox, discover: { brains })
         await w.refreshHarnesses()
-        let host = RemoteHost(workspace: w, macName: "Mac mini", macID: UUID(), localInterval: .milliseconds(20),
+        let host = RemoteHost(workspace: w, macName: "Mac mini", macID: UUID(), localInterval: localInterval,
                               cloudInterval: .milliseconds(200))
         return (w, host)
     }
@@ -96,7 +97,8 @@ import XBotRemote
     /// Ten quick deltas reach a local phone as a few live frames, not ten.
     @Test func liveTextIsCoalesced() async throws {
         let brain = ScriptedBrain((0..<10).map { _ in .textDelta("x") }, hold: true)
-        let (w, host) = await setUp([.claude: brain])
+        // A window long enough that even a slow runner's ten deltas fall into one or two of them.
+        let (w, host) = await setUp([.claude: brain], localInterval: .milliseconds(400))
         let chat = try #require(w.newChat(in: nil))
         let link = FakeLink()
         host.attach(link)
@@ -105,8 +107,8 @@ import XBotRemote
         await until { link.sent.contains { if case .live(_, [.text("xxxxxxxxxx")]) = $0 { true } else { false } } }
         let lives = link.sent.compactMap { if case .live(_, let parts) = $0 { parts } else { nil } }
         #expect(lives.last == [.text("xxxxxxxxxx")])
-        // Coalesced: fewer frames than deltas (how many depends on how fast the machine is).
-        #expect(lives.count <= 5)
+        // Coalesced: a few frames, not ten.
+        #expect(lives.count <= 3)
         w.stop(chat.id)
     }
 
