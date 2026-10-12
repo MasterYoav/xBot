@@ -254,6 +254,35 @@ public struct RemoteAutomation: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+// MARK: Jev workflows
+
+/// A Jev workflow, as the phone lists it: to see and run, not to edit.
+public struct RemoteWorkflow: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var name: String
+    public var schedule: RemoteSchedule?
+    public var stepTitles: [String]
+    public var isEnabled: Bool
+    public var nextRun: Date?
+    public var lastRunAt: Date?
+    public var runs: [RemoteRun]
+    /// Why Run now won't work right now (no Jev key, an agent missing…), if it won't.
+    public var blocked: String?
+
+    public init(id: UUID, name: String, schedule: RemoteSchedule? = nil, stepTitles: [String] = [], isEnabled: Bool = true,
+                nextRun: Date? = nil, lastRunAt: Date? = nil, runs: [RemoteRun] = [], blocked: String? = nil) {
+        self.id = id
+        self.name = name
+        self.schedule = schedule
+        self.stepTitles = stepTitles
+        self.isEnabled = isEnabled
+        self.nextRun = nextRun
+        self.lastRunAt = lastRunAt
+        self.runs = runs
+        self.blocked = blocked
+    }
+}
+
 /// A step's kind, from the Mac's palette: its apps, then connectors.
 public struct RemoteApp: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var key: String

@@ -68,7 +68,7 @@ extension RemoteHost {
             return (request, automationsAnswer(request))
 
         default:
-            return answerCrew(message)
+            return answerWorkflows(message)
         }
     }
 

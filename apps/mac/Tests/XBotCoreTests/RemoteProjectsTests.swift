@@ -59,7 +59,7 @@ import XBotRemote
 
     static func requestID(of message: HostMessage) -> UUID? {
         switch message {
-        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _), .abilities(let r, _, _, _), .shellOpened(let r, _, _), .profile(let r, _): r
+        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .workflows(let r, _, _), .crew(let r, _, _), .avatarImage(let r, _), .abilities(let r, _, _, _), .shellOpened(let r, _, _), .profile(let r, _): r
         default: nil
         }
     }
