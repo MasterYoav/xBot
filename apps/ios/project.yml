@@ -31,6 +31,8 @@ targets:
         product: XBotRemote
       - package: XBot
         product: XBotWorld
+      - package: XBot
+        product: XBotMarkdown
       - package: SwiftTerm
     scheme:
       testTargets: [XBotMobileUITests]

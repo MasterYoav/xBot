@@ -22,6 +22,7 @@ let package = Package(
         .executable(name: "XBot", targets: ["XBotApp"]),
         .library(name: "XBotRemote", targets: ["XBotRemote"]),
         .library(name: "XBotWorld", targets: ["XBotWorld"]),
+        .library(name: "XBotMarkdown", targets: ["XBotMarkdown"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
@@ -34,6 +35,8 @@ let package = Package(
         .target(name: "XBotRemote", swiftSettings: strict),
         // The crew's looks and their pixel worlds: SwiftUI only, shared with the iPhone/iPad app.
         .target(name: "XBotWorld", swiftSettings: strict),
+        // Markdown files as editable blocks, written back as Markdown (Foundation only; for the phone).
+        .target(name: "XBotMarkdown", swiftSettings: strict),
         .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotRemote", "XBotWorld", .product(name: "SwiftTerm", package: "SwiftTerm")],
                 swiftSettings: strict),
         .target(
@@ -65,6 +68,7 @@ let package = Package(
         .testTarget(
             name: "XBotCoreTests", dependencies: ["XBotCore"], resources: [.copy("Fixtures")], swiftSettings: strict
         ),
+        .testTarget(name: "XBotMarkdownTests", dependencies: ["XBotMarkdown"], swiftSettings: strict),
         .testTarget(name: "XBotRemoteTests", dependencies: ["XBotRemote"], swiftSettings: strict),
         .testTarget(name: "XBotUITests", dependencies: ["XBotUI"], swiftSettings: strict),
     ]

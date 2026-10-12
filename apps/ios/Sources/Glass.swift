@@ -7,9 +7,10 @@ enum Glass {
     /// One horizontal margin everywhere, matching the large-title inset.
     static let margin: CGFloat = 16
     static let radius: CGFloat = 28
-    /// A brighter accent for glows and arcs; the plain one stays for text and tint.
-    static let glow = Color(red: 0.93, green: 0.49, blue: 0.74)
-    static let violet = Color(red: 0.55, green: 0.42, blue: 0.95)
+    /// A brighter accent for glows; the plain one stays for text and tint.
+    @MainActor static var glow: Color { Theme.accent.brighter() }
+    /// The accent's neighbour, for gradients.
+    @MainActor static var violet: Color { Theme.accent.turned(-35) }
 }
 
 extension View {
@@ -109,10 +110,10 @@ struct ArcGauge: View {
     var lineWidth: CGFloat = 30
 
     /// The arc covers this much of a circle, open at the bottom.
-    static let sweep = 0.68
+    static let sweep = 0.75
 
     var body: some View {
-        let start = 0.5 + (1 - Self.sweep) / 2
+        let start = 0.25 + (1 - Self.sweep) / 2
         let clamped = min(max(value, 0), 1)
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
@@ -208,5 +209,38 @@ struct ChatMark: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+}
+
+/// Settings › Appearance: the accent as a row of swatches, plus any colour.
+struct AccentPicker: View {
+    private var store: AccentStore { AccentStore.shared }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 14) {
+                ForEach(AccentChoice.presets) { choice in
+                    let chosen = store.hex.caseInsensitiveCompare(choice.hex) == .orderedSame
+                    Button { withAnimation(.snappy) { store.hex = choice.hex } } label: {
+                        VStack(spacing: 6) {
+                            Circle()
+                                .fill(LinearGradient(colors: [Color(hexString: choice.hex).brighter(0.15), Color(hexString: choice.hex)],
+                                                     startPoint: .top, endPoint: .bottom))
+                                .frame(width: 40, height: 40)
+                                .overlay { if chosen { Image(systemName: "checkmark").font(.footnote.bold()).foregroundStyle(.white) } }
+                                .padding(3)
+                                .overlay(Circle().strokeBorder(chosen ? Color(hexString: choice.hex) : .clear, lineWidth: 2))
+                            Text(choice.name).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(choice.name)
+                    .accessibilityAddTraits(chosen ? .isSelected : [])
+                }
+            }
+            ColorPicker(String(localized: "Custom colour"),
+                        selection: Binding(get: { store.color }, set: { store.hex = $0.hexString }), supportsOpacity: false)
+        }
+        .padding(.vertical, 6)
     }
 }

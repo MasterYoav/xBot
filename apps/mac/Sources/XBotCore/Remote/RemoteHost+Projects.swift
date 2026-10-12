@@ -225,6 +225,13 @@ extension RemoteHost {
             case .trash(let path):
                 guard !path.isEmpty, let url = Self.inside(project, path), fm.fileExists(atPath: url.path) else { return refuse(request, outside) }
                 try fm.trashItem(at: url, resultingItemURL: nil)
+            case .write(let path, let text, let expected):
+                guard !path.isEmpty, let url = Self.inside(project, path), !Self.isFolder(url) else { return refuse(request, outside) }
+                if let expected, fm.fileExists(atPath: url.path),
+                   (try? String(contentsOf: url, encoding: .utf8)) != expected {
+                    return refuse(request, String(localized: "It changed on the Mac since you opened it. Open it again to see the new version."))
+                }
+                try Data(text.utf8).write(to: url, options: .atomic)
             }
         } catch {
             return refuse(request, error.localizedDescription)

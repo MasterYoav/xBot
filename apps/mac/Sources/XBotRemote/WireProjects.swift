@@ -147,6 +147,9 @@ public enum RemoteFileAction: Codable, Equatable, Sendable {
     case rename(path: String, to: String)
     /// To the Mac's Trash, so it can be put back from there.
     case trash(path: String)
+    /// Saves a text file. `expected` is what the phone opened: if the file changed on the Mac since,
+    /// the save is refused instead of overwriting someone else's edit.
+    case write(path: String, text: String, expected: String?)
 }
 
 /// A folder on the Mac, when picking one to add as a project.
