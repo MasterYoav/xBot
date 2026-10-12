@@ -82,8 +82,11 @@ extension RemoteHost {
                 let status: String? = switch a.status {
                 case .connected: "connected"; case .needsSignIn: "needsSignIn"; case .failed: "failed"; case .pending: "pending"; case nil: nil
                 }
+                // An MCP server's command line or address can hold a token: masked before it leaves
+                // the Mac, whatever produced it (the parser masks it too).
+                let summary = a.kind == .mcps ? a.summary.map { SecretRedaction.redact($0) } : a.summary
                 return RemoteAbility(id: a.id, agent: a.agent.rawValue, kind: a.kind.rawValue, title: a.title, source: a.source,
-                                     summary: a.summary, enabled: a.enabled, canSwitch: a.toggle != nil, fixedReason: a.fixedReason,
+                                     summary: summary, enabled: a.enabled, canSwitch: a.toggle != nil, fixedReason: a.fixedReason,
                                      status: status, canRemove: a.removal != nil)
             }
         }
