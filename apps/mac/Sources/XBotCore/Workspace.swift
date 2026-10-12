@@ -125,6 +125,8 @@ public final class Workspace {
     public func messages(in id: UUID) -> [ChatMessage] { transcripts[id] ?? [] }
 
     public func isRunning(_ id: UUID) -> Bool { turns[id] != nil }
+    /// Any turn at all: an update waits for none to be running.
+    public var isRunningAnyTurn: Bool { !turns.isEmpty }
 
     /// Why the composer cannot send, in a sentence, or nil when it can. A running turn is not a
     /// reason: the composer shows Stop instead.
