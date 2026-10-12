@@ -16,28 +16,6 @@ struct Sprite: View {
     }
 }
 
-struct CrewCard: View {
-    let member: RemoteCrewMember
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Sprite(image: member.image, height: 76)
-                .padding(.top, 14)
-            VStack(spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(member.name).font(.headline).lineLimit(1)
-                    if member.isHeadMaster { Image(systemName: "crown.fill").font(.caption2).foregroundStyle(.yellow) }
-                }
-                Text(member.role.isEmpty ? " " : member.role).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-            }
-            CrewStatus(member: member).padding(.bottom, 12)
-        }
-        .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color(.secondarySystemBackground)))
-        .accessibilityElement(children: .combine)
-    }
-}
-
 struct CrewStatus: View {
     let member: RemoteCrewMember
 
@@ -175,7 +153,7 @@ struct CrewEditor: View {
                     Section {
                         let crew = client.crew ?? []
                         let below = Set(OrgChart.tree(crew.map(\.orgMember)).below(member.id))
-                        let suggested = OrgChart.suggestedManager(role: member.role, id: member.id, among: crew.map(\.orgMember) + (isNew ? [] : []))
+                        let suggested = OrgChart.suggestedManager(role: member.role, id: member.id, among: crew.map(\.orgMember))
                         Picker(String(localized: "Reports to"), selection: Binding(
                             get: { member.managerID ?? crew.first(where: \.isHeadMaster)?.id },
                             set: { member.managerID = $0 }
