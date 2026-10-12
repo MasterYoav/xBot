@@ -44,7 +44,7 @@ struct Composer: View {
                 } else {
                     Button { Task { await send() } } label: {
                         Image(systemName: "arrow.up").font(.system(size: 16, weight: .bold)).frame(width: 40, height: 40)
-                            .background(Circle().fill(Theme.accent.opacity(canSend ? 1 : 0.3))).foregroundStyle(.white)
+                            .background(Circle().fill(canSend ? Theme.accent : Color(.systemGray3))).foregroundStyle(.white)
                     }
                     .buttonStyle(.plain)
                     .disabled(!canSend)

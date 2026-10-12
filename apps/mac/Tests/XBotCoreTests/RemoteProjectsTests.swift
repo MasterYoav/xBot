@@ -59,7 +59,7 @@ import XBotRemote
 
     static func requestID(of message: HostMessage) -> UUID? {
         switch message {
-        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _): r
+        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _): r
         default: nil
         }
     }
@@ -294,5 +294,72 @@ import XBotRemote
         link.say(.deleteAutomation(requestID: delete, automationID: made.id))
         guard case .automations(_, let gone, _, _) = await tests.answer(link, delete) else { Issue.record("not deleted"); return }
         #expect(gone.isEmpty && w.automations.isEmpty)
+    }
+}
+
+/// The crew from the phone.
+@MainActor @Suite(.serialized) struct RemoteCrewTests {
+    let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+
+    @Test func hireEditTalkDeleteAndUndo() async throws {
+        let brain = ScriptedBrain([.textDelta("on it"), .done])
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: brain] })
+        await w.refreshHarnesses()
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        host.drawAvatar = { avatar in Data("png:\(avatar.skin)".utf8) }
+        defer { withExtendedLifetime(host) {} }
+        let link = FakeLink()
+        host.attach(link)
+        let tests = RemoteProjectsTests()
+
+        let list = UUID()
+        link.say(.listCrew(requestID: list))
+        guard case .crew(_, let first, let parts) = await tests.answer(link, list) else { Issue.record("no crew"); return }
+        #expect(parts.map(\.key) == AgentAvatar.Part.allCases.map(\.rawValue) && parts.first?.count == 6)
+        let head = first.first { $0.isHeadMaster }
+        #expect(head != nil)
+
+        // Hired on the phone.
+        var hired = RemoteCrewMember(name: "  Quill ", role: "Writer", instructions: "Short sentences.",
+                                     avatar: RemoteAvatar(parts: ["skin": 2, "hair": 3]), agent: "claude")
+        let save = UUID()
+        link.say(.saveCrew(requestID: save, member: hired))
+        guard case .crew(_, let crew, _) = await tests.answer(link, save) else { Issue.record("not hired"); return }
+        let quill = try #require(crew.first { $0.id == hired.id })
+        #expect(quill.name == "Quill" && quill.role == "Writer" && quill.image == Data("png:2".utf8) && quill.status == "idle")
+        #expect(w.agent(hired.id)?.avatar.hair == 3)
+
+        hired.role = "Editor"
+        let edit = UUID()
+        link.say(.saveCrew(requestID: edit, member: hired))
+        guard case .crew = await tests.answer(link, edit) else { Issue.record("not edited"); return }
+        #expect(w.agent(hired.id)?.role == "Editor")
+
+        // A preview of a look.
+        let draw = UUID()
+        link.say(.drawAvatar(requestID: draw, avatar: RemoteAvatar(parts: ["skin": 5])))
+        guard case .avatarImage(_, let png) = await tests.answer(link, draw) else { Issue.record("no picture"); return }
+        #expect(png == Data("png:5".utf8))
+
+        // Talk: a chat with Quill, not opened on the Mac.
+        let talk = UUID()
+        link.say(.talkTo(requestID: talk, memberID: hired.id, text: "Draft the intro"))
+        guard case .reply(_, true, _, let chatID?) = await tests.answer(link, talk) else { Issue.record("no chat"); return }
+        #expect(w.chat(chatID)?.agentID == hired.id && !w.openChatIDs.contains(chatID))
+        let end = Date.now.addingTimeInterval(20)
+        while brain.requests.withLock({ $0.isEmpty }), Date.now < end { try? await Task.sleep(for: .milliseconds(20)) }
+        #expect(brain.requests.withLock { $0.last?.prompt.contains("Draft the intro") } == true)
+
+        // HeadMaster stays; Quill goes and comes back with the chat.
+        let fire = UUID()
+        link.say(.deleteCrew(requestID: fire, memberID: try #require(head).id))
+        guard case .reply(_, false, _, _) = await tests.answer(link, fire) else { Issue.record("fired the founder"); return }
+        let delete = UUID(), undo = UUID()
+        link.say(.deleteCrew(requestID: delete, memberID: hired.id))
+        guard case .crew(_, let without, _) = await tests.answer(link, delete) else { Issue.record("not deleted"); return }
+        #expect(!without.contains { $0.id == hired.id } && w.chat(chatID)?.agentID == nil)
+        link.say(.undoDeleteCrew(requestID: undo))
+        guard case .crew(_, let back, _) = await tests.answer(link, undo) else { Issue.record("not undone"); return }
+        #expect(back.contains { $0.id == hired.id } && w.chat(chatID)?.agentID == hired.id)
     }
 }

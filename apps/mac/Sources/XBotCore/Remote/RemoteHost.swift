@@ -44,6 +44,10 @@ public final class RemoteHost {
     private var watching = false
     private var flushTask: Task<Void, Never>?
     private var awake: Bool?
+    /// Draws a crew member's sprite as PNG for phones; set by the app (the sprite lives in XBotUI).
+    public var drawAvatar: (@MainActor (AgentAvatar) -> Data?)?
+    /// Brings back the last crew member a phone let go.
+    var undoCrewDelete: (@MainActor () -> Void)?
     /// The last note a phone deleted: where it was, and where the Trash put it.
     var deletedNote: (projectID: UUID, from: URL, to: URL)?
     /// Chats deleted from a phone, so the phone can undo (the newest few).
@@ -298,7 +302,8 @@ public final class RemoteHost {
             answer(client, request, workspace.chat(chatID) != nil, chatID: chatID)
         case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject,
              .listNotes, .saveNote, .deleteNote, .undoDeleteNote,
-             .listAutomations, .saveAutomation, .deleteAutomation, .runAutomation, .setAutomationHelper:
+             .listAutomations, .saveAutomation, .deleteAutomation, .runAutomation, .setAutomationHelper,
+             .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar:
             handleProject(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
