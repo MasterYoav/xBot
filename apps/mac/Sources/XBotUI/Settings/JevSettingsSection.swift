@@ -30,7 +30,11 @@ struct JevSettingsSection: View {
             } else {
                 LabeledContent(String(localized: "API key")) {
                     HStack(spacing: Space.s) {
-                        SecureField(String(localized: "TypeSafe API key"), text: $typed)
+                        // Prompt inside the field, label hidden: in a Form the label otherwise sits
+                        // beside the field and wraps.
+                        SecureField(String(localized: "TypeSafe API key"), text: $typed,
+                                    prompt: Text(String(localized: "Paste your key")))
+                            .labelsHidden()
                             .textFieldStyle(.roundedBorder)
                             .onSubmit(save)
                         Button(String(localized: "Save"), action: save)
