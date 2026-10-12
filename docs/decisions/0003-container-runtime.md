@@ -4,7 +4,7 @@
 
 **Status:** Accepted, with a scheduled review
 **Date:** 2026-09
-**Related:** [07-container-runtime.md](../07-container-runtime.md), [06-onboarding.md](../06-onboarding.md)
+**Related:** 07-container-runtime.md (removed with the engine; in git history), [06-onboarding.md](../06-onboarding.md)
 
 ---
 
@@ -46,7 +46,7 @@ implementing the driver.**
 ### 1. The abstraction is not optional
 
 All runtime interaction goes through `ContainerDriver`
-([07-container-runtime.md](../07-container-runtime.md)). Adding a runtime is a new conformance, not a
+(07-container-runtime.md (removed with the engine; in git history)). Adding a runtime is a new conformance, not a
 rewrite. This is the actual decision — everything below is a preference ordering that we expect to
 change.
 

@@ -1,5 +1,8 @@
 # Plan: the computer, as client tools in the Mac app
 
+> **xBot 1.x history.** This plan was for the Docker/OpenBot engine, removed in
+> [ADR-0009](../decisions/0009-native-harness-redesign.md). Kept as a record; nothing in it applies to the app today.
+
 **Why.** Upstream's agents use their computer through **client-side tools**. OpenBot's web app
 registers them with `useFrontendTool` (`engine/app/src/lib/copilot/computer-tools.tsx`); the engine never
 offers them. The Mac app is xBot's client and sends `tools: []` on every run, so no xBot agent has ever

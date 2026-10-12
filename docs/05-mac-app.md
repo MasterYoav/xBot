@@ -1,38 +1,71 @@
 # The Mac app
 
-A Swift package in `apps/mac`. Swift 6 language mode, macOS 26, Apple silicon.
+A Swift package in `apps/mac`. Swift 6 language mode with strict concurrency, macOS 26, Apple
+silicon. Two dependencies: [Sparkle](https://sparkle-project.org) for updates and
+[SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for terminals. The iPhone and iPad app in
+`apps/ios` builds three of this package's libraries; see [its page](14-iphone-and-ipad.md).
 
 ## Modules
 
 Dependencies point one way:
 
 ```
-XBotApp ── XBotUI ── XBotCore ── XBotBrain   (Foundation only)
+XBotApp ── XBotUI ── XBotCore ─┬─ XBotBrain     (Foundation only)
+                               ├─ XBotRemote    (Foundation + Network; also built for iOS)
+                               └─ XBotWorld     (SwiftUI; also built for iOS)
+XBotMarkdown                                    (Foundation; used by the iOS app)
 ```
 
 | Module | Owns |
 | --- | --- |
-| `XBotBrain` | `Brain`, `BrainEvent`, `TurnRequest`; `HarnessKind` (arguments and stream parsing per CLI); `HarnessBrain` (one process per turn); `HarnessLocator` (finding CLIs and the login-shell `PATH`) |
-| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite); `Workspace`, the `@MainActor @Observable` object the window talks to; `AbilityCatalog` (connectors, plugins, skills, MCPs through the agents' CLIs), `ProjectNotes` (`<project>/notes/*.md`), and the crew: `Agent` (a persona over a CLI, with a pixel `AgentAvatar` and role instructions sent on every turn), HeadMaster's hand-offs, `WorkplaceWorld` (the Agents page's map), and `TerminalDeck` (each chat's floating terminal window and its tabs; the shells are SwiftTerm views in `XBotUI/Terminal`). Re-exports `XBotBrain`. |
-| `XBotUI` | The design system; `RootView`, the sidebar, chat tabs, transcript and composer |
-| `XBotApp` | `@main`, menus, Sparkle, quitting cleanly (`AppDelegate` stops running turns so their replies are saved) |
+| `XBotBrain` | `Brain`, `BrainEvent`, `TurnRequest`; `HarnessKind` (each CLI's arguments, permission flags and abilities); `HarnessBrain` (one process per turn); `HarnessLocator` (finding the CLIs and the login-shell `PATH`); the stream parsers (`ClaudeStream`, `CodexStream`, `MoreStreams` for Antigravity and Copilot, `SchemaTail`); `Effort`; `RateLimits` |
+| `XBotRemote` | The wire to the phone: `HostMessage` and `ClientMessage`, the value types they carry, `Frame` (length-prefixed JSON), `PairingKey` and `PairingInvite`, `LocalTransport` (TLS-PSK listener and browser, `FramedConnection`) and `CloudTransport` (`CloudChannel` over a `CloudMailbox`; `CloudKitMailbox` is the real one) |
+| `XBotWorld` | The crew's look and home, shared with the phone: `AgentAvatar` and `AvatarSprite` (pixel avatars), `WorkplaceWorld` (who stands and walks where), the five realms and `WorkplaceBackdrop`, `WorldStage` (the drawn world, in tiers by rank), `OrgChart` (who reports to whom, suggested managers), `Motion` (the `motionPaused` environment value) |
+| `XBotMarkdown` | `MarkdownDocument` (a Markdown file as blocks that keep their exact source, so an edit changes only what was touched) and `InlineMarkdown` |
+| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite, schema v6); `Workspace`, the `@MainActor @Observable` object every view and the remote talk to, split by feature (`+Plan`, `+Edit`, `+Panels`, `+Home`, `+Abilities`, `Agents/`, `Automations/`); `Git/` (status, diffs, pull requests through `gh`, a folder watcher); `History/` (the profile, built from the CLIs' own history); `Abilities/` (connectors, plugins, skills and MCP servers through the CLIs); `Notes`; `Usage`; `Appearance` and `AsciiWallpaper`; `TerminalDeck` (each chat's terminal window and its tabs); `Remote/` (`RemoteService`: pairing, the lanes, keep-awake; `RemoteHost` and one extension per feature; `RemoteShell`). Re-exports `XBotBrain` and `XBotWorld` |
+| `XBotUI` | The design system and every view: `Shell/` (root, sidebar, top bar, Home), `Chat/` (transcript, composer, plan cards, effort control), `Inspector/`, `Agents/`, `Abilities/`, `Notes/`, `Automations/`, `Profile/`, `Account/`, `Settings/`, `Terminal/` (SwiftTerm views), `Components/` |
+| `XBotApp` | `@main`, menus and commands, Sparkle, the app icon, quitting cleanly (`AppDelegate` stops running turns so their replies are saved), and the headless `--automations-tick` run for the automations helper |
 
-`XBotBrain` never imports SwiftUI. Views hold no logic: they read the workspace and call its
-methods.
+`XBotBrain` and `XBotRemote` never import SwiftUI. Views hold no logic: they read the workspace and
+call its methods. The remote calls the same methods, so the phone and the Mac's window can't
+behave differently.
+
+## Where things are stored
+
+`~/Library/Application Support/xBot/xbot.sqlite` (projects, chats, messages, usage, agents,
+automations) and `Inbox/` for loose chats; notes in `<project>/notes/`; settings in user defaults;
+pairing keys in the Keychain. See [architecture](02-architecture.md#storage).
 
 ## Tests
 
-- Stream parsers are tested against JSON lines recorded from real CLI runs
-  (`Tests/XBotBrainTests/Fixtures`). When a CLI changes its format, record a new fixture.
-- `HarnessBrain` is tested against fake CLIs — small shell scripts — that check the prompt arrived
-  on stdin, that cancelling kills the process, and that an exit without a result is a failure.
-- `Workspace` is tested with a scripted `Brain` and an in-memory store.
-- Abilities parsers are tested against CLI output recorded on a real Mac
+443 tests, Swift Testing, in six targets: `XBotBrainTests`, `XBotCoreTests`, `XBotRemoteTests`,
+`XBotWorldTests`, `XBotMarkdownTests` and `XBotUITests`. (`Tests/XBotRuntimeTests` is an empty
+folder left from 1.x.)
+
+- **Stream parsers** are tested against lines recorded from real CLI runs
+  (`Tests/XBotBrainTests/Fixtures`, personal paths removed). When a CLI changes its format, record a
+  new fixture; never hand-write one from documentation.
+- **`HarnessBrain`** is tested against fake CLIs (small shell scripts) that check the prompt arrived
+  where it should, that cancelling kills the process, and that an exit without a result is a
+  failure.
+- **`Workspace`** is tested with a scripted `Brain` and an in-memory store: chats, plans, edits,
+  hand-offs and the org chart (`OrgTests`), automations, panels, the profile.
+- **Abilities** parsers are tested against CLI output recorded on a real Mac
   (`Tests/XBotCoreTests/Fixtures/abilities`, personal paths and secrets removed); the catalog's
   actions run against a scripted `CommandRunner`.
-- `LiveHarnessTests` runs real turns against the installed CLIs, only with `XBOT_LIVE_HARNESS=1`.
+- **The remote**: every wire message round-trips, the local transport over loopback (a wrong key is
+  refused), the cloud channel against a fake mailbox, and `RemoteHost` for each feature.
+- **The world**: `OrgChartTests` (tiers, loops, suggestions by role) and `WorkplaceWorld`'s slots.
+- **Live**, opt-in: `LiveHarnessTests` runs real turns against the installed CLIs with
+  `XBOT_LIVE_HARNESS=1`; `scripts/e2e_automations.py` has launchd run automations through the
+  installed app (xBot must be closed). The phone's live tests are on
+  [its page](14-iphone-and-ipad.md#tests).
 
 ```sh
-scripts/generate-app-icon.sh          # once, on a fresh clone
+scripts/generate-app-icon.sh          # once, on a fresh clone (compiles xBot.icon; needs Xcode 26)
 cd apps/mac && swift build --build-tests && swift test
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same commands on a macOS 26 runner. Its Swift is older
+than a current Xcode's, so two rules keep it building: don't pass a method reference as a
+`Binding` setter (the compiler crashes), and annotate closure types where inference is long.

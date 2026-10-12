@@ -46,3 +46,20 @@ personas — around them. What it lacks is what xBot was for: an agent with a co
 - Intel Macs and macOS before 26 are no longer supported.
 - xBot 1.x users keep a Docker container and volumes on disk; `scripts/uninstall-xbot.command`
   removes them.
+
+## Since then
+
+Recorded here so the decision above isn't read as describing the app today.
+
+- **Four harnesses, not two.** Antigravity (`agy`) and GitHub Copilot (`copilot`) joined Claude Code
+  and Codex ([spec](../superpowers/specs/2026-10-11-more-providers-design.md)). Neither reads a
+  prompt from stdin, so for them it goes on its own flag, attached as `--print=…` / `--prompt=…`,
+  which a prompt starting with `-` can't be mistaken for.
+- **"No listening ports" was relaxed for the phone.** The iPhone and iPad remote
+  ([spec](../superpowers/specs/2026-10-11-mobile-remote-design.md)) needs the Mac reachable on the
+  local network: after the first pairing, xBot listens on one TCP port, advertised over Bonjour,
+  that accepts only TLS with a pairing key. With no paired device it listens on nothing. Away from
+  home the phone goes through the person's own iCloud, not a port.
+- **Still no services.** One optional LaunchAgent exists, `dev.xbot.automations`, which starts xBot's
+  own binary headless once a minute to run due automations while the app is closed. It's off until
+  the person turns it on.

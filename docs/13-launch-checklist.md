@@ -1,261 +1,242 @@
 # Launch checklist
 
-> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
-> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
-> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
-> Until then, where it disagrees with the code, the code and the spec win.
+Everything between here and a public xBot 2.0: a signed `.dmg` a stranger can download, open and
+use, with updates that work.
 
-Everything between here and a `.dmg` a stranger can download and use.
+The [roadmap](12-roadmap.md) says what's built. This says what to *do*, in order. Steps marked
+**needs you** can only be done by the account holder (the Apple Developer account, the GitHub
+repository's settings, the Sparkle key). The rest is work in the repository. How the pieces work is
+in [packaging and updates](11-packaging-and-updates.md).
 
-`docs/12-roadmap.md` says what each milestone means and what is done. This says what to *do*, in
-order, with the parts that need a human marked as such. Written after a pass that found and fixed
-the things a machine could find alone; what is left is mostly things only an account holder can do.
-
-The ordering is not arbitrary. Step 1 unblocks 2, 3 and 4; step 5 needs a real key; step 6 needs a
-clean machine. Doing them out of order mostly means doing them twice.
+The order matters: the PRs have to be on master before anything is built from it, the iCloud
+decision changes what gets signed, and the clean-machine run tests the build you're about to publish.
 
 ---
 
-## 1. Apple identity — **needs you**, unblocks everything else
+## Already done, so you don't redo it
 
-Nothing else in this list can finish first. Until the app is signed, every local build is ad-hoc
-signed, its code identity changes on every rebuild, and macOS re-prompts for Keychain access on each
-launch — which is also why interactive verification of the app keeps getting blocked mid-session.
+- **The release pipeline has shipped once.** "Mac release" run 36527990203 (29 September 2026)
+  built, signed with Developer ID, notarized and stapled the app and the DMG, passed its own
+  `spctl`/`stapler` checks, generated an EdDSA-signed appcast, and published **xBot 1.0.0** (a
+  pre-release; the old Docker app). So the Developer ID certificate, its `.p12` and the notarization
+  credentials worked, at least on that day.
+- **All nine release secrets are set**: `MACOS_SIGNING_IDENTITY`, `MACOS_CERTIFICATE_P12`,
+  `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`,
+  `XBOT_APPCAST_URL`, `XBOT_SPARKLE_PUBLIC_KEY`, `SPARKLE_EDDSA_PRIVATE_KEY`.
+  (`XBOT_RELEASE_DOWNLOAD_PREFIX` is optional and not needed.)
+- **Sparkle keys exist**, and 1.0.0 was built with the public key baked in.
+- **GitHub Pages is on** (source: GitHub Actions) and the site answers at
+  masteryoav.github.io/xBot.
+- **CI is green** on every open PR in the stack (`swift build --build-tests && swift test` on
+  `macos-26`; 443 tests).
+- **The redesign runs signed with iCloud on a real Mac**: the installed app is signed by
+  `scripts/sign-mac-remote.sh` (Apple Development, Xcode-managed profile with CloudKit and push), and
+  an iPhone 15 Pro paired with it by QR, chatted over Wi-Fi, and got a new chat answered through
+  iCloud with Wi-Fi off.
+- **Measured on the installed release build** (11 October 2026): 0.01% CPU, 63 MB, with a phone
+  paired and xBot in the background.
 
-1. **Enrol in the Apple Developer Program** (~$99/year, individual is fine). Allow a day or two;
-   identity verification is not instant.
-2. **Create a Developer ID Application certificate.** Xcode → Settings → Accounts → Manage
-   Certificates → **+** → *Developer ID Application*. Not "Apple Development" — that one only signs
-   for machines on your team and Gatekeeper will still refuse it on somebody else's Mac.
-3. **Export it as `.p12`.** Keychain Access → My Certificates → right-click the *Developer ID
-   Application* entry → Export. Set a password; you will need it in step 5. Export the certificate
-   **with its private key** — if the disclosure triangle shows no key, you exported the wrong row.
-4. **Create an app-specific password** for notarization at
-   [appleid.apple.com](https://appleid.apple.com) → Sign-In and Security → App-Specific Passwords.
-   Your Apple ID password will not work; `notarytool` refuses it.
-5. **Find your Team ID** — Apple Developer → Membership. Ten characters.
+---
 
-**Verify before moving on**, on this Mac:
+## 1. Merge the open PRs — **needs you**
 
-```bash
-security find-identity -v -p codesigning | grep "Developer ID Application"
+In this order, each after its CI passes:
+
+1. **#30** — motion gate (animations pause while xBot isn't in view). Based on master.
+2. **#31 → #42** — the iPhone and iPad app and the org chart. #31 is based on master; each later PR
+   is based on the one before it (#32 on #31's branch, and so on up to #42 on #41's). Merge them
+   one at a time, bottom up, so each diff stays reviewable; after each merge, retarget the next PR at
+   master if GitHub hasn't.
+3. **The documentation refresh** (`docs-refresh`), which is stacked on #42.
+
+Then pull master and run the suite once more locally:
+
+```sh
+scripts/generate-app-icon.sh
+cd apps/mac && swift build --build-tests && swift test
 ```
 
-One line, with a hash. No line means step 2 or 3 did not take.
-
 ---
 
-## 2. Set the CI secrets
+## 2. Check the Apple side still holds — **needs you**
 
-Repository → Settings → Secrets and variables → Actions.
+The secrets were set on 18 and 29 September. Before relying on them:
 
-| Secret | Where it comes from |
-| --- | --- |
-| `MACOS_SIGNING_IDENTITY` | The full string from `find-identity`, e.g. `Developer ID Application: Your Name (AB12CD34EF)` |
-| `MACOS_CERTIFICATE_P12` | `base64 -i cert.p12 \| pbcopy` — the export from step 1.3 |
-| `MACOS_CERTIFICATE_PASSWORD` | The password you set when exporting it |
-| `APPLE_ID` | The Apple ID email on the developer account |
-| `APPLE_TEAM_ID` | From step 1.5 |
-| `APPLE_APP_PASSWORD` | The app-specific password from step 1.4 |
+- The **Developer ID Application** certificate is still valid (Keychain Access, or
+  `security find-identity -v -p codesigning | grep "Developer ID Application"` on the Mac you
+  exported it from).
+- The **app-specific password** behind `APPLE_APP_PASSWORD` hasn't been revoked
+  (appleid.apple.com › Sign-In and Security › App-Specific Passwords).
+- The **Apple Developer Program membership** is current.
 
-The workflow no-ops every signing step when these are absent, so a run with none of them still
-produces an unsigned DMG. That is deliberate — it keeps the pipeline exercised.
-
-**Why `MACOS_CERTIFICATE_P12` exists:** `codesign` looks the identity up in the keychain search list,
-and a runner's keychain is empty. Naming an identity does not make one exist. Without the `.p12` the
-sign step fails with *"The specified item could not be found in the keychain"*, which reads like a
-wrong identity string and is a missing certificate.
+The build-only run in step 6 proves all three at once; this step is so a failure there isn't a
+surprise.
 
 ---
 
 ## 3. Sparkle keys — **needs you**
 
-Updates are dead until this exists, and it cannot be retrofitted: an app shipped without the public
-key baked in can never verify an update, so v1.0 users would be stranded on v1.0 forever.
+The keys exist; this is about not losing them. Losing the private key strands every installed copy,
+because an app can't verify an update signed by a key it has never seen.
 
-1. Run `scripts/generate-sparkle-keys.sh`. It writes the private key to your login Keychain and
-   prints the public key. There is nothing to download — Sparkle's own `generate_keys` is already in
-   the SwiftPM artifacts, and the script only finds it. Running it twice is safe: it prints the
-   existing public key rather than replacing a key your shipped builds were signed against.
-2. Add two more secrets: `SPARKLE_EDDSA_PRIVATE_KEY` and `XBOT_SPARKLE_PUBLIC_KEY` (the public one,
-   which gets baked into the bundle). The private key is in the Keychain, not on disk, so export it
-   first — `apps/mac/.build/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle-private.key` —
-   paste the file's contents into the secret, and then delete the file. That export is the key
-   itself: anything holding it can sign an update your users' apps will install.
-3. Decide where the appcast lives and set `XBOT_APPCAST_URL` to it. GitHub Releases plus a raw file
-   in the repo is enough to start; `XBOT_RELEASE_DOWNLOAD_PREFIX` is optional and only needed if the
-   DMG is served from somewhere other than the appcast's own host.
-
-**Back the private key up somewhere you will still have in two years.** Losing it means the same
-stranding as never having had it.
+1. On the Mac that generated them, run `scripts/generate-sparkle-keys.sh` (after one
+   `cd apps/mac && swift build -c release`). It prints the public key and changes nothing.
+2. Confirm it's the key in `XBOT_SPARKLE_PUBLIC_KEY`. GitHub won't show a secret back, so compare
+   with your own record of what you set, or with `SUPublicEDKey` inside the 1.0.0 app.
+3. **Back the private key up** somewhere you'll still have in two years. Export it with
+   `apps/mac/.build/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle-private.key`, store it,
+   and delete the file (`sparkle-private.key` is git-ignored, but don't leave it lying around).
 
 ---
 
-## 4. First signed release
+## 4. Decide about the iCloud lane — **needs you**
 
-```bash
+A Developer ID build today carries **no entitlements**, so the phone can pair and work on the same
+network but can't reach the Mac through iCloud; the Mac falls back to the local lane. Pick one:
+
+**A. Ship 2.0 with the local lane only.** Nothing to do here; say so in the release notes and on the
+website ("same Wi-Fi for now").
+
+**B. Ship the away lane too.** Then:
+
+1. In the Apple Developer portal (Certificates, Identifiers & Profiles), make sure the App ID
+   `dev.xbot.app` has iCloud (CloudKit, container `iCloud.dev.xbot`) and Push Notifications.
+   The development profile already uses both, so they should be on.
+2. Create a **Developer ID provisioning profile** for `dev.xbot.app` with those capabilities, and
+   download it.
+3. In the **CloudKit Console**, deploy the schema of `iCloud.dev.xbot` from Development to
+   **Production**. The `Batch` record type exists only in development, where it was created on first
+   use; a distributed build uses production.
+4. Make the profile available to CI (for example as another base64 secret) and change
+   `scripts/sign-mac-app.sh` to embed it as `Contents/embedded.provisionprofile` and sign the app
+   with an entitlements file: CloudKit, `iCloud.dev.xbot`, `aps-environment` `production`, and the
+   production CloudKit environment. This is code; it isn't written.
+5. Verify on a Mac that isn't registered to the team: pair a phone, turn its Wi-Fi off, and get a
+   reply through iCloud.
+
+---
+
+## 5. Fix what ships stale
+
+Work in the repository, before anything is published:
+
+- **The uninstaller.** `scripts/uninstall-xbot.command` ships in the DMG and still describes 1.x.
+  It doesn't remove the automations LaunchAgent (`~/Library/LaunchAgents/dev.xbot.automations.plist`)
+  or the pairing keys (Keychain service `dev.xbot.remote.pairing`), and its text mentions an in-app
+  "Settings → Advanced → Uninstall" that no longer exists. Keep the 1.x Docker clean-up: 1.0.0
+  installs exist.
+- **The website.** `site/index.html` still describes the Docker engine, OpenBot and the 1.x
+  uninstaller. Rewrite it for 2.0 (what xBot does now, that it needs an agent CLI, that it isn't
+  sandboxed and why, the phone app's status, uninstall). Pushing to master republishes it.
+- **The committed `Info.plist`** (`apps/mac/Resources/Info.plist`) says version `1.0.0` and
+  "Engine © 2026 CopilotKit, MIT" in its copyright line. The version is overwritten at release time;
+  the copyright line isn't.
+
+---
+
+## 6. A build-only release run
+
+```sh
 gh workflow run "Mac release" -R MasterYoav/xBot
+gh run watch -R MasterYoav/xBot
+gh run download -R MasterYoav/xBot -n xbot-release
 ```
 
-Then download the artifact and check the two things that actually matter:
+No version means nothing is published. Open the downloaded `xBot.dmg` and check:
 
-```bash
-spctl -a -vvv -t install /Volumes/xBot/XBot.app   # → "accepted", "Notarized Developer ID"
+```sh
+spctl -a -vvv -t execute /Volumes/xBot/XBot.app   # → accepted, "Notarized Developer ID"
 xcrun stapler validate /Volumes/xBot/XBot.app     # → "The validate action worked!"
+codesign -d --entitlements :- /Volumes/xBot/XBot.app   # empty for A; iCloud and push for B
 ```
 
-If `spctl` says *accepted* but not *notarized*, notarization was skipped or failed — check the
-notarytool output in the job log rather than shipping it. A signed-but-unnotarized app still shows
-the "cannot be opened" dialog on a stranger's Mac, which is the whole failure this step exists to
-prevent.
+If `spctl` says *accepted* but not *Notarized Developer ID*, notarization was skipped or failed:
+read the `notarytool` output in the job log.
 
 ---
 
-## 5. End-to-end conversation — **no CopilotKit key needed**
+## 7. Clean-machine run — **needs a Mac that has never seen xBot**
 
-ADR-0007 kept CopilotKit Intelligence for v1; [ADR-0008](decisions/0008-local-thread-runner.md)
-changed that. No key was available to build or verify against, so the engine's local-mode seam was
-built out instead — `LocalThreadRunner`, a durable wrapper around the vendor's own SSE runner. The
-app has no field anywhere to paste an Intelligence key; conversations are kept by the engine itself.
+The one test that can't be faked from the development Mac. Apple silicon, macOS 26, no Xcode, no
+Homebrew, no xBot data, no agent CLI yet.
 
-1. Start the engine and hold a real conversation with an agent: send a message, get a reply, let it
-   call a tool, and confirm the reply survives a restart of the app.
+1. Install from the step 6 DMG. It opens with no Gatekeeper warning.
+2. Home says "xBot works through an agent you already have". Follow its link, install Claude Code
+   (or Codex) and sign in. xBot finds it without a restart or a terminal hint (Settings › Agents).
+3. Add a project folder, start a chat, get a streamed reply with tool rows; stop one mid-reply (⌘.);
+   run a plan; open the terminal; edit a note.
+4. Turn on **Run when xBot is closed** for an automation, quit xBot, and see it run. Turn it off and
+   check `~/Library/LaunchAgents/dev.xbot.automations.plist` is gone.
+5. Pair a phone from Settings › Devices (installed from Xcode). Same Wi-Fi works; with option B,
+   iCloud works too.
+6. Quit, drag xBot to the Trash, run `Uninstall xBot.command` from the DMG, and check nothing of
+   xBot is left (the table in [packaging](11-packaging-and-updates.md#uninstall)).
+7. Time the whole thing, and write down every place you reached for something the app should have
+   done. There's no onboarding flow yet (the [roadmap](12-roadmap.md) has it after the native
+   brain), so this run is what shows how much one is needed.
 
-That last part is the actual test. `LocalThreadRunner` persisting to Postgres and hydrating on boot
-is precisely what this buys, so a reply that does not survive a restart means it is not working.
-
-Three more things only this conversation can prove, all built on 14 September against a stubbed
-engine (`docs/plans/computer-client-tools.md`):
-
-- **Memory, within one conversation.** Tell the agent something, then ask about it two messages
-  later. Each run carries the whole conversation; before, every agent forgot everything between
-  messages. (Recall *across* separate conversations is pgvector work ADR-0001 still owns, not this.)
-- **Its computer.** Ask it to open a page and say what is on it. The Activity panel should show
-  `computer_navigate` and the screen should show the page. Then check the conversation after an app
-  restart has no duplicated messages — the tool-call loop resends messages the thread already holds,
-  and relies on their ids matching.
-- **The asks.** Ask it to sign in somewhere. "Needs you" or a masked field should appear above the
-  composer, and the agent should carry on once you answer.
-
-**There is an automated version of the engine half.** `apps/mac/Tests/XBotEngineTests/LiveEngineTests.swift`
-drives the real client against a running engine — point it at a throwaway one, since it creates
-agents. **It has now been run** (27 September), against an engine built from the working tree and a
-local Ollama (`qwen2.5:7b`): set `XBOT_LIVE_OLLAMA_MODEL` and `LiveConversationTests` holds a real
-three-turn conversation — it answers, drives `computer_navigate` through the client-tool loop and
-reports the page, remembers a codeword two turns later, and leaves each message in the thread once.
-Restarting that engine left every conversation's message count unchanged. What remains for a person
-is the app half: the same conversation typed into the window, and the asks.
-
-That first run found three engine faults, each of which failed every conversation:
-
-- **The managed Bot could not be dialled.** `createAgentFetch` refused `127.0.0.1:4201`, the
-  address the image itself gives the Bot, so every run through the server ended in "This deployment
-  will not dial…". The Bot's configured host is now added to the allowed hosts
-  (`server/src/agents/managed-agent-host.ts`), and only that host and port.
-- **A keyless `openai-compatible` endpoint was refused locally.** OpenAI's client falls back to
-  `OPENAI_API_KEY` when handed no key, so every Ollama run failed with "Missing credentials". It now
-  gets a placeholder the endpoint ignores (`agent-langgraph/src/models/build.ts`).
-- **Every Anthropic run was refused.** The server's standing role message arrived after the Bot's
-  guidance, and Anthropic accepts a system message only first. All system texts are now merged, in
-  order, into one leading message (`agent-langgraph/src/history.ts`).
-
-**The intermittent fault, found and fixed** (29 September). On a freshly started engine, roughly one
-full live run in six had a turn come back empty, followed by "Thread already running". The cause was
-Bun's own `idleTimeout`, 10 seconds by default: a streaming run writes RUN_STARTED and then nothing
-until the model's first token, and a cold local model takes longer than that. The connection was
-closed under a live run, the reply was empty, and the orphaned run held the thread until it
-finished. A fake model that stays silent for 15 seconds reproduced it every time. Streaming agent
-runs are now exempt from the idle timeout (`server/src/xbot/stream-idle-timeout.ts`); with that, 6
-of 6 full live rounds on fresh engines with a cold model passed with no busy refusals. A message
-sent while a run genuinely is still going now gets RUN_ERROR with a sentence rather than an empty
-200.
-
-**Two more, found starting the app on this Mac's own engine** (27 September), both leaving the
-container unhealthy with nothing on its port and no way back short of deleting the data:
-
-- **Any recreate of the container lost the database password.** The app mounts `xbot-data` at
-  `/var/lib/postgresql/data`; the password file lives one level up, so it went with the container
-  while the cluster kept the password. Every environment change recreates the container. Reproduced
-  on the old image with a clean stop and recreate; `postgres-init.sh` now sets a new password when a
-  cluster has none beside it, which also heals an install already in this state.
-- **`migrate` raced Postgres after an unclean stop.** It started before crash recovery finished and
-  failed on `57P03`; 3 of 3 SIGKILL-and-start rounds broke the old image, 0 of 3 the fixed one.
-  `migrate.sh` now waits for `pg_isready`, up to 60s.
-
-**Also close the last M2 item here:** point one agent at a second real vendor — Anthropic is already
-proven, so use OpenAI or Google — and confirm the reply comes from the vendor you picked. A model
-name the vendor does not have should come back as a named error, not a silent fall back to somebody
-else's model.
+The live suites are worth a run on the development Mac at the same time:
+`XBOT_LIVE_HARNESS=1 swift test` in `apps/mac`, `scripts/e2e_automations.py` (xBot closed), and
+the 18 phone UI tests in `apps/ios/UITests/LiveRemoteUITests.swift` against a debug Mac build.
 
 ---
 
-## 6. Clean-VM run — **needs a machine that has never seen this project**
+## 8. Publish 2.0.0 — **needs you**
 
-The one test that cannot be faked from here. Everything in the app assumes a first run; this Mac has
-not had one in months.
+```sh
+gh workflow run "Mac release" -R MasterYoav/xBot -f version=2.0.0
+```
 
-On a fresh macOS VM with no Docker, no Xcode, and no Homebrew:
+Leave **prerelease** unticked. Sparkle's feed is `releases/latest/download/appcast.xml`, which
+GitHub resolves only to the newest release that isn't a pre-release. Today that URL is a 404,
+because the only release, 1.0.0, is a pre-release.
 
-1. Install from the DMG. It should open without a Gatekeeper warning — if it does not, step 4 is not
-   finished.
-2. Walk onboarding without touching a terminal, editing a file, or reading a log. That is invariant 1
-   and this is the only place it gets tested honestly.
-3. Let it install the container runtime, pull the engine, and reach a conversation.
-4. Time it. The engine image is 4.5 GB and the first Start is the longest wait in the product; the
-   progress figure now shows in Settings and onboarding, but if the wait is unreasonable on a normal
-   connection that is a finding, not a fact of life.
+Publishing 2.0.0 as a full release also means **every 1.0.0 install on macOS 26 will be offered
+2.0**: same bundle id, same key, and its feed starts answering. Decide whether that's wanted. Those
+people's Docker container and volumes stay behind; the uninstaller (step 5) is how they remove them.
 
-Write down anywhere you reached for something the app should have done for you. Those are the M6
-bugs, and they are only visible on the first run.
+Afterwards:
 
----
+```sh
+curl -sIL https://github.com/MasterYoav/xBot/releases/latest/download/appcast.xml | grep -i '^HTTP'
+```
 
-## 7. The website — **built; needs Pages turned on**
-
-`site/index.html` is the page: one file, no build step. It carries the download (pointing at
-`releases/latest`), the security explanation, the uninstall instructions — per docs/11 the standalone
-uninstaller is documented here and not in the app — and, per [ADR-0008](decisions/0008-local-thread-runner.md),
-the fact that conversation history is kept by the engine on this Mac, in the README's wording rather
-than a second version that can drift.
-
-`.github/workflows/pages.yml` publishes it on every push to master that touches `site/`. **It needs
-you once:** repository → Settings → Pages → Source: **GitHub Actions**. Until then the workflow fails
-at the deploy step. The download link is only useful once step 4 has published a release.
+ends in `200`, and **xBot › Check for Updates…** in the installed 2.0.0 says it's up to date.
 
 ---
 
-## What is already verified, so you do not redo it
+## 9. Prove an update — **after the next release**
 
-From a shell holding no credentials:
-
-- `manifests/engine-stable.json` at `raw.githubusercontent.com` answers 200.
-- The digest it names resolves at ghcr on an anonymous pull token — a stranger's first Start can pull
-  the engine.
-- The manifest bundled into the app is byte-identical to the published one, so a first run with the
-  network blocked still starts from a real pin.
-- Every outbound URL the app can show a person answers 200.
-- On 18 September, a throwaway engine built from master (with the model hop lifted into
-  `models/build.ts`) came up healthy on loopback, refused an unauthenticated request with a 401, and
-  passed all eight live client tests: health, read endpoints, the vault, agent and conversation
-  round-trip, browser, files, shell, and the asks. That run predates ADR-0008; the conversation store
-  now needs re-running against `LocalThreadRunner` rather than a CopilotKit key — see item 5.
-- On 27 September, it was: a throwaway engine in local mode with no CopilotKit key held a real
-  conversation with a local Ollama model, used its computer through the client-tool loop, remembered
-  across turns, and kept every conversation intact through a restart. Item 5 has the details,
-  including the intermittent empty reply found and fixed on 29 September.
-- The pinned engine is one multi-arch image (linux/amd64 and linux/arm64). On 14 September an Apple
-  Silicon Mac pulled it anonymously, got arm64, was healthy in about ten seconds on a port other than
-  3001, and passed the live suite: browser, files, shell, and a help request handed back. Before that
-  the image was amd64 only, and every Apple Silicon Mac ran the engine under emulation.
-
-Plus: the Swift suite and the engine suite are green in CI, the latter against a real database.
+An update channel isn't verified until an update has gone through it. Publish 2.0.1 the same way
+and check that 2.0.0 offers it, asks before installing, installs and relaunches as 2.0.1.
 
 ---
 
-## Two things worth doing but not blocking
+## 10. The phone app: TestFlight or not — **needs you**
 
-- **A second pair of eyes on the security posture** before the website goes up. The invariants in
-  `CLAUDE.md` are the checklist; the audit trail, the loopback bindings, and the Keychain rules are
-  the three that would hurt most to have wrong in public.
-- **Decide the trademark question** in `docs/decisions/0006-naming-and-trademark.md`. It is recorded
-  as unresolved and it is cheaper to answer before a public launch than after.
+Today the iPhone and iPad app is installed from Xcode onto the team's own devices. To let anyone
+else use it:
+
+1. An App Store Connect record for `dev.xbot.mobile`, and an App Store distribution profile with
+   iCloud and push.
+2. `aps-environment` `production`, and the CloudKit production schema from step 4.B (TestFlight
+   builds use production).
+3. A privacy description for what it asks for: the local network (Bonjour `_xbot._tcp`) and the
+   camera (scanning the pairing code).
+4. An upload with `xcodebuild archive` (still with `-skipPackagePluginValidation`), then TestFlight
+   review.
+
+Without option B in step 4, a TestFlight phone only works on the same network as the Mac.
+
+---
+
+## Worth doing, not blocking
+
+- **A second look at the security posture** before the website goes up: the
+  [security doc](10-security.md), the TLS-PSK pairing, and what the agents may do under each
+  permission mode.
+- **The name.** [ADR-0006](decisions/0006-naming-and-trademark.md) is still unresolved, and it's
+  cheaper to answer before a public launch than after.
+- **Hold updates during a turn.** Sparkle can prompt while an agent is mid-reply; the hook for it
+  exists in `SparkleAppUpdateController` but isn't connected (see
+  [packaging](11-packaging-and-updates.md#updates)).

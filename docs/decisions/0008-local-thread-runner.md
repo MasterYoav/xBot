@@ -7,7 +7,7 @@
 **Supersedes:** nothing. **Partially resolves** [ADR-0001](0001-local-history-provider.md) — the
 "conversation persists with no account" half of it. Recall/memory (pgvector) is still that ADR's,
 unimplemented.
-**Related:** [ADR-0007](0007-wrap-openbot-keep-intelligence.md), [03-openbot-fork.md](../03-openbot-fork.md)
+**Related:** [ADR-0007](0007-wrap-openbot-keep-intelligence.md), 03-openbot-fork.md (removed with the engine; in git history)
 
 ---
 

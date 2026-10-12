@@ -1,276 +1,146 @@
-# Onboarding
+# First run
 
-> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
-> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
-> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
-> Until then, where it disagrees with the code, the code and the spec win.
+The redesigned xBot has no onboarding flow. There is no welcome screen, no system check, no step
+that asks for a key: the app opens to Home, looks for the agent CLIs you already have, and is ready
+when it finds one. This page says what happens the first time, on the Mac and when you pair a
+phone. The onboarding the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)
+plans is at the end, and isn't built.
 
-The single most important surface in the product. Everything xBot claims — that it is local, that it
-is easy, that you never touch a terminal — is either proved or disproved in the first four minutes.
+xBot needs macOS 26 on Apple silicon ([ADR-0009](decisions/0009-native-harness-redesign.md)).
 
-## The bar
+## On the Mac
 
-**A person who has never heard of Docker installs xBot and talks to an agent, having typed only an
-API key.**
+### Launch
 
-If they see a container, a port, a shell command, or a log during a successful run, we failed. If
-they see one during a *failed* run, we failed harder — that is when they need us most.
+1. **The library is made.** `Store.live()` opens
+   `~/Library/Application Support/xBot/xbot.sqlite`, creating it, and runs the migrations up to
+   schema version 6. If it can't be opened, xBot runs on an in-memory library and says so: "xBot
+   couldn't open its library, so this session won't be saved."
+2. **The founding crew is seeded.** The migration that adds the `agents` table (version 4) saves
+   four agents if the table is empty: **HeadMaster** (founder and orchestrator), **Forge**
+   (builder), **Hawk** (reviewer) and **Quill** (scribe), each with a pixel avatar and
+   instructions (`Agent.foundingCrew`). It runs once per library, so a member you let go stays
+   gone. All four use Claude Code; a chat with one of them uses the first CLI found if Claude Code
+   isn't installed. The three members report to HeadMaster, and HeadMaster to you.
+3. **The CLIs are looked for.** The window opens on Home and `HarnessLocator` runs: it reads your
+   login shell's `PATH` (`$SHELL -l -i -c`, given five seconds) and adds the usual install
+   folders (`~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.npm-global/bin`,
+   `~/.bun/bin`, `~/.claude/local` and the system folders), then takes the first `claude`,
+   `codex`, `agy` and `copilot` it finds there. Nothing is installed and nothing is asked.
+4. **Nothing listens.** No port is opened and iCloud isn't touched until you pair a device.
 
-## Shape
+While it looks, Home shows the composer. When it has finished, one of two things.
 
-A single fixed-size window, no resize, no minimise. Steps advance with a spring; the back button is
-always live except during work that cannot be undone. There is no progress bar with fake segments —
-each step says what it is doing.
+### An agent was found
 
-```
-   1  Welcome            what this is, one screen, no scrolling
-   2  System check       silent when it passes
-   3  Set up the engine  the long one. Honest about time
-   4  Connect a model    the only step that asks for input
-   5  Meet your agent    ends inside a real conversation
-```
+Home is the composer on its own. A new chat uses the agent picked in the composer, else the one used
+most recently, else the first found in the order Claude Code, Codex, Antigravity, Copilot. New chats start in **Can edit**, with the agent's own model and reasoning, until you
+change the defaults in Settings › General. A chat without a project runs in
+`~/Library/Application Support/xBot/Inbox/`.
 
-Five steps. Two of them ask nothing. **Exactly one asks for input**, and it is the one where the
-user gets something in return.
+xBot doesn't check that a CLI is signed in before the first turn. If it isn't, the turn fails with
+whatever the CLI wrote to stderr.
 
-## What exists today
+### No agent was found
 
-All five steps are implemented in `XBotOnboarding`: Welcome, SystemCheck, EngineSetup,
-ConnectModel, MeetAgent. The flow runs inside the main window via `AppShellView` (crossfade handoff
-to the rail/conversation layout on completion). Colima **Install for me**, Docker Desktop start,
-engine container adoption for an existing `xbot-engine`, provider key validation, and runtime choice
-persistence (`RuntimeChoiceStore`) are in place. Failure branches for engine health timeout and
-failed start have automated tests; VM clean-machine validation (M6 done criterion) is still open.
+Home says, in full (`HomeView`):
 
----
-
-## Step 1 — Welcome
-
-One screen. A short line about what xBot is, three points about what makes it different, one button.
-
-> **Your own AI coworkers.**
+> **xBot works through an agent you already have.**
 >
-> Agents that run on your Mac, with their own browser and their own files.
+> Install Claude Code or Codex and sign in, then come back. xBot will find it.
 >
-> - Bring any model — or run one locally, with nothing leaving your Mac
-> - Watch what your agents do, and take over whenever you want
-> - Everything stays here. No account, no cloud
+> Get Claude Code · Get Codex
 >
-> [ Get started ]
+> [ Look again ]
 
-No account creation. No email. No telemetry consent yet — that comes later, and separately, so it is
-a real choice rather than a thing they click past to get in.
+The two links open `claude.com/product/claude-code` and `developers.openai.com/codex`. The copy
+names only Claude Code and Codex, although Antigravity and GitHub Copilot are found the same way
+if they're installed. xBot looks again when you press **Look again**, press **Look Again** in
+Settings › Agents, or relaunch; it doesn't notice an install on its own.
 
-**Motion:** content arrives with a 40ms stagger, `bounce: 0`, `duration: 0.4`. Nothing bounces —
-nothing was thrown.
+### Settings › Agents
 
----
+One section per CLI, all four always listed:
 
-## Step 2 — System check
-
-Runs on entry, takes under two seconds, and **shows nothing if everything passes** — the window
-advances on its own. Apple's *simplicity* principle: do not make the user acknowledge good news.
-
-Checks:
-
-| Check | Fail behaviour |
+| Row | Shows |
 | --- | --- |
-| macOS 14+ | Hard stop, with the version they have |
-| Architecture | Informational. Affects runtime choice |
-| Free disk ≥ 12 GB | Blocking, with actual free space and a Storage Settings link |
-| Physical RAM | 8 GB → a warning about running one agent at a time. 16 GB+ → silent |
-| Container runtime present | → the branch below |
+| Found at | The executable's path, "Looking…" or "Not installed" |
+| Signed in | Claude Code: "Yes" or "No", from the account block in `~/.claude.json`. Codex: "Yes" once its session logs have shown a plan, else "Not seen yet". Antigravity and Copilot: "Checked on the first turn" |
+| Plan | Claude Code's from `~/.claude.json`; Codex's from its session logs |
+| 5-hour / Weekly usage left | When the CLI has reported its limits |
 
-### The runtime branch
+What xBot reads of those files, and what it doesn't, is in [Security](10-security.md).
 
-The only genuinely hard moment in onboarding, because the honest answer is "you need another piece
-of software."
+## Pairing an iPhone or iPad
 
-**Detected and running** → silent, advance.
+The phone app is a remote for the Mac ([The iPhone and iPad app](14-iphone-and-ipad.md)). It's
+installed from Xcode for now; there's no TestFlight or App Store build.
 
-**Detected but not running** → "Docker Desktop is installed but not running." One button, **Start
-Docker**. The app launches it and waits with a real progress state. No instruction to the user.
+### On the phone, before pairing
 
-**Not detected** → the one screen where we must be straight:
+Until it's paired the app shows one screen (`PairView`), not the tab bar:
 
-> **xBot needs a container runtime**
+> **Your Mac, in your pocket**
 >
-> Your agents run in isolated containers so they can't touch the rest of your Mac. That needs one
-> free piece of software.
+> Keep working with your agents from here. They still run on your Mac; this is the remote.
 >
-> [ Install for me ]  — recommended
-> [ I'll install Docker Desktop myself ]
+> 1. On your Mac, open xBot › Settings › Devices.
+> 2. Click Pair an iPhone or iPad.
+> 3. Scan the code it shows.
 >
-> This takes about 5 minutes and around 4 GB.
+> [ Scan the code ]
 
-**"Install for me"** installs the app's bundled choice — see
-[ADR-0003](decisions/0003-container-runtime.md) — with a real progress bar and a phase label
-("Downloading", "Installing", "Starting"). No terminal appears. It may require an administrator
-password, which is a native macOS prompt and is fine.
+**Scan the code** opens the camera (iOS asks for it once). A code that isn't an xBot link gets
+"That isn't an xBot pairing code." Opening an `xbot://pair?…` link on the phone pairs it the same
+way. There's no field to paste the link into.
 
-**The manual path** opens docker.com and leaves the window on a live check that flips to a green
-state and a Continue button the moment Docker appears. **The user does not come back and click
-"Recheck".** We poll.
+### On the Mac
 
-**⚠️ This is the highest-risk screen in the product.** It is where a non-technical user is most
-likely to quit. It deserves the most iteration and the most user testing. If Apple's Containerization
-framework matures enough to remove this screen entirely, that is worth a major version.
+**Settings › Devices › Pair an iPhone or iPad…** makes a new pairing key, saves it in the Keychain,
+starts the local listener and, if this copy of xBot is signed for iCloud, the iCloud lane. The
+sheet shows a QR code with the `xbot://pair?…` link: the Mac's id, name, Wi-Fi or Ethernet address,
+the listener's port if it already has one, and the key. Under it: "The code pairs one device. Keep
+it to yourself: it's the key to this Mac." Anyone who sees the code can pair; see
+[Security](10-security.md#pairing).
 
----
+### Connecting
 
-## Step 3 — Set up the engine
+1. The phone saves the code in its Keychain and looks for the Mac: over Bonjour by the Mac's id,
+   and straight at the address and port in the code if there are both. iOS asks once for local
+   network access.
+2. Not found within 4 seconds, it goes through iCloud, which needs the phone and the Mac signed in
+   to the same iCloud account. With iCloud off on the phone it says "Your Mac isn't on this
+   network, and iCloud is off on this device."
+3. When the phone first connects, the Mac lists it in Settings › Devices and the sheet changes to
+   "Paired. You can close this." The phone opens on Home; the status under the Mac's name says
+   which lane it's on.
 
-The long one: pulling an image of a few gigabytes over an unknown connection.
+If the Mac's copy of xBot isn't signed for iCloud (a Developer ID release, for now), Settings ›
+Devices says "This copy of xBot isn't signed for iCloud, so phones can reach it on the same network
+only."
 
-**Be honest about time and specific about phase.** A single indeterminate spinner for four minutes is
-how you get a force-quit.
+### Unpairing
 
-```
-   Setting up xBot
+**Remove** in the Mac's Settings › Devices ends that device's access on both lanes. **Unpair this
+device** in the phone's Settings forgets the Mac and the cached chat list on the phone, and brings back the pairing
+screen; it doesn't tell the Mac, so remove the device there too.
 
-   ●  Downloading the engine        1.2 GB of 3.4 GB · about 2 minutes left
-   ○  Preparing storage
-   ○  Starting up
+## Coming from xBot 1.x
 
-   This is a one-time setup. Later updates are much smaller.
+The redesign imports nothing from 1.x. Its Docker container and volumes stay on disk until removed
+with `scripts/uninstall-xbot.command`, which also removes the current app's library and
+preferences.
 
-   [ Cancel ]
-```
+## Planned, not built
 
-Phases:
+The redesign spec's onboarding is three screens, and none of it exists yet:
 
-1. **Download** — real bytes, real ETA from observed throughput. Resumable.
-2. **Prepare storage** — create volumes, initialise Postgres, run migrations, generate secrets into
-   the Keychain, negotiate ports.
-3. **Start** — bring the engine up, poll `/health` until it answers as xBot.
+1. **Welcome.**
+2. **Connect a brain:** the CLIs found, shown as ready; or paste an API key; or use Ollama if it's
+   running.
+3. **Meet your first bot:** a name, a soul from a template, and an optional "give it a computer"
+   that starts the VM image download in the background.
 
-**"It answers as xBot", not "the port is open."** Upstream's start script learned this the hard way
-and Yoav's screenshots show the failure: a Homebrew Postgres already on 5432, xBot talking to the
-wrong database, `role "openbot" does not exist`. The health check verifies identity, not liveness.
-The app negotiates a free port before starting and never asks the user about it.
-
-**Cancel is real.** It stops the pull, removes partial state, and returns to step 2. A cancel that
-leaves a half-configured machine is worse than no cancel.
-
-### When it fails
-
-Every failure gets a sentence, a cause, and a button. Never a stack trace on screen.
-
-| Failure | What we say | Button |
-| --- | --- | --- |
-| Network drops | "The engine download was interrupted. Check your internet connection and try again — what already downloaded is kept." | Try again (docker keeps finished layers, so this resumes) |
-| Disk fills mid-pull | "There isn't enough disk space for the engine. Free up some space and try again." | Try again. *No byte count and no Storage Settings button: the disk that filled may be the container runtime's own VM disk, which macOS Storage cannot see or free* |
-| Registry busy (429) | "The download server is busy right now. Wait a few minutes and try again." | Try again |
-| Image refused or missing | "The engine download isn't available right now. Try again later." | Try again — this one is ours to fix |
-| Ports occupied | *(nothing — we picked others)*. Built: a refused port is retried once on another, silently | — |
-| Runtime dies | "The engine isn't running" in the composer; "The container runtime isn't running — Start will wake it" in Settings. Noticed by the health watch within about twenty seconds | Start (wakes the runtime) |
-| Engine container dies | "The engine stopped unexpectedly" | Try again |
-| Migration fails | "Couldn't set up the database." | Retry · Reset and try again |
-| Anything unclassified | "Something went wrong setting up the engine." | Retry · Copy diagnostics |
-
-**Copy diagnostics** puts a redacted report on the clipboard — versions, state machine history,
-last 200 log lines, **no keys, no tokens, no conversation content.** It exists so the user can send
-it to us, not so they can read it.
-
----
-
-## Step 4 — Connect a model
-
-The only step that asks for anything, and the one that returns something immediately.
-
-> **Choose a model**
->
-> xBot doesn't include an AI model. Connect one you have a key for, or run one on your Mac for free.
->
->   ○ Anthropic — Claude
->   ○ OpenAI — GPT
->   ○ Google — Gemini
->   ○ xAI — Grok
->   ○ Ollama — runs on your Mac, no key needed        [ Detected · 3 models ]
->
->   [ paste your key here                                              ]
->   Your key is stored in your Mac's Keychain and only sent to <vendor>.
->
->   [ Skip for now ]                                    [ Connect ]
-
-**Details that matter:**
-
-- **The key is validated before Continue enables.** One cheap models-list call. A key that is wrong
-  is caught here, not on the user's first message.
-- **The sentence about storage is not a disclaimer, it is the product.** Keychain, and only to that
-  vendor. Say it where they are typing the key.
-- **Ollama appears with live state.** Detected, with a model count → the row is selectable and asks
-  for nothing. Not detected → shown greyed with a link. Never an install instruction.
-- **Skip is allowed.** Someone evaluating the app should reach the UI. Skipping lands them in the app
-  with a persistent, dismissible banner and a disabled composer that says why.
-- **Paste is the primary input.** Handle a key with whitespace or a `Bearer ` prefix. Trim it. Do not
-  reject on formatting.
-
----
-
-## Step 5 — Meet your agent
-
-Do not end on a "You're all set!" screen. End **inside the product, with something happening.**
-
-The app creates a first agent — a general assistant with a generated avatar, on the model just
-connected — and transitions the onboarding window into the main window with that conversation open
-and one message already in it:
-
-> **Hi. I'm your first agent.**
->
-> I have a browser and files of my own, and I'll ask before doing anything that matters.
->
-> Try me with something like:
-> - "Find three well-reviewed ramen places near me and tell me which opens earliest"
-> - "Open my calendar and summarise this week"
->
-> You can make more agents any time with the **+** in the sidebar.
-
-**Transition, not a jump.** The onboarding window becomes the main window: the panel expands, the
-rail slides in from the left, the composer settles into place. Spatially continuous — Apple's
-*spatial consistency*, and the moment the app stops being an installer and starts being an app.
-
----
-
-## What onboarding writes
-
-By the time step 5 completes:
-
-| Where | What |
-| --- | --- |
-| **Keychain** | Vendor API key · engine bearer token · DB encryption key |
-| **UserDefaults** | Onboarding version completed, window state, chosen runtime |
-| **Runtime volumes** | `xbot-data` (Postgres) · `xbot-workspace` · `xbot-profiles` |
-| **Engine DB** | The first agent, its channel, the first message |
-
-**Nothing is written to a file the user could find and edit.** No `~/.xbot/config.yaml`. No `.env` in
-Application Support. The configuration surface is the app.
-
----
-
-## Re-onboarding
-
-Onboarding is versioned. A user who completed v1 and updates to a build that adds a step sees only
-the new step, as a sheet in the main window, not a fresh five-step flow. `OnboardingVersion` is an
-integer; the app runs the steps between completed and current.
-
-**Reset** lives in Settings → Advanced, is a two-step confirmation, and is explicit about what it
-destroys: conversations, agents, and browser logins. It is the only path in the app that removes the
-data volume.
-
----
-
-## Testing onboarding
-
-The path with the least test coverage and the most consequence. It gets more, not less.
-
-- **Failure branches covered in unit tests** with `FakeDriver` / fake health clients: engine health
-  timeout, failed start (no command echo), runtime-not-detected paths, a refused port retried on
-  another. Network drop, disk full, registry busy and image refused are classified from docker's own
-  wording (`RuntimeError.kind`) and tested against real error text; what is not automated is a pull
-  actually failing on a real network.
-- **The happy path is an XCUITest** on a clean machine image in CI — **not wired yet**.
-- **Manual, before every release, on a genuinely clean Mac** — no Homebrew, no Docker, no developer
-  tools. A VM snapshot. See `scripts/README-packaging.md` for the M6 checklist.
-- **Timed.** Record how long a clean install takes on a normal connection. If it grows past ten
-  minutes, that is a regression with a bug number.
+No Docker or Colima check: the only requirement is macOS 26 on Apple silicon, enforced by the
+deployment target. It depends on parts that aren't built either, the native brain (API keys,
+Ollama) and a bot's own computer, and is item 3 in the [roadmap](12-roadmap.md), not started.

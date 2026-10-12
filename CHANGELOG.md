@@ -47,6 +47,36 @@ xBot is now a native app that drives the agent CLIs you already have. See
 - Terminal-style tabs in the title bar (⌘1…⌘9), the sidebar running to the top beside the traffic
   lights, and a sunset that fades across the top of Home and, softly, behind chats.
 
+- Edit a sent prompt and resend it; tabs reorder by dragging; Settings › Appearance (light, dark or
+  system, wallpaper, typeface) and a choice of app icons (Ink, Rose, Sunset, Plum).
+- Abilities: each agent CLI's connectors, plugins, skills and MCP servers in one page, switched
+  through the CLIs themselves, with a plugin marketplace and Add an MCP server.
+- Notes: Markdown notes per project, kept in the project's own `notes/` folder.
+- Agents: a crew of personas over your CLIs, each with a name, role, instructions, a pixel-art
+  avatar, a model and a home project. HeadMaster founded the place and hands work to the others.
+  The Agents page is a living world (Village, Sky Realm, Underwater Kingdom, Moonbase, Enchanted
+  Forest) where they walk, sit down to work and say what they're doing; the sidebar shows a
+  miniature of it.
+- The crew as a company: everyone has a manager, HeadMaster reports to you, and **Organise**
+  suggests what most companies do (executives under HeadMaster, teams under their executive or
+  lead); **Reports to** overrides it. Any manager hands work to their own team, and finished work
+  reports back to them. The world stands them in tiers by rank.
+- A terminal window per chat, with tabs (⌃`), and **Run** on shell code blocks in replies.
+- Wallpapers drawn by an agent as text art, still or animated.
+- Antigravity (Gemini) and GitHub Copilot as agents, next to Claude Code and Codex.
+- Automations: a trigger and steps in plain words (Mail, Calendar, Reminders, Notes, Messages and
+  more, your connectors, or anything), run by an agent, and, if you turn it on, while xBot is
+  closed.
+- xBot for iPhone and iPad: pair with a QR code in Settings › Devices, then use your Mac's chats,
+  projects and files, notes, automations, crew and world, abilities, a real terminal and your
+  profile from the phone, on the same Wi-Fi or through your own iCloud when away. Liquid Glass,
+  with your choice of accent colour, a plan board for every provider you use, suggested agents to
+  hire, and Markdown files you edit as documents.
+- Animations pause while xBot isn't the active app (idle CPU from about 19.6% to 0.0%).
+
+### Changed
+- Automations replace the Inbox in the sidebar; loose chats are listed under Recent.
+
 ### Removed
 - The OpenBot engine, Docker and Colima, Postgres, the CopilotKit runner, the engine image and its
   update pipeline, onboarding, settings and the web admin. Onboarding, bots, notes, the native model

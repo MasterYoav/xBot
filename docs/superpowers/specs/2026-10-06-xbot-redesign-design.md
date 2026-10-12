@@ -2,6 +2,12 @@
 
 Date: 2026-10-06 · Status: approved; sub-project 1a built (see the build order)
 
+> **Where this stands (2026-10-12).** Built since: notes and abilities, the crew and its worlds, the
+> terminal, automations, two more harnesses, and an iPhone/iPad remote this spec didn't foresee.
+> Invariant 5 ("no listening ports") was relaxed for the remote's local lane; see
+> [ADR-0009 › Since then](../../decisions/0009-native-harness-redesign.md#since-then). Native brain,
+> machine, browser and licensing aren't built. Current state: [the roadmap](../../12-roadmap.md).
+
 ## Intent
 
 **What the user said.** Redesign xBot after [monocode](https://github.com/hardbeat920/monocode),

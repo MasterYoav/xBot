@@ -1,80 +1,73 @@
-# Mac app packaging (M7)
+# Mac app packaging
 
-Local release flow until CI signing credentials exist. See `docs/11-packaging-and-updates.md`.
+The local release flow for the Mac app. Why each step exists, signing, Sparkle and the iPhone app
+are in [`docs/11-packaging-and-updates.md`](../docs/11-packaging-and-updates.md); what's left before
+a public 2.0 is in [`docs/13-launch-checklist.md`](../docs/13-launch-checklist.md).
 
-```sh
-# 1. Official icon (Icon Composer → Assets.car + xBot.icns)
-scripts/generate-app-icon.sh
+Needs Xcode 26 (for `actool` and the Metal toolchain) on an Apple-silicon Mac with macOS 26. Run
+from the repository root.
 
-# 2. Release binary (Apple silicon only: the bots' machines need Apple's Containerization)
-cd apps/mac && swift build -c release --arch arm64 && cd ../..
-
-# 3. .app bundle
-scripts/bundle-mac-app.sh
-
-# 4. DMG (unsigned stub)
-scripts/create-dmg.sh
-
-```
-
-## M6 manual test (clean VM)
-
-Before each release candidate, on a snapshot with **no Homebrew and no dev tools**, with Claude Code
-installed and signed in:
-
-1. Install from DMG → drag to Applications → launch
-2. New Chat, send one message, confirm the reply streams
-3. Add a project folder, ask for a change, confirm the tool rows and the edit
-4. ⌘. mid-reply, confirm "Stopped." and the partial reply survive a relaunch
-5. Rerun `XBOT_LIVE_HARNESS=1 swift test --filter Live` after any CLI update
-
-# Sparkle updates
-
-Sparkle 2 is linked through SwiftPM (`Package.swift`). It stays **inert** until a release
-`Info.plist` includes `SUFeedURL` and `SUPublicEDKey` (EdDSA public key from
-`generate_keys` / `generate_appcast`).
-
-Release Info.plist keys (injected at CI pack time via `scripts/inject-sparkle-plist.sh`, not
-committed with secrets):
-
-```xml
-<key>SUFeedURL</key>
-<string>https://releases.example.com/xbot/appcast.xml</string>
-<key>SUPublicEDKey</key>
-<string>base64-public-key</string>
-<key>SUEnableAutomaticChecks</key>
-<true/>
-<key>SUAutomaticallyUpdate</key>
-<false/>
-```
-
-`scripts/bundle-mac-app.sh` embeds `Sparkle.framework` when present and calls
-`inject-sparkle-plist.sh`. Settings → Updates exposes **Check for app update**; checks are deferred
-while a turn is streaming.
-
-When CI has signing credentials:
+## Build
 
 ```sh
+scripts/generate-app-icon.sh                                   # xBot.icon → Assets.car + xBot.icns; first, on a fresh clone
+cd apps/mac && swift build --build-tests && swift test && cd ../..
+cd apps/mac && swift build -c release --arch arm64 && cd ../..  # Apple silicon only
+XBOT_VERSION=2.0.0-dev scripts/bundle-mac-app.sh               # → apps/mac/XBot.app (XBOT_BUILD_NUMBER sets CFBundleVersion)
+```
+
+If the build stops on SwiftTerm's Metal shader: `xcodebuild -downloadComponent MetalToolchain`.
+
+## Sign: pick one
+
+```sh
+# For this team's own Macs, with iCloud (the phone's away lane). Apple Development identity;
+# Xcode makes the profile through the XBotMacSigning helper in apps/ios/project.yml.
+scripts/sign-mac-remote.sh
+
+# For anyone else: Developer ID, then notarize and staple the app and the DMG.
+# Without the three APPLE_* variables it signs but doesn't notarize. No iCloud entitlement.
 export MACOS_SIGNING_IDENTITY="Developer ID Application: …"
-export APPLE_ID=…
-export APPLE_TEAM_ID=…
-export APPLE_APP_PASSWORD=…
-scripts/sign-mac-app.sh
+export APPLE_ID=… APPLE_TEAM_ID=… APPLE_APP_PASSWORD=…
+scripts/sign-mac-app.sh                                         # also rebuilds dist/xBot.dmg
 ```
 
-When CI has Sparkle EdDSA credentials:
+For a local install, quit xBot and replace the old copy:
+`rm -rf /Applications/XBot.app && ditto apps/mac/XBot.app /Applications/XBot.app`.
+
+## DMG
 
 ```sh
-export SPARKLE_EDDSA_PRIVATE_KEY=…          # or SPARKLE_EDDSA_PRIVATE_KEY_FILE
-export XBOT_RELEASE_DOWNLOAD_PREFIX=https://… # optional CDN prefix for enclosure URLs
-scripts/generate-appcast.sh                   # writes dist/releases/appcast.xml
+scripts/create-dmg.sh      # → dist/xBot.dmg: XBot.app, Applications alias, Uninstall xBot.command
 ```
 
-Generate an EdDSA key pair once (from the Sparkle SPM checkout after `swift build`):
+`sign-mac-app.sh` runs this itself after signing, so the DMG holds the signed app.
+
+## Sparkle
+
+Inert unless both `XBOT_APPCAST_URL` (HTTPS) and `XBOT_SPARKLE_PUBLIC_KEY` are set when
+`bundle-mac-app.sh` runs; `inject-sparkle-plist.sh` then writes `SUFeedURL`, `SUPublicEDKey`,
+`SUEnableAutomaticChecks` (true) and `SUAutomaticallyUpdate` (false) into the bundle.
 
 ```sh
-apps/mac/.build/artifacts/sparkle/Sparkle/bin/generate_keys
+scripts/generate-sparkle-keys.sh                  # prints the public key; makes a pair only if none exists
+SPARKLE_EDDSA_PRIVATE_KEY_FILE=sparkle-private.key \
+  scripts/generate-appcast.sh                     # → dist/releases/xBot-<version>.dmg + appcast.xml
 ```
 
-Commit the public key to CI as `XBOT_SPARKLE_PUBLIC_KEY`; keep the private key in
-`SPARKLE_EDDSA_PRIVATE_KEY` only.
+`SPARKLE_EDDSA_PRIVATE_KEY` (the key itself) works instead of the file. Never commit the key.
+
+## In CI
+
+The same steps run in `.github/workflows/mac-release.yml`:
+
+```sh
+gh workflow run "Mac release" -R MasterYoav/xBot                    # build only → artifact xbot-release
+gh workflow run "Mac release" -R MasterYoav/xBot -f version=2.0.0   # build, verify, publish v2.0.0
+```
+
+## Before a release candidate
+
+Run the clean-machine test in the [launch checklist](../docs/13-launch-checklist.md) (step 7), and
+the live suites on the development Mac: `XBOT_LIVE_HARNESS=1 swift test` in `apps/mac`, and
+`scripts/e2e_automations.py` with xBot closed.

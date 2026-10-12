@@ -1,285 +1,274 @@
-# Model providers
+# Agents and providers
 
-> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
-> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
-> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
-> Until then, where it disagrees with the code, the code and the spec win.
+xBot has no model of its own and holds no API keys. Its intelligence comes from the agent CLIs the
+person already has installed and is signed in to, run on their own subscriptions. A provider, in
+xBot, is a CLI.
 
-The promise is "every AI." This document is what that costs.
+Four are supported today, each a case of `HarnessKind` (`apps/mac/Sources/XBotBrain/HarnessKind.swift`):
 
-## What the user sees
-
-One screen in Settings, **Models**, listing providers. Each row is a name, a state, and a key field.
-The user pastes a key; the app validates it against the vendor and shows a green state or an error
-in plain language.
-
-```
-Models
-
-  OpenAI               Connected · 14 models          [ Manage ]
-  Anthropic            Connected · 8 models           [ Manage ]
-  Google               Not connected                  [ Connect ]
-  xAI                  Not connected                  [ Connect ]
-  Ollama               Running locally · 3 models     [ Manage ]
-
-  + Add a custom provider
-```
-
-Then, per agent, one control in that agent's settings:
-
-```
-  Model      [ Claude Sonnet 4.5              ⌄ ]
-             Anthropic · vision · tools · 200K context
-```
-
-Changing it takes effect on the next message. No restart. Not visible anywhere else.
-
-**Ollama gets special treatment.** The app detects it on `localhost:11434` and lists the models the
-user already has. No key. If it is not installed, the row offers a link, not an instruction.
-
-## What exists today
-
-**The router is built and the whole path is wired. It has not answered a real vendor yet.**
-
-| Piece | State |
-| --- | --- |
-| Provider registry + resolution + error classification | `engine/agent-langgraph/src/models/registry.ts`. Four providers: `openai`, `anthropic`, `google`, `openai-compatible` |
-| The seam that was `BOT_PROVIDER` | `buildModel()` takes a selection instead of closing over module constants. The environment is still read **at boot**, as the deployment fallback, so an OpenBot deployment forwarding nothing is unchanged |
-| Wire type + parser | `engine/shared/model-selection.ts`, shared because the server writes what the agent reads |
-| Selection on the agent | `configuration.modelSelection` — the column that already holds `endpoint`, so **no migration** |
-| Forwarded per run | `forwardedProps.xbotModel`, beside the run assertion and tool names |
-| Read back | `agentDto` publishes it, **stripped of any per-agent key** by `publishableSelection` — so the picker shows what is stored and `GET /api/agents` never carries a secret |
-| Onboarding **Connect a model** step | Provider picker, secure key field, live validation via `ModelProviderValidator` |
-| Keychain storage | `ProviderKeyStore` / `ProviderKeyVault` — keys never in UserDefaults or logs |
-| Connection state | `ProviderConnectionStore` — injected storage, so a test never touches the real domain |
-| Agent settings model picker | Dropdown in panel, backed by `ModelProviderCatalog` |
-| Settings → Models | **Built.** Provider rows with live connect/disconnect, Ollama detection, and **Add a custom provider** |
-
-**Built since:** the three native adapters — `buildChatModel` in `agent-langgraph/src/models/build.ts`
-hands Anthropic to `ChatAnthropic`, Google to `ChatGoogleGenerativeAI`, and OpenAI plus every
-compatible endpoint to `ChatOpenAI` at its own base URL. `tests/models-build.test.ts` asserts which
-client each selection gets, because a wrong one still answers. Usage accounting is built too.
-
-**Not built yet:** the live two-vendor smoke that closes M2, which needs a second vendor key.
-
-**Ollama container routing:** the app probes Ollama on the host (`localhost:11434`) and routes
-engine calls through `hostGatewayAddress()` from the runtime driver
-(`http://<gateway>:11434/v1`), not `localhost` inside the container.
-
-### Three bugs this path shipped with, for anyone reading the history
-
-All three were silent, and together they are why the picker did nothing for weeks. They are worth
-keeping written down because they are the same mistake at three different points on one path:
-
-1. **The engine dropped the field.** `parseAgentInput` never read `modelSelection`, so the value the
-   app was already sending went nowhere while the screen reported success.
-2. **The client sent the wrong key, in a body the engine rejects.** It sent `provider` — a display
-   name, `"Anthropic"` — where the engine reads `providerId`; and it built a partial PATCH against a
-   parser that requires the full object, so **every** agent edit returned 400, renames included.
-
-3. **Nothing ever read it back.** `AgentProfile` did not carry the selection and `agentDto` did not
-   publish it, so `GET /api/agents` never mentioned it. The value was stored and routed on
-   correctly, and the settings pane still said "Not set" on every reload.
-
-The lesson worth keeping: a setting that goes nowhere is worse than one that is absent, because the
-screen looks the same either way — and "goes nowhere" has as many places to hide as the path has
-hops. Parsed, stored, forwarded, and read back are four separate things, and three of them were
-broken one at a time.
-
-## What upstream does instead
-
-```ts
-const PROVIDER = (process.env.BOT_PROVIDER ?? "openai").toLowerCase();
-```
-
-Read once at process start. Applies to every agent in that container. Three vendors. Changing it
-means editing `.env` and restarting. See [03-openbot-fork.md](03-openbot-fork.md).
-
-## The router
-
-### Where the selection lives
-
-On the agent record, not in the environment:
-
-```ts
-interface ModelSelection {
-  providerId: string;       // "anthropic", "ollama", "custom:my-gateway"
-  model: string;            // "claude-sonnet-4-5"
-  parameters?: {
-    temperature?: number;
-    maxTokens?: number;
-    reasoningEffort?: "low" | "medium" | "high";
-  };
-}
-```
-
-Nullable. Null means "use the workspace default", which is itself a setting. A new agent inherits
-the default; changing the default moves every agent that never chose.
-
-### Resolution, per request
-
-```
-resolve(agentId)
-  → agent.modelSelection ?? workspace.defaultModel
-  → provider registry lookup
-  → credential vault: key for providerId          ← never process.env
-  → construct client (cached per provider+baseURL)
-  → call
-```
-
-Four rules:
-
-1. **Never read a key from `process.env` in request-handling code.** Keys come from the vault, which
-   is encrypted at rest with a key held in the macOS Keychain. Environment variables leak into crash
-   reports, child processes, and `/proc`. Upstream passes them into the agent container by
-   necessity; our router removes the necessity.
-2. **Resolution is per request.** Not cached beyond the client object. A settings change is live on
-   the next message, which is what the user expects from a dropdown.
-3. **Failure is specific.** "No key configured for Anthropic" and "Anthropic rejected the key" and
-   "Anthropic is rate-limiting you" are three different sentences with three different buttons.
-   `Error: 401` is not acceptable.
-4. **A missing key is a UI state, not an exception.** An agent whose provider has no key shows a
-   badge in the rail and a prompt in the composer, and the composer is disabled with a reason. It
-   does not fail on send.
-
-### The provider interface
-
-```ts
-interface ModelProvider {
-  id: string;
-  displayName: string;
-
-  // How the user connects it
-  auth: { kind: "apiKey"; keyFormat?: RegExp } | { kind: "none" };
-  baseURL?: string;          // user-overridable for compatible endpoints
-
-  // What it can do
-  listModels(credential: Credential): Promise<ModelInfo[]>;
-  validate(credential: Credential): Promise<ValidationResult>;
-
-  // The actual call
-  createClient(credential: Credential, options: ClientOptions): LanguageModel;
-
-  capabilities: {
-    tools: boolean;
-    vision: boolean;
-    streaming: boolean;
-    structuredOutput: boolean;
-  };
-}
-```
-
-`listModels` is why the settings screen can say "Connected · 14 models" rather than making the user
-type a model string. Vendors that offer no model-list endpoint fall back to a curated static list
-plus a free-text field.
-
-## The vendors
-
-### Tier 1 — first-class adapters
-
-| Provider | Auth | Notes |
+| Agent | Binary | Models behind it |
 | --- | --- | --- |
-| **Anthropic** | API key | Native tool use. Extended thinking where the model supports it |
-| **OpenAI** | API key | Some models require the Responses API — upstream already tracks this with `BOT_RESPONSES_API`. Keep that logic, move it per-model |
-| **Google** | API key | Gemini. Different tool schema; the adapter absorbs it |
-| **xAI** | API key | Grok. OpenAI-compatible endpoint, so this can ship in compatible mode first |
-| **Ollama** | none | Local. Detected, not configured. See below |
+| Claude Code | `claude` | Anthropic's Claude |
+| Codex | `codex` | OpenAI's models on a ChatGPT plan |
+| Antigravity | `agy` | Gemini, plus the other models Google offers in it. It replaced Gemini CLI, which no longer works for personal Google accounts |
+| GitHub Copilot | `copilot` | Whatever models the person's Copilot plan includes |
 
-### Tier 2 — the compatible adapter
+With none installed, Home says "xBot works through an agent you already have" and links to Claude
+Code and Codex. There is no onboarding flow and no key field anywhere in the app.
 
-One adapter, `openai-compatible`, with a user-supplied `baseURL`. Covers **OpenRouter, Groq,
-Together, Fireworks, DeepSeek, Mistral, LM Studio, vLLM, llama.cpp**, and any corporate gateway.
+## How a turn runs
 
-This is the single highest-leverage piece of the router. It turns "every AI" from a roadmap item
-into a text field, and it is how xAI and Ollama work on day one before their dedicated adapters
-exist.
+`HarnessBrain` (`XBotBrain/HarnessBrain.swift`) runs **one fresh process per turn**, in the chat's
+folder, and continues the conversation through the CLI's own session id. A crashed turn cannot
+leave a wedged process behind for the next one.
 
-The "Add a custom provider" row is exactly this: name, base URL, model, optional key. **Built** —
-`CustomProviderStore` and `ModelSettingsState.addCustomProvider`.
+1. If the chat's folder has gone, the turn fails with a sentence saying so, before anything runs.
+2. `HarnessKind.arguments(for:)` builds the argv. **The prompt is never in argv for Claude Code and
+   Codex**: it goes on stdin, because a prompt starting with `-` would be read as a flag and argv
+   has a length limit. Antigravity and Copilot cannot read stdin, so for them the prompt is
+   attached to its flag (`--print=…`, `--prompt=…`), which still cannot be mistaken for an option;
+   their stdin is empty and closed at once.
+3. stdout is split on `\n` bytes by xBot itself (not `bytes.lines`, which also breaks at U+2028 and
+   U+2029 inside JSON strings) and each line goes to that CLI's parser, which turns it into
+   `BrainEvent`s: session, text, tool call, tool result, structured answer, limits, notice, done,
+   failed.
+4. The stream ends with exactly one `.done` or `.failed`. If the CLI exits without either, the turn
+   fails with the last 4 KB of stderr, or "stopped before finishing (exit code N)".
+5. Stop sends `SIGTERM` to the CLI, which tears down its own tools. Writing to a CLI that has
+   already exited cannot raise `SIGPIPE` and take the app with it (`F_SETNOSIGPIPE`).
 
-**One rule in it is a security rule, not a nicety.** A key sent to a plain-`http` address on another
-machine crosses the network in clear text, so it is refused before any request is made. Loopback is
-exempt — it never leaves the machine, and it is exactly where a local Ollama or LM Studio lives, so
-refusing there would block the case the row exists to serve.
+The UI never knows which agent produced an event. Other CLIs' tool names are mapped to Claude
+Code's (`view` → Read, `run_command` → Bash, `str_replace` → Edit, …, in `ToolNames`), so tool rows
+read the same whichever agent ran them.
 
-### Tier 3 — later
+### Finding the CLIs
 
-Bedrock and Vertex, both of which need real cloud credential flows (SigV4, service accounts) rather
-than a pasted key. Real demand exists; it is not v1.
+An app started from the Dock inherits launchd's bare `PATH`, which contains none of the places these
+CLIs install to — and the CLIs need the person's `PATH` to run their own tools. `HarnessLocator`
+therefore runs the login shell (`$SHELL -l -i -c`, five-second limit, the value read between markers
+because startup files may print anything) and appends the usual folders: `~/.local/bin`,
+`/opt/homebrew/bin`, `/usr/local/bin`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.claude/local`, and the
+system bins. The first executable named after the CLI on that path wins. Every CLI is started with
+that `PATH`; variables beginning `CLAUDECODE` or `CLAUDE_CODE_` are removed from its environment.
 
-## Ollama
+Settings › Agents lists, per agent, where it was found (or "Not installed"), whether it is signed
+in, its plan and its usage left, with a **Look Again** button. "Signed in" is read from
+`~/.claude.json` for Claude Code; Codex counts as signed in once it has reported a plan; Antigravity
+and Copilot are "Checked on the first turn".
 
-The local case deserves its own treatment because it is the one that makes the privacy claim
-literal, and because its UX is different from every other provider.
+## The composer's controls, per agent
 
-**Detection, not configuration.** The app probes `http://localhost:11434/api/tags` at launch and
-when the Models screen opens. Found → the row is live and lists the user's installed models. Not
-found → the row reads "Not detected" with a link to ollama.com and no further instruction.
+### Permission mode
 
-**No key.** The auth kind is `none`. The Connect button is absent.
+The person picks **Read only**, **Can edit** or **Full access** (`PermissionMode`); each CLI gets
+its own flags.
 
-**Model list is the user's, not ours.** `/api/tags` returns what they have pulled. We do not offer
-to pull models — that is Ollama's job and doing it for them means owning multi-gigabyte download
-progress inside our app for no gain.
+| | Read only | Can edit | Full access |
+| --- | --- | --- | --- |
+| Claude Code | `--permission-mode default` | `--permission-mode acceptEdits` | `--permission-mode bypassPermissions` |
+| Codex | `-c sandbox_mode="read-only"` | `-c sandbox_mode="workspace-write"` | `-c sandbox_mode="danger-full-access"` |
+| Copilot | no flag (reads allowed, anything else denied headless) | `--allow-tool write` | `--allow-all-tools --allow-all-paths` |
+| Antigravity | `--mode plan` | `--dangerously-skip-permissions` | `--dangerously-skip-permissions` |
 
-**Honest capability reporting.** Many local models handle tool calls poorly or not at all. The model
-picker shows a tools badge, and selecting a model without it warns that the agent will not be able
-to use its computer. **Silently degrading an agent to text-only is the worst outcome here** — a user
-watching their agent fail to click anything with no explanation will conclude xBot is broken.
+Antigravity's edit mode, run headless, refuses even to read, so **Can edit has to use its full
+permissions** (`editingNeedsFullAccess`). The permission menu says so when Antigravity is chosen.
 
-**Resolved:** the container reaches the host's Ollama via `hostGatewayAddress()` — passed into
-`ModelProviderCatalog.ollamaBaseURL(hostGateway:)` when building model selections. The app still
-probes `localhost:11434` on the Mac for detection; only the engine-facing URL uses the gateway.
+Codex takes the sandbox through `-c` rather than `-s` because `codex exec resume` has no `-s`.
 
-## Costs and limits
+### Reasoning effort
 
-Both screenshots of Grok Bot show a **Weekly usage 31%** meter, because that product owns the model
-and therefore owns the quota. We do not. The user's quota is with their vendor.
+One slider, six stops, for every agent: Low, Medium, High, Extra, Max and Galaxy (`Effort.swift`).
+The slider marks a "Recommended" stop: the model's own default where the agent reports one (Codex),
+otherwise Medium. Each CLI gets its own spelling:
 
-**What we can honestly show:** token counts per conversation and per agent, from the usage numbers
-the APIs return, and an estimated spend using a locally-maintained price table. Both live in a
-**Usage** pane.
+| Stop | Claude Code `--effort` | Codex `model_reasoning_effort` | Copilot `--reasoning-effort` | Antigravity `--effort` |
+| --- | --- | --- | --- | --- |
+| Low | `low` | `low` | `low` | `low` |
+| Medium | `medium` | `medium` | `medium` | `medium` |
+| High | `high` | `high` | `high` | `high` |
+| Extra | `xhigh` | `xhigh` | `xhigh` | `high` |
+| Max | `max` | `max` | `max` | `high` |
+| Galaxy | `max`, and the model becomes `opus` | `ultra`, on a model that supports it | `max` | `high` |
 
-**What we must not do:** show a percentage meter. It implies a limit we do not know and cannot
-enforce. A number the user cannot verify and we cannot guarantee is worse than no number.
+**Galaxy** is the most each agent can do. On Claude Code it forces Opus whatever model was picked. On
+Codex it keeps the chosen model if that model reasons at `ultra`, otherwise switches to the first
+listed model that does (`CodexModels.model(for:chosen:in:)`).
 
-For Ollama, usage shows tokens and no cost.
+### Models
 
-**Built.** The agent reads `usage_metadata` off the model's reply and accumulates it across the
-turn — one turn is several model calls once the tool loop runs — then reports it once as a CUSTOM
-AG-UI event, `xbot.usage`, before the run closes. A CUSTOM event rather than a field on
-`RUN_FINISHED`, so a surface that does not know about usage ignores it rather than failing to parse
-the event that ends every run. Verified live against Anthropic: 864 in, 10 out on a one-word reply.
+The agent chip lists, per agent, **Default model** (no `--model` flag: the CLI's own choice,
+whatever it is this week) and then the models from `Workspace.modelOptions`, filled when the agents
+are found:
 
-The app accumulates per agent and prices it from `ModelPrices`, a local table matched on the model
-family prefix so a dated id like `claude-haiku-4-5-20251001` does not need its own row. Three rules
-are tested rather than trusted: an unknown model has **no** price rather than a free one, a model
-running on this Mac is **not** priced at zero, and absent usage is absent rather than zero — a
-provider that reported nothing must not read as a turn that cost nothing.
+| Agent | Models offered | Where the list comes from |
+| --- | --- | --- |
+| Claude Code | Opus, Sonnet, Haiku | A fixed list of the aliases the CLI takes (`Workspace.claudeModels`) |
+| Codex | Whatever the account can use, in Codex's order, with each model's reasoning levels and default | `~/.codex/models_cache.json`, the cache Codex keeps (models with `visibility: "list"`) |
+| Antigravity | Whatever Google offers the account | `agy models`, run when agents are found (it asks Google; 20-second limit) |
+| Copilot | Default only | Copilot has no list command; a named model not on the plan fails with "not available" |
 
-**The hop to the server is verified too.** The server reaches a remote agent with `HttpAgent` from
-`@ag-ui/client`, and driving that against the running agent yields
-`CUSTOM:xbot.usage={"inputTokens":864,"outputTokens":10}` in order, between `TEXT_MESSAGE_END` and
-`RUN_FINISHED`. So the event survives the client the server actually uses. What remains unproven is
-only CopilotKit's runtime re-serialising it to the app, which needs Intelligence credentials to
-exercise.
+Changing a chat's agent clears its model and its session.
 
-## Testing
+### Plan mode
 
-- **Unit:** resolution order (agent → workspace default → error), key lookup, client caching, error
-  classification. No network.
-- **Contract:** each adapter against a recorded fixture — a tool call, a streamed response, a 401, a
-  429, a truncated stream. Every adapter passes the same suite.
-- **Live smoke:** one real call per configured provider, run manually before a release, not in CI.
+Plan mode needs answers that follow a JSON schema: one read-only planning turn that returns the
+plan, then one turn per step that returns the step's outcome. Only Claude Code and Codex can do that
+(`givesStructuredAnswers`, sent to the phone as `makesPlans`).
 
-## Implementation order
+- **Claude Code**: `--json-schema <schema>`; the planning turn runs with `--permission-mode plan`.
+  Its plan-mode file writes into `~/.claude/plans` and its `StructuredOutput` tool are hidden from
+  the transcript.
+- **Codex**: `--output-schema <file>`, a temporary file written per turn and removed when it ends;
+  the planning turn runs in the read-only sandbox.
+- **Antigravity and Copilot**: Antigravity's `--json-schema` came back empty when tried; Copilot has
+  none. The Plan chip is greyed out with "can't make plans in xBot yet", and a chat with plan mode
+  on simply runs. Drawn wallpapers need schema'd answers too, so that sheet offers only Claude Code
+  and Codex.
 
-1. Provider registry + interface + `openai-compatible` adapter. **This alone makes xAI, Ollama,
-   OpenRouter, and Groq work.**
-2. `model_selection` on the agent record + the settings UI.
-3. Router resolution, replacing the `BOT_PROVIDER` read.
-4. Native Anthropic, OpenAI, and Google adapters.
-5. Ollama detection and model listing.
-6. Usage accounting.
+### Who the agent is
 
-Steps 1–3 are the blocker. Step 4 onward is quality.
+A crew member's instructions are sent on every turn. Claude Code takes them as
+`--append-system-prompt`, Codex as `-c developer_instructions=<TOML string>`. Antigravity and Copilot
+have no system-prompt option, so the instructions go ahead of the prompt inside
+`<instructions>…</instructions>`.
+
+### Sessions
+
+| Agent | Session id read from | Passed back as |
+| --- | --- | --- |
+| Claude Code | `system` / `init` line, `session_id` | `--resume <id>` |
+| Codex | `thread.started`, `thread_id` | `codex exec resume … <id> -` |
+| Copilot | the final `result` line, `sessionId` | `--resume <id>` |
+| Antigravity | `init`, `conversation_id` | `--conversation <id>` |
+
+## The four, in detail
+
+### Claude Code
+
+```
+claude -p --output-format stream-json --verbose --include-partial-messages
+       --permission-mode <mode> [--model <alias>] [--effort <level>] [--resume <id>]
+       [--json-schema <schema>] [--append-system-prompt <instructions>]
+```
+
+Prompt on stdin. Parsed by `ClaudeStream`: reply text from the `stream_event` text deltas only (the
+complete `assistant` message that follows repeats it); tool calls from the `assistant` message,
+where their input is whole, with "+N" lines for a write or an edit; anything a subagent says
+(`parent_tool_use_id` set) is left out of the reply.
+
+### Codex
+
+```
+codex exec [resume] --json --skip-git-repo-check -c sandbox_mode="<mode>" [-m <model>]
+           [-c model_reasoning_effort="<level>"] [--output-schema <file>]
+           [-c developer_instructions="<instructions>"] [<session id>] -
+```
+
+The trailing `-` reads the prompt from stdin. Parsed by `CodexStream`. Items arrive whole, so a
+Codex reply appears a message at a time rather than token by token. Commands are shown without the
+`/bin/zsh -lc '…'` wrapper Codex puts round them; connector calls are named `mcp__<server>__<tool>`
+as Claude Code names them. A top-level `error` line is a notice, not the end of the turn: Codex
+reports a reconnect that way and carries on.
+
+### Antigravity
+
+```
+agy --print=<prompt> --output-format stream-json [--mode plan | --dangerously-skip-permissions]
+    [--model <id>] [--effort low|medium|high] [--conversation <id>]
+```
+
+Parsed by `AntigravityStream`: reply text from `agent_response` steps, tools from `tool` steps
+(`ACTIVE` when they start, `DONE` or `ERROR` with their output), `result` with status `SUCCESS` ends
+the turn.
+
+### GitHub Copilot
+
+```
+copilot --prompt=<prompt> --output-format json --no-color [permission flags]
+        [--model <id>] [--reasoning-effort <level>] [--resume <id>]
+```
+
+Parsed by `CopilotStream`: reply text from `assistant.message_delta` only (`assistant.message`
+repeats it, and `assistant.reasoning*` is the model thinking), tools from `tool.execution_start` and
+`tool.execution_complete`, and a final `result` line that carries the session id and exit code.
+
+## Comparison
+
+| | Claude Code | Codex | Antigravity | GitHub Copilot |
+| --- | --- | --- | --- | --- |
+| Binary | `claude` | `codex` | `agy` | `copilot` |
+| Prompt | stdin | stdin (`-`) | `--print=…`, empty stdin | `--prompt=…`, empty stdin |
+| Output | `stream-json` | `exec --json` | `stream-json` | `json` |
+| Streams token by token | Yes | No, a message at a time | Yes | Yes |
+| Resume | `--resume` | `exec resume <id>` | `--conversation` | `--resume` |
+| Instructions | `--append-system-prompt` | `developer_instructions` | In the prompt | In the prompt |
+| Model list | Opus, Sonnet, Haiku | `~/.codex/models_cache.json` | `agy models` | Default only |
+| Effort levels used | low…max (+ Opus for Galaxy) | low…ultra | low, medium, high | low…max |
+| Plan mode | Yes | Yes | No | No |
+| Can edit | `acceptEdits` | `workspace-write` | Needs full access | `--allow-tool write` |
+| Usage limits shown | Yes, from the turn's stream | Yes, from session logs | No | No |
+| Abilities page | Yes | Yes | No | No |
+
+## Usage and plan limits
+
+The account menu's **Usage remaining** shows, per agent, what is left of the five-hour and weekly
+windows and when each resets. **No credentials are read**: the numbers are what the agents
+themselves report.
+
+- **Claude Code** prints a `rate_limit_event` in every turn's stream; `ClaudeStream` reads the
+  `five_hour` and `seven_day` windows from it. So Claude Code's usage appears after the first turn
+  ("Run a turn to see Claude Code's usage."). The plan name (Claude Pro, Max, Team, Enterprise) comes
+  from the `oauthAccount` block of `~/.claude.json`, which holds no secrets.
+- **Codex** writes its limits into its session logs. `CodexUsage.latest()` reads the newest of
+  `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` that has a `rate_limits` line — trying up to five
+  files, and only the last 512 KB of each — taking `primary` as the five-hour window, `secondary` as
+  the weekly one and `plan_type` as the plan (ChatGPT Plus, Pro, Team, Business, Enterprise).
+  `Workspace.refreshCodexUsage()` runs when the account menu or Settings › Agents opens, and every
+  minute while the menu is open.
+- **Antigravity and Copilot** do not report limits, so they are not shown.
+
+Each agent's last report is kept in the `usage` table of `xbot.sqlite`, so the menu has numbers
+straight after a relaunch, with "Updated N min ago" beneath. The phone shows the same numbers on its
+Home plan board, in each provider's own colours (`ProviderStyle` in `apps/ios/Sources/Accent.swift`:
+Claude clay `#D97757`, Codex green `#10A37F`, Antigravity blue `#4285F4`, Copilot purple `#8957E5`).
+On the Mac each agent's dot uses `Palette.agent`: Claude's clay, Codex in ink, Google blue, Copilot
+purple.
+
+## Adding a provider
+
+One adapter per CLI. The design for the last two is
+[2026-10-11-more-providers-design.md](superpowers/specs/2026-10-11-more-providers-design.md), which
+also records what was looked at and not added (Gemini CLI, Cursor, OpenCode, Grok).
+
+1. **Record real output first.** Run the CLI headless on a real turn and save its lines as a fixture
+   in `apps/mac/Tests/XBotBrainTests/Fixtures/` (`<cli>-read-turn.jsonl` and so on), with paths
+   scrubbed. Parsers are written against what the CLI actually prints, not its documentation.
+2. **Add a case to `HarnessKind`**: display name, executable name, `arguments(for:)` (prompt,
+   permission mapping, model, effort, resume, instructions), and whether it reads stdin, gives
+   structured answers, needs instructions in the prompt, or needs full access to edit.
+3. **Write its parser** beside the others (`MoreStreams.swift`), mapping tool names through
+   `ToolNames.canonical`, ending in exactly one `.done` or `.failed`.
+4. **Models**: a list command, a cache file, or default only — wired into
+   `Workspace.refreshHarnesses()`.
+5. **Test** the parser against the fixtures, then run the live suite on a signed-in Mac:
+
+   ```
+   cd apps/mac && XBOT_LIVE_HARNESS=1 swift test --filter Live
+   ```
+
+   `LiveHarnessTests` runs, per installed agent, a real read-only turn that must use a tool, find a
+   word in a file and then resume the session to recall it; and a real two-step plan run to the end
+   (which only an agent that makes plans can pass). It costs tokens and is off by default. Run it
+   again after a CLI update, to see whether its stream still reads.
+
+## Not built yet
+
+The [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md) plans a second brain,
+**`NativeBrain`**: a Swift tool-use loop against Anthropic, OpenAI, Google and Ollama over
+`URLSession`, with keys in the Keychain, for people who have an API key or a local model rather than
+an agent CLI. It is step 4 of the spec's build order. None of it exists in the app today: there is
+no key field, no Ollama detection, and no per-token cost accounting. `BrainEvent` is already the
+shape it would speak, so the transcript would not need to change.
+
+The 1.x model router (`BOT_PROVIDER`, the engine's provider registry, Settings › Models) was removed
+with the Docker/OpenBot engine; see [ADR-0009](decisions/0009-native-harness-redesign.md).

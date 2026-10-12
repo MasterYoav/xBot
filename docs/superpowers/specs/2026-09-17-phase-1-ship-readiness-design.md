@@ -1,5 +1,8 @@
 # Phase 1: Ship Readiness
 
+> **xBot 1.x history.** Written for the Docker/OpenBot app, removed in
+> [ADR-0009](../../decisions/0009-native-harness-redesign.md). Kept as a record.
+
 **Date:** 17 September 2026  
 **Status:** Approved design; awaiting written-spec review
 
