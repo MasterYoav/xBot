@@ -21,6 +21,7 @@ struct ChatListView: View {
         List(selection: $selection) {
             if query.isEmpty {
                 Section {
+                    NavigationLink(value: Destination.profile) { Label(String(localized: "Profile"), systemImage: "person.crop.circle") }
                     NavigationLink(value: Destination.notes) { Label(String(localized: "Notes"), systemImage: "note.text") }
                     NavigationLink(value: Destination.automations) { Label(String(localized: "Automations"), systemImage: "bolt.horizontal") }
                     NavigationLink(value: Destination.agents) { Label(String(localized: "Agents"), systemImage: "person.3") }

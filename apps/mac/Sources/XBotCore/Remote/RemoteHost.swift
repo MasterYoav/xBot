@@ -308,7 +308,7 @@ public final class RemoteHost {
              .listNotes, .saveNote, .deleteNote, .undoDeleteNote,
              .listAutomations, .saveAutomation, .deleteAutomation, .runAutomation, .setAutomationHelper,
              .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar,
-             .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP:
+             .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP, .getProfile:
             handleProject(message, link: client.link)
         case .openShell, .shellInput, .shellResize, .closeShell:
             handleShell(message, client: id, link: client.link)

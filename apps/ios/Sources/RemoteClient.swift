@@ -344,7 +344,7 @@ final class RemoteClient {
             if let shell = shells[id] { shell.output(data) } else { earlyShellOutput[id, default: Data()].append(data) }
         case .shellEnded(let id):
             shells.removeValue(forKey: id)?.ended()
-        case .shellOpened(let requestID, _, _):
+        case .shellOpened(let requestID, _, _), .profile(let requestID, _):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: true, reason: nil, chatID: nil, payload: message))
         case .reply(let requestID, let ok, let reason, let chatID):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: ok, reason: reason, chatID: chatID))

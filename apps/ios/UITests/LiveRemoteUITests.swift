@@ -405,6 +405,28 @@ final class LiveRemoteUITests: XCTestCase {
         attach(app, "2 project shell")
     }
 
+    /// Profile, then the phone's appearance set to dark.
+    func testProfileAndAppearance() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+        app.buttons["Profile"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Lifetime tokens"].firstMatch.waitForExistence(timeout: 90), "No stats")
+        sleep(1)
+        attach(app, "1 profile")
+        app.swipeUp()
+        attach(app, "2 profile lower")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["Settings"].firstMatch.tap()
+        app.buttons["Dark"].firstMatch.tap()
+        sleep(1)
+        attach(app, "3 dark settings")
+        app.buttons["Match the device"].firstMatch.tap()
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name

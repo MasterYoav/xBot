@@ -199,6 +199,7 @@ public enum HostMessage: Codable, Equatable, Sendable {
     /// What the shell wrote, as bytes for the terminal.
     case shellOutput(shellID: UUID, data: Data)
     case shellEnded(shellID: UUID)
+    case profile(requestID: UUID, profile: RemoteProfile)
 }
 
 /// Phone → Mac.
@@ -274,6 +275,8 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case shellInput(shellID: UUID, data: Data)
     case shellResize(shellID: UUID, cols: Int, rows: Int)
     case closeShell(shellID: UUID)
+    /// The Profile page and plan usage; `refresh` reads the agents' history and limits again.
+    case getProfile(requestID: UUID, refresh: Bool)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }

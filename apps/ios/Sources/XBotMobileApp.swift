@@ -6,12 +6,14 @@ import XBotRemote
 struct XBotMobileApp: App {
     @UIApplicationDelegateAdaptor(PushDelegate.self) private var push
     @State private var client = RemoteClient()
+    @AppStorage("appearance") private var appearance = Appearance.system.rawValue
     @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
         WindowGroup {
             RootView(client: client)
                 .tint(Theme.accent)
+                .preferredColorScheme(Appearance(rawValue: appearance)?.scheme)
                 .onOpenURL { url in
                     if let invite = PairingInvite(url: url) { client.pair(with: invite) }
                 }
@@ -74,6 +76,7 @@ enum Destination: Hashable {
     case agents
     case abilities
     case terminal
+    case profile
 }
 
 /// A new chat to start, maybe in a project, maybe with text already in it.
@@ -115,6 +118,8 @@ struct RootView: View {
                     CrewScreen(client: client)
                 case .abilities:
                     AbilitiesScreen(client: client)
+                case .profile:
+                    ProfileScreen(client: client)
                 case .terminal:
                     NavigationStack { TerminalScreen(client: client, projectID: nil) }
                 default:
@@ -178,8 +183,22 @@ struct LinkStatus: View {
     }
 }
 
+enum Appearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var scheme: ColorScheme? { switch self { case .system: nil; case .light: .light; case .dark: .dark } }
+    var title: String {
+        switch self {
+        case .system: String(localized: "Match the device")
+        case .light: String(localized: "Light")
+        case .dark: String(localized: "Dark")
+        }
+    }
+}
+
 struct SettingsSheet: View {
     let client: RemoteClient
+    @AppStorage("appearance") private var appearance = Appearance.system.rawValue
     @Environment(\.dismiss) private var dismiss
     @State private var confirming = false
 
@@ -191,6 +210,13 @@ struct SettingsSheet: View {
                     LinkStatus(client: client)
                 } footer: {
                     Text(String(localized: "The agents run on your Mac. Keep it on and awake; while this device is connected, xBot keeps it from sleeping."))
+                }
+                Section(String(localized: "Appearance")) {
+                    Picker(String(localized: "Look"), selection: $appearance) {
+                        ForEach(Appearance.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
                 }
                 Section {
                     Button(String(localized: "Unpair this device"), role: .destructive) { confirming = true }
