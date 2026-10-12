@@ -164,12 +164,12 @@ private struct WorkflowEditor: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Space.s) {
+            // The name has a row of its own: beside the controls it was clipped in a narrow window.
+            TextField(String(localized: "Name"), text: $workflow.name)
+                .textFieldStyle(.plain)
+                .font(Typography.hero)
+                .foregroundStyle(Palette.textPrimary)
             HStack(spacing: Space.s) {
-                TextField(String(localized: "Name"), text: $workflow.name)
-                    .textFieldStyle(.plain)
-                    .font(Typography.hero)
-                    .foregroundStyle(Palette.textPrimary)
-                Spacer()
                 Toggle("", isOn: $workflow.isEnabled).toggleStyle(.switch).controlSize(.small).labelsHidden()
                     .help(String(localized: "On: runs on its schedule. Run now always works."))
                 Menu {
@@ -178,6 +178,7 @@ private struct WorkflowEditor: View {
                     Button(String(localized: "Delete…"), role: .destructive) { confirmingDelete = true }
                 } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                Spacer()
                 runButton
             }
             HStack(spacing: Space.s) {
@@ -517,7 +518,7 @@ private struct WorkflowStepCard: View {
     private func gateBranches(_ gate: JevGate) -> some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             HStack(spacing: Space.s) {
-                Text(String(localized: "Yes at")).captionText().foregroundStyle(Palette.textSecondary)
+                Text(String(localized: "Yes at")).captionText().foregroundStyle(Palette.textSecondary).fixedSize()
                 Slider(value: Binding(get: { () -> Double in gate.threshold },
                                       set: { (value: Double) in
                                           var g = gate
@@ -525,8 +526,8 @@ private struct WorkflowStepCard: View {
                                           setGate(g)
                                       }),
                        in: 0.05...0.95)
-                    .frame(width: Metrics.effortCardWidth / 2)
-                Text(verbatim: String(format: "%.2f", gate.threshold)).font(Typography.mono).foregroundStyle(Palette.textSecondary)
+                    .frame(maxWidth: Metrics.effortCardWidth / 2)
+                Text(verbatim: String(format: "%.2f", gate.threshold)).font(Typography.mono).foregroundStyle(Palette.textSecondary).fixedSize()
             }
             branch(String(localized: "Yes →"), gate.yes) { (target: StepTarget) in
                 var g = gate
