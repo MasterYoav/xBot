@@ -412,7 +412,7 @@ public final class Workspace {
     }
 }
 
-private extension String {
+extension String {
     func trimmingSuffix(_ suffix: String) -> String {
         count > 1 && hasSuffix(suffix) ? String(dropLast(suffix.count)) : self
     }

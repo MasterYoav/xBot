@@ -19,7 +19,7 @@ final class RemoteClient {
         case unreachable(String)
     }
 
-    struct Answer: Sendable { var ok: Bool; var reason: String?; var chatID: UUID? }
+    struct Answer: Sendable { var ok: Bool; var reason: String?; var chatID: UUID?; var payload: HostMessage? = nil }
 
     private(set) var link: Link = .unpaired
     private(set) var macName: String?
@@ -208,6 +208,22 @@ final class RemoteClient {
         }
     }
 
+    /// A request answered with data (a folder, a file, git status…); nil when refused, with the
+    /// reason shown, unless `quiet`.
+    func call(quiet: Bool = false, _ make: (UUID) -> ClientMessage) async -> HostMessage? {
+        let answer = await request(make)
+        if !answer.ok, !quiet { notice = answer.reason }
+        return answer.payload
+    }
+
+    /// A request answered with ok or a reason; false (reason shown) when refused.
+    @discardableResult
+    func act(_ make: (UUID) -> ClientMessage) async -> Bool {
+        let answer = await request(make)
+        if !answer.ok { notice = answer.reason }
+        return answer.ok
+    }
+
     @discardableResult
     func send(_ text: String, in chatID: UUID) async -> Answer {
         let answer = await request { .send(requestID: $0, chatID: chatID, text: text) }
@@ -321,6 +337,9 @@ final class RemoteClient {
             live[chatID] = parts.isEmpty ? nil : parts
         case .reply(let requestID, let ok, let reason, let chatID):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: ok, reason: reason, chatID: chatID))
+        case .folder(let requestID, _), .file(let requestID, _), .git(let requestID, _), .diff(let requestID, _),
+             .macFolders(let requestID, _, _):
+            pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: true, reason: nil, chatID: nil, payload: message))
         }
     }
 

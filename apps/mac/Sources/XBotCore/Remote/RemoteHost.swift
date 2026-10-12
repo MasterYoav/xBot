@@ -37,7 +37,7 @@ public final class RemoteHost {
     /// Bumped when a phone attaches or leaves, for Settings › Devices.
     public var onClientsChanged: (() -> Void)?
 
-    private let workspace: Workspace
+    let workspace: Workspace
     private let localInterval: Duration
     private let cloudInterval: Duration
     private var clients: [UUID: Client] = [:]
@@ -294,6 +294,8 @@ public final class RemoteHost {
             }
             workspace.restoreChat(deleted.remove(at: index))
             answer(client, request, workspace.chat(chatID) != nil, chatID: chatID)
+        case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject:
+            handleProject(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
             if let reason = apply(settings, to: chatID) { return answer(client, request, refused: reason) }
@@ -336,7 +338,7 @@ public final class RemoteHost {
 
     // MARK: Mapping
 
-    private func remoteProjects() -> [RemoteProject] { workspace.projects.map { RemoteProject(id: $0.id, name: $0.name) } }
+    private func remoteProjects() -> [RemoteProject] { workspace.projects.map { RemoteProject(id: $0.id, name: $0.name, path: $0.path) } }
 
     private func remoteChats() -> [RemoteChat] {
         workspace.chats.filter { $0.automationID == nil }.map { chat in

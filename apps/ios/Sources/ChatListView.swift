@@ -4,9 +4,10 @@ import XBotRemote
 /// Chats, as on the Mac's sidebar: Recent (no project) and each project.
 struct ChatListView: View {
     let client: RemoteClient
-    @Binding var selection: UUID?
+    @Binding var selection: Destination?
     let showSettings: () -> Void
-    @State private var composing = false
+    let compose: (UUID?, String) -> Void
+    let addProject: () -> Void
     @State private var query = ""
     @State private var renaming: RemoteChat?
     @State private var deleting: RemoteChat?
@@ -24,8 +25,15 @@ struct ChatListView: View {
             }
             ForEach(client.projects) { project in
                 let theirs = shown.filter { $0.projectID == project.id }
-                if !theirs.isEmpty {
-                    Section(project.name) { ForEach(theirs) { row($0) } }
+                if !theirs.isEmpty || query.isEmpty {
+                    Section(project.name) {
+                        NavigationLink(value: Destination.project(project.id)) {
+                            Label(String(localized: "Files and changes"), systemImage: "folder")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        .accessibilityLabel(String(localized: "\(project.name): files and changes"))
+                        ForEach(theirs) { row($0) }
+                    }
                 }
             }
         }
@@ -52,7 +60,10 @@ struct ChatListView: View {
                 Button(action: showSettings) { Image(systemName: "gearshape") }.accessibilityLabel(String(localized: "Settings"))
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { composing = true } label: { Image(systemName: "square.and.pencil") }
+                Menu {
+                    Button { compose(nil, "") } label: { Label(String(localized: "New chat"), systemImage: "square.and.pencil") }
+                    Button(action: addProject) { Label(String(localized: "Add a project…"), systemImage: "folder.badge.plus") }
+                } label: { Image(systemName: "square.and.pencil") } primaryAction: { compose(nil, "") }
                     .accessibilityLabel(String(localized: "New chat"))
                     .keyboardShortcut("n", modifiers: .command)
                     .disabled(client.agents.isEmpty)
@@ -77,16 +88,11 @@ struct ChatListView: View {
         } message: {
             Text(String(localized: "It's deleted on your Mac too. You can undo right after."))
         }
-        .sheet(isPresented: $composing) {
-            NewChatSheet(client: client) { id in
-                composing = false
-                selection = id
-            }
-        }
+
     }
 
     private func row(_ chat: RemoteChat) -> some View {
-        NavigationLink(value: chat.id) {
+        NavigationLink(value: Destination.chat(chat.id)) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(Theme.agentColor(chat.agent).opacity(0.15)).frame(width: 36, height: 36)
@@ -121,7 +127,7 @@ struct ChatListView: View {
     }
 
     private func remove(_ chat: RemoteChat) {
-        if selection == chat.id { selection = nil }
+        if selection == .chat(chat.id) { selection = nil }
         Task { await client.delete(chat.id) }
     }
 
@@ -134,6 +140,8 @@ struct ChatListView: View {
 /// A new chat: where, which agent, and the first message.
 struct NewChatSheet: View {
     let client: RemoteClient
+    var initialProject: UUID?
+    var initialText = ""
     let started: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
@@ -171,6 +179,8 @@ struct NewChatSheet: View {
             }
             .onAppear {
                 settings.agent = client.agents.first?.id
+                projectID = initialProject
+                if text.isEmpty { text = initialText }
                 focused = true
             }
         }

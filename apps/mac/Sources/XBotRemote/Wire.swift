@@ -26,7 +26,9 @@ public enum Wire {
 public struct RemoteProject: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var id: UUID
     public var name: String
-    public init(id: UUID, name: String) { self.id = id; self.name = name }
+    /// The folder on the Mac (shown under the name; absent from older Macs).
+    public var path: String?
+    public init(id: UUID, name: String, path: String? = nil) { self.id = id; self.name = name; self.path = path }
 }
 
 public struct RemoteChat: Codable, Equatable, Sendable, Identifiable {
@@ -174,6 +176,13 @@ public enum HostMessage: Codable, Equatable, Sendable {
     case live(chatID: UUID, parts: [RemotePart])
     /// The answer to a phone's request.
     case reply(requestID: UUID, ok: Bool, reason: String?, chatID: UUID?)
+    // Answers that carry data (each to one request; a refusal comes as `reply` instead).
+    case folder(requestID: UUID, entries: [RemoteFileEntry])
+    case file(requestID: UUID, file: RemoteFile)
+    case git(requestID: UUID, status: RemoteGit)
+    case diff(requestID: UUID, lines: [RemoteDiffLine])
+    /// Folders on the Mac, to pick a new project from; `path` is the one listed.
+    case macFolders(requestID: UUID, path: String, folders: [RemoteFolder])
 }
 
 /// Phone → Mac.
@@ -197,6 +206,19 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     /// Deletes the chat; `undoDelete` brings it back (the Mac keeps the last few deleted chats).
     case delete(requestID: UUID, chatID: UUID)
     case undoDelete(requestID: UUID, chatID: UUID)
+    // Projects. Paths are relative to the project's folder and can't leave it.
+    case listFolder(requestID: UUID, projectID: UUID, path: String)
+    case readFile(requestID: UUID, projectID: UUID, path: String)
+    case gitStatus(requestID: UUID, projectID: UUID)
+    case gitDiff(requestID: UUID, projectID: UUID, path: String)
+    /// Answered with the new `git` status.
+    case gitAction(requestID: UUID, projectID: UUID, action: RemoteGitAction)
+    /// Answered with `reply` (ok, or why not).
+    case fileAction(requestID: UUID, projectID: UUID, action: RemoteFileAction)
+    /// Folders in a folder on the Mac (nil: the home folder); for adding a project.
+    case browseMac(requestID: UUID, path: String?)
+    case addProject(requestID: UUID, path: String)
+    case removeProject(requestID: UUID, projectID: UUID)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }
