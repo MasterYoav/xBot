@@ -36,6 +36,7 @@ struct ProfileScreen: View {
                 .frame(maxWidth: .infinity)
             }
             .refreshable { await load(refresh: true) }
+            .closable()
             .navigationTitle(String(localized: "Profile"))
             .navigationBarTitleDisplayMode(.inline)
         }

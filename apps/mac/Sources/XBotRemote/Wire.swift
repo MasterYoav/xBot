@@ -200,6 +200,8 @@ public enum HostMessage: Codable, Equatable, Sendable {
     case shellOutput(shellID: UUID, data: Data)
     case shellEnded(shellID: UUID)
     case profile(requestID: UUID, profile: RemoteProfile)
+    /// The Agents world: sent on connecting, then whenever the setting or anyone in it changes.
+    case world(RemoteWorld)
 }
 
 /// Phone → Mac.
@@ -277,6 +279,8 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case closeShell(shellID: UUID)
     /// The Profile page and plan usage; `refresh` reads the agents' history and limits again.
     case getProfile(requestID: UUID, refresh: Bool)
+    /// Moves the crew to another world (the Mac's Agents page follows). Answered with a `reply`.
+    case setWorld(requestID: UUID, setting: String)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }

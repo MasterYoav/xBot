@@ -55,6 +55,7 @@ struct AbilitiesScreen: View {
                 .padding(.horizontal, 16).padding(.vertical, 8)
                 .background(.bar)
             }
+            .closable()
             .navigationTitle(String(localized: "Abilities"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

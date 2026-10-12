@@ -1,14 +1,11 @@
 import SwiftUI
 import XBotRemote
 
-/// Chats, as on the Mac's sidebar: Recent (no project) and each project.
+/// Every chat, newest first: loose ones under Recent, then each project's.
 struct ChatListView: View {
     let client: RemoteClient
-    @Binding var selection: Destination?
-    let showSettings: () -> Void
-    let compose: (UUID?, String) -> Void
-    let addProject: () -> Void
-    @State private var query = ""
+    let nav: Navigator
+    var query = ""
     @State private var renaming: RemoteChat?
     @State private var deleting: RemoteChat?
 
@@ -18,42 +15,28 @@ struct ChatListView: View {
     }
 
     var body: some View {
-        List(selection: $selection) {
-            if query.isEmpty {
-                Section {
-                    NavigationLink(value: Destination.profile) { Label(String(localized: "Profile"), systemImage: "person.crop.circle") }
-                    NavigationLink(value: Destination.notes) { Label(String(localized: "Notes"), systemImage: "note.text") }
-                    NavigationLink(value: Destination.automations) { Label(String(localized: "Automations"), systemImage: "bolt.horizontal") }
-                    NavigationLink(value: Destination.agents) { Label(String(localized: "Agents"), systemImage: "person.3") }
-                    NavigationLink(value: Destination.abilities) { Label(String(localized: "Abilities"), systemImage: "puzzlepiece.extension") }
-                    NavigationLink(value: Destination.terminal) { Label(String(localized: "Terminal"), systemImage: "terminal") }
-                }
-            }
+        List {
             let loose = shown.filter { $0.projectID == nil }
             if !loose.isEmpty {
-                Section(String(localized: "Recent")) { ForEach(loose) { row($0) } }
+                Section { ForEach(loose) { row($0) } } header: { header(String(localized: "Recent")) }
             }
             ForEach(client.projects) { project in
                 let theirs = shown.filter { $0.projectID == project.id }
-                if !theirs.isEmpty || query.isEmpty {
-                    Section(project.name) {
-                        NavigationLink(value: Destination.project(project.id)) {
-                            Label(String(localized: "Files and changes"), systemImage: "folder")
-                                .foregroundStyle(Color.accentColor)
-                        }
-                        .accessibilityLabel(String(localized: "\(project.name): files and changes"))
-                        ForEach(theirs) { row($0) }
-                    }
+                if !theirs.isEmpty {
+                    Section { ForEach(theirs) { row($0) } } header: { header(project.name) }
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .searchable(text: $query, prompt: String(localized: "Search chats"))
+        .listSectionSpacing(.compact)
+        .scrollEdgeEffectStyle(.soft, for: .all)
         .overlay {
-            if client.chats.isEmpty {
-                if client.link == .local || client.link == .cloud {
+            if shown.isEmpty {
+                if !query.isEmpty {
+                    ContentUnavailableView.search(text: query)
+                } else if client.link == .local || client.link == .cloud {
                     ContentUnavailableView(String(localized: "No chats yet"), systemImage: "bubble.left.and.bubble.right",
-                                           description: Text(String(localized: "Start one with ✎.")))
+                                           description: Text(String(localized: "Start one with +.")))
                 } else {
                     ContentUnavailableView {
                         Label(String(localized: "Connecting"), systemImage: "antenna.radiowaves.left.and.right")
@@ -61,22 +44,15 @@ struct ChatListView: View {
                 }
             }
         }
-        .navigationTitle(String(localized: "Chats"))
-        .safeAreaInset(edge: .top, spacing: 0) {
-            LinkStatus(client: client).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20).padding(.bottom, 6)
-        }
+        .navigationTitle(query.isEmpty ? String(localized: "Chats") : "")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: showSettings) { Image(systemName: "gearshape") }.accessibilityLabel(String(localized: "Settings"))
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button { compose(nil, "") } label: { Label(String(localized: "New chat"), systemImage: "square.and.pencil") }
-                    Button(action: addProject) { Label(String(localized: "Add a project…"), systemImage: "folder.badge.plus") }
-                } label: { Image(systemName: "square.and.pencil") } primaryAction: { compose(nil, "") }
-                    .accessibilityLabel(String(localized: "New chat"))
-                    .keyboardShortcut("n", modifiers: .command)
-                    .disabled(client.agents.isEmpty)
+            if query.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { nav.newChat() } label: { Image(systemName: "plus") }
+                        .accessibilityLabel(String(localized: "New chat"))
+                        .keyboardShortcut("n", modifiers: .command)
+                        .disabled(client.agents.isEmpty)
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -98,30 +74,26 @@ struct ChatListView: View {
         } message: {
             Text(String(localized: "It's deleted on your Mac too. You can undo right after."))
         }
+    }
 
+    private func header(_ title: String) -> some View {
+        Text(title).font(.system(size: 22, weight: .bold, design: .rounded)).foregroundStyle(.primary)
+            .textCase(nil).padding(.leading, -12).padding(.bottom, 2)
     }
 
     private func row(_ chat: RemoteChat) -> some View {
         NavigationLink(value: Destination.chat(chat.id)) {
             HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(Theme.agentColor(chat.agent).opacity(0.15)).frame(width: 36, height: 36)
-                    if chat.isRunning {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text(String((chat.crewName ?? chat.agentName).prefix(1))).font(.subheadline.bold())
-                            .foregroundStyle(Theme.agentColor(chat.agent))
-                    }
-                }
+                ChatMark(chat: chat)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(chat.title).font(.body.weight(.medium)).lineLimit(1)
+                    Text(chat.title).font(.system(.body, design: .rounded, weight: .semibold)).lineLimit(1)
                     Text(subtitle(chat)).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 Text(chat.updatedAt, format: .relative(presentation: .numeric, unitsStyle: .narrow)).font(.caption).foregroundStyle(.tertiary)
                     .lineLimit(1).fixedSize()
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) { remove(chat) } label: { Label(String(localized: "Delete"), systemImage: "trash") }
@@ -137,13 +109,33 @@ struct ChatListView: View {
     }
 
     private func remove(_ chat: RemoteChat) {
-        if selection == .chat(chat.id) { selection = nil }
+        nav.drop(.chat(chat.id))
         Task { await client.delete(chat.id) }
     }
 
     private func subtitle(_ chat: RemoteChat) -> String {
         if chat.isRunning { return String(localized: "\(chat.crewName ?? chat.agentName) is working…") }
         return chat.crewName.map { "\($0) · \(chat.agentName)" } ?? chat.agentName
+    }
+}
+
+/// Search: chats by title, and projects by name.
+struct SearchScreen: View {
+    let client: RemoteClient
+    let nav: Navigator
+    @State private var query = ""
+
+    var body: some View {
+        Group {
+            if query.isEmpty {
+                ContentUnavailableView(String(localized: "Search your chats"), systemImage: "magnifyingglass",
+                                       description: Text(String(localized: "Find a chat by its title, on any project.")))
+            } else {
+                ChatListView(client: client, nav: nav, query: query)
+            }
+        }
+        .navigationTitle(String(localized: "Search"))
+        .searchable(text: $query, prompt: String(localized: "Chats"))
     }
 }
 

@@ -86,6 +86,28 @@ apps/ios  (Xcode project, iOS/iPadOS 26)          SwiftUI: chat list, chat, comp
 - iPad: a sidebar of projects and chats beside the chat, keyboard shortcuts (⌘N, ⌘Return, Esc).
 - A status line: "Connected to Yoav's Mac mini · same Wi-Fi" / "· through iCloud" / "Mac asleep".
 
+## Mobile UI (Liquid Glass, 2026-10-12)
+
+Replaces the first version's sidebar list of places.
+
+- A tab bar along the bottom (a sidebar on iPad) that folds away while scrolling
+  (`tabBarMinimizeBehavior(.onScrollDown)`): **Home, Chats, Agents, Projects, Search**.
+  Each tab has its own navigation stack; a chat hides the tab bar for its composer.
+- **Home**: the Mac's name in a glass capsule (status dot; menu with Settings and Add a project),
+  glass `+` and gear buttons. Then a glowing open arc with the plan that has the least left (from
+  Profile's usage; without plan numbers, today's chats), a two-tone sentence ("Codex has used 31% of
+  its 5 hours. Forge is working."), two tiles (Working, Today), a Working now card, the Recent chats
+  card, and **Places**: Notes, Automations, Abilities, Terminal and Profile, which open full screen
+  with a zoom from their circle and close with ×.
+- Cards: charcoal, 28 pt continuous corners, a faint top highlight; controls (composer, chips, crew
+  cards, the toolbar) are Liquid Glass. Type is SF Rounded throughout.
+- **Agents**: the Mac's pixel world, drawn by the same code (the `XBotWorld` package library: the
+  avatars, `WorkplaceWorld`, the five settings, `WorldStage`, `WorkplaceBackdrop`). The crew walks
+  about, sits at a desk to work and says what it's doing, from the Mac's live status. The world is
+  the Mac's: the host pushes `world(RemoteWorld)` (setting + residents) on connecting and whenever it
+  changes, and `setWorld` from the phone moves the Mac's Agents page too. Below the stage, glass crew
+  cards and postcards of the five worlds; a tap on someone opens their page (message, edit, let go).
+
 ## Setup the person does once
 
 - Xcode signing: the iOS app and the Mac app get the iCloud capability with container

@@ -15,36 +15,41 @@ struct Composer: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    agentMenu
-                    modeMenu
-                    effortMenu
-                    planChip
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        agentMenu
+                        modeMenu
+                        effortMenu
+                        planChip
+                    }
                 }
                 .padding(.horizontal, 16)
             }
+            .scrollClipDisabled()
             HStack(alignment: .bottom, spacing: 8) {
                 TextField(chat.blocked ?? String(localized: "Message \(chat.crewName ?? chat.agentName)"), text: $text, axis: .vertical)
                     .lineLimit(1...6)
                     .focused(focused)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color(.secondarySystemBackground)))
+                    .padding(.horizontal, 18).padding(.vertical, 12)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
                     .disabled(chat.blocked != nil)
                     .accessibilityIdentifier("composer")
                 if chat.isRunning {
                     Button { Task { await client.stop(chat.id) } } label: {
-                        Image(systemName: "stop.fill").font(.system(size: 15, weight: .bold)).frame(width: 40, height: 40)
-                            .background(Circle().fill(.primary)).foregroundStyle(Color(.systemBackground))
+                        Image(systemName: "stop.fill").font(.system(size: 15, weight: .bold)).frame(width: 46, height: 46)
+                            .foregroundStyle(.primary)
+                            .glassEffect(.regular.interactive(), in: .circle)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(String(localized: "Stop"))
                     .keyboardShortcut(.escape, modifiers: [])
                 } else {
                     Button { Task { await send() } } label: {
-                        Image(systemName: "arrow.up").font(.system(size: 16, weight: .bold)).frame(width: 40, height: 40)
-                            .background(Circle().fill(canSend ? Theme.accent : Color(.systemGray3))).foregroundStyle(.white)
+                        Image(systemName: "arrow.up").font(.system(size: 17, weight: .bold)).frame(width: 46, height: 46)
+                            .foregroundStyle(canSend ? .white : .secondary)
+                            .glassEffect(canSend ? .regular.tint(Theme.accent).interactive() : .regular, in: .circle)
                     }
                     .buttonStyle(.plain)
                     .disabled(!canSend)
@@ -54,9 +59,8 @@ struct Composer: View {
             }
             .padding(.horizontal, 12)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 8)
-        .background(.bar)
+        .padding(.top, 6)
+        .padding(.bottom, 6)
     }
 
     private func send() async {
@@ -198,8 +202,8 @@ struct Chip: View {
             if let symbol { Image(systemName: symbol).font(.caption) }
             Text(text).font(.footnote.weight(.medium)).lineLimit(1)
         }
-        .padding(.horizontal, 12).padding(.vertical, 7)
-        .background(Capsule().fill(on ? Theme.accent.opacity(0.18) : Color(.secondarySystemBackground)))
+        .padding(.horizontal, 12).padding(.vertical, 8)
         .foregroundStyle(on ? Theme.accent : .primary)
+        .glassEffect(on ? .regular.tint(Theme.accent.opacity(0.35)) : .regular, in: .capsule)
     }
 }

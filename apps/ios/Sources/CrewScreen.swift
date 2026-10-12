@@ -1,122 +1,6 @@
 import SwiftUI
 import XBotRemote
 
-/// The crew, like the Mac's Agents page: who's here, what they're doing, and a way to talk to them.
-struct CrewScreen: View {
-    let client: RemoteClient
-    @State private var members: [RemoteCrewMember]?
-    @State private var parts: [RemoteAvatarPart] = []
-    @State private var editing: RemoteCrewMember?
-    @State private var talking: RemoteCrewMember?
-    @State private var path: [Route] = []
-    @State private var lastLetGo: String?
-
-    enum Route: Hashable {
-        case member(UUID)
-        case chat(UUID, String)
-    }
-
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(members ?? []) { member in
-                        NavigationLink(value: Route.member(member.id)) { CrewCard(member: member) }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button { talking = member } label: { Label(String(localized: "Message"), systemImage: "bubble.left") }
-                                Button { editing = member } label: { Label(String(localized: "Edit"), systemImage: "pencil") }
-                                if !member.isHeadMaster {
-                                    Button(role: .destructive) { Task { await letGo(member) } } label: { Label(String(localized: "Let go"), systemImage: "person.badge.minus") }
-                                }
-                            }
-                    }
-                }
-                .padding()
-            }
-            .overlay { if members == nil { ProgressView() } }
-            .refreshable { await load() }
-            .navigationTitle(String(localized: "Agents"))
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { editing = newMember() } label: { Image(systemName: "person.badge.plus") }
-                        .accessibilityLabel(String(localized: "Hire"))
-                        .disabled(parts.isEmpty || client.agents.isEmpty)
-                }
-            }
-            .navigationDestination(for: Route.self) { route in
-                switch route {
-                case .member(let id):
-                    if let member = members?.first(where: { $0.id == id }) {
-                        CrewDetail(client: client, member: member, edit: { editing = member }, talk: { talking = member },
-                                   letGo: { path.removeAll(); Task { await letGo(member) } })
-                    }
-                case .chat(let id, let name):
-                    ChatScreen(client: client, chatID: id, fallbackTitle: name)
-                }
-            }
-            .sheet(item: $editing) { member in
-                CrewEditor(client: client, member: member, parts: parts, isNew: !(members ?? []).contains { $0.id == member.id }) { answer in
-                    apply(answer)
-                    editing = nil
-                }
-            }
-            .sheet(item: $talking) { member in
-                TalkSheet(client: client, member: member) { chatID in
-                    talking = nil
-                    path.append(.chat(chatID, member.name))
-                }
-                .presentationDetents([.medium])
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if let lastLetGo {
-                UndoBanner(text: String(localized: "\(lastLetGo) left")) { Task { await undo() } } dismiss: { self.lastLetGo = nil }
-            }
-        }
-        .animation(.snappy, value: lastLetGo)
-        .task { await load() }
-        .task {
-            // Who's working changes on the Mac: keep it fresh while on screen.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(4))
-                await load(quiet: true)
-            }
-        }
-    }
-
-    private func newMember() -> RemoteCrewMember {
-        var look: [String: Int] = [:]
-        for part in parts { look[part.key] = Int.random(in: 0..<max(part.count, 1)) }
-        return RemoteCrewMember(name: "", avatar: RemoteAvatar(parts: look), agent: client.agents.first?.id ?? "claude")
-    }
-
-    private func apply(_ answer: HostMessage?) {
-        guard case .crew(_, let list, let looks) = answer else { return }
-        members = list
-        parts = looks
-    }
-
-    private func load(quiet: Bool = false) async {
-        let answer = await client.call(quiet: quiet) { .listCrew(requestID: $0) }
-        if answer == nil, members == nil { members = [] }
-        apply(answer)
-    }
-
-    private func letGo(_ member: RemoteCrewMember) async {
-        let answer = await client.call { .deleteCrew(requestID: $0, memberID: member.id) }
-        if answer != nil { lastLetGo = member.name }
-        apply(answer)
-    }
-
-    private func undo() async {
-        lastLetGo = nil
-        apply(await client.call { .undoDeleteCrew(requestID: $0) })
-    }
-}
-
 /// The sprite, crisp at any size.
 struct Sprite: View {
     let image: Data?
@@ -131,7 +15,7 @@ struct Sprite: View {
     }
 }
 
-private struct CrewCard: View {
+struct CrewCard: View {
     let member: RemoteCrewMember
 
     var body: some View {
@@ -177,7 +61,7 @@ struct CrewStatus: View {
     }
 }
 
-private struct CrewDetail: View {
+struct CrewDetail: View {
     let client: RemoteClient
     let member: RemoteCrewMember
     let edit: () -> Void
@@ -214,7 +98,7 @@ private struct CrewDetail: View {
             if !theirChats.isEmpty {
                 Section(String(localized: "Chats")) {
                     ForEach(theirChats) { chat in
-                        NavigationLink(value: CrewScreen.Route.chat(chat.id, chat.title)) {
+                        NavigationLink(value: Destination.chat(chat.id)) {
                             VStack(alignment: .leading) {
                                 Text(chat.title).lineLimit(1)
                                 Text(chat.updatedAt, format: .relative(presentation: .named)).font(.caption).foregroundStyle(.secondary)
@@ -236,7 +120,7 @@ private struct CrewDetail: View {
 }
 
 /// Hire or change someone: who they are, what they work on, and how they look.
-private struct CrewEditor: View {
+struct CrewEditor: View {
     let client: RemoteClient
     @State var member: RemoteCrewMember
     let parts: [RemoteAvatarPart]
@@ -326,7 +210,7 @@ private struct CrewEditor: View {
 }
 
 /// The first message to someone; opens the chat.
-private struct TalkSheet: View {
+struct TalkSheet: View {
     let client: RemoteClient
     let member: RemoteCrewMember
     let started: (UUID) -> Void

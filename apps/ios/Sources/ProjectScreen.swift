@@ -15,7 +15,6 @@ struct ProjectScreen: View {
     private var project: RemoteProject? { client.project(projectID) }
 
     var body: some View {
-        NavigationStack {
             Group {
                 switch tab {
                 case .files: FolderView(client: client, projectID: projectID, path: "", startChat: startChat)
@@ -31,7 +30,6 @@ struct ProjectScreen: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(.bar)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -56,7 +54,6 @@ struct ProjectScreen: View {
             } message: {
                 Text(String(localized: "Its chats are removed too. The folder and its files stay on the Mac."))
             }
-        }
     }
 }
 
@@ -110,7 +107,7 @@ struct FolderView: View {
         .refreshable { await load() }
         .task { await load() }
         .toolbar {
-            ToolbarItem(placement: .bottomBar) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { Task { await make(.newFile(folder: path)) } } label: { Label(String(localized: "New File"), systemImage: "doc.badge.plus") }
                     Button { Task { await make(.newFolder(folder: path)) } } label: { Label(String(localized: "New Folder"), systemImage: "folder.badge.plus") }

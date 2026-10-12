@@ -500,3 +500,54 @@ import XBotRemote
         #expect(profile.usage.first?.agent == "codex" && profile.usage.first?.fiveHourUsed == 42 && profile.usage.first?.plan == "plus")
     }
 }
+
+/// The Agents world on the phone: who's in it, and which world, kept in step with the Mac.
+@MainActor @Suite(.serialized) struct RemoteWorldTests {
+    let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+
+    func waitFor(_ seconds: Double = 20, _ done: () -> Bool) async {
+        let end = Date.now.addingTimeInterval(seconds)
+        while !done(), Date.now < end { try? await Task.sleep(for: .milliseconds(20)) }
+    }
+
+    func worlds(_ link: FakeLink) -> [RemoteWorld] { link.sent.compactMap { if case .world(let w) = $0 { w } else { nil } } }
+
+    @Test func theWorldFollowsTheMacBothWays() async throws {
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
+        await w.refreshHarnesses()
+        w.workplace = .village
+        defer { w.workplace = .village }
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        defer { withExtendedLifetime(host) {} }
+        let link = FakeLink()
+        host.attach(link)
+
+        await waitFor { !worlds(link).isEmpty }
+        let first = try #require(worlds(link).last)
+        #expect(first.setting == "village")
+        #expect(first.residents.map(\.name) == w.agents.map(\.name) && !first.residents.isEmpty)
+        #expect(first.residents.first?.isHeadMaster == true && first.residents.allSatisfy { $0.status == "idle" })
+
+        // From the phone.
+        let ask = UUID()
+        link.say(.setWorld(requestID: ask, setting: "skyRealm"))
+        await waitFor { worlds(link).last?.setting == "skyRealm" }
+        #expect(w.workplace == .skyRealm)
+        #expect(link.replies().contains { $0.0 == ask && $0.1 })
+
+        // From the Mac.
+        w.workplace = .moonbase
+        await waitFor { worlds(link).last?.setting == "moonbase" }
+        #expect(worlds(link).last?.setting == "moonbase")
+
+        // Someone new moves in.
+        w.saveAgent(w.hire())
+        await waitFor { worlds(link).last?.residents.count == w.agents.count }
+        #expect(worlds(link).last?.residents.count == w.agents.count)
+
+        let bad = UUID()
+        link.say(.setWorld(requestID: bad, setting: "mars"))
+        await waitFor { link.replies().contains { $0.0 == bad } }
+        #expect(link.replies().contains { $0.0 == bad && !$0.1 })
+    }
+}

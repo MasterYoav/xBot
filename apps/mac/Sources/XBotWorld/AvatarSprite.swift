@@ -1,11 +1,10 @@
 import SwiftUI
-import XBotCore
 
 /// An agent's original pixel-art chibi, in the MapleStory Classic manner: a big head, a small body,
 /// a dark outline. Built from a template per part on a 16×24 grid, then outlined. Faces right; the
 /// world mirrors it to face left.
-struct AvatarSprite: View {
-    struct Frame: Hashable {
+public struct AvatarSprite: View {
+    public struct Frame: Hashable {
         var breathe = false
         var blink = false
         var legs = Legs.stand
@@ -14,16 +13,24 @@ struct AvatarSprite: View {
         var typing = 0
         /// Just the head and hair, for faces.
         var headOnly = false
+
+        public init(headOnly: Bool = false) { self.headOnly = headOnly }
     }
 
-    enum Legs: Hashable { case stand, stride, sit }
+    public enum Legs: Hashable, Sendable { case stand, stride, sit }
 
     let avatar: AgentAvatar
     var frame = Frame()
     /// Points per sprite pixel.
     var pixel: CGFloat = 3
 
-    var body: some View {
+    public init(avatar: AgentAvatar, frame: Frame = Frame(), pixel: CGFloat = 3) {
+        self.avatar = avatar
+        self.frame = frame
+        self.pixel = pixel
+    }
+
+    public var body: some View {
         let map = PixelMap.make(avatar, frame)
         Canvas { context, _ in
             for (point, color) in map.pixels {
@@ -37,7 +44,7 @@ struct AvatarSprite: View {
 }
 
 /// The sprite on its own clock: blinking now and then, breathing, walking if asked.
-struct LivingAvatar: View {
+public struct LivingAvatar: View {
     let avatar: AgentAvatar
     var pixel: CGFloat = 3
     var legs = AvatarSprite.Legs.stand
@@ -48,14 +55,24 @@ struct LivingAvatar: View {
 
     @Environment(\.motionPaused) private var motionPaused
 
-    var body: some View {
+    public init(avatar: AgentAvatar, pixel: CGFloat = 3, legs: AvatarSprite.Legs = .stand, talking: Bool = false,
+                headOnly: Bool = false, seed: Int = 0) {
+        self.avatar = avatar
+        self.pixel = pixel
+        self.legs = legs
+        self.talking = talking
+        self.headOnly = headOnly
+        self.seed = seed
+    }
+
+    public var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 12, paused: motionPaused)) { context in
             AvatarSprite(avatar: avatar, frame: Self.frame(at: context.date, seed: seed, legs: legs,
                                                            talking: talking, headOnly: headOnly), pixel: pixel)
         }
     }
 
-    static func frame(at date: Date, seed: Int, legs: AvatarSprite.Legs, talking: Bool, headOnly: Bool) -> AvatarSprite.Frame {
+    public static func frame(at date: Date, seed: Int, legs: AvatarSprite.Legs, talking: Bool, headOnly: Bool) -> AvatarSprite.Frame {
         let t = date.timeIntervalSinceReferenceDate + Double(abs(seed % 997)) * 0.37
         var frame = AvatarSprite.Frame(headOnly: headOnly)
         // Blink for ~0.15 s every 3–6 s, sometimes twice.
@@ -79,74 +96,29 @@ struct LivingAvatar: View {
     }
 }
 
-/// The sidebar's face: the head in a round tile, alive.
-struct AgentFace: View {
-    let agent: Agent
-    var size: CGFloat = 30
-    var status: AgentStatus = .idle
-
-    var body: some View {
-        ZStack {
-            Circle().fill(AvatarPalette.tile(agent.avatar))
-            LivingAvatar(avatar: agent.avatar, pixel: size / 17, talking: status.isWorking, headOnly: true,
-                         seed: agent.id.hashValue)
-                .offset(y: -size * 0.12)
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-        }
-        .frame(width: size, height: size)
-        .overlay {
-            switch status {
-            case .working: WorkingRing(size: size)
-            case .done: Circle().strokeBorder(Palette.success, lineWidth: max(1.5, size / 16))
-            case .idle: Circle().strokeBorder(Palette.hairline)
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel(agent.name)
-    }
-}
-
-/// A turning arc: this one is busy.
-private struct WorkingRing: View {
-    let size: CGFloat
-    @Environment(\.motionPaused) private var motionPaused
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused)) { context in
-            let angle = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4 * 360
-            Circle()
-                .trim(from: 0, to: 0.3)
-                .stroke(Palette.accent, style: StrokeStyle(lineWidth: max(1.5, size / 14), lineCap: .round))
-                .rotationEffect(.degrees(angle))
-                .padding(max(0.75, size / 28))
-        }
-        .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Colours
 
-enum AvatarPalette {
-    static let skin = ["FFE3C9", "F7CBA4", "E8B08A", "C98B60", "8F5B3C", "5E3B27"].map(Color.init(hex:))
-    static let hair = ["2C2B36", "5B3A26", "A3622F", "EBC46A", "F497BC", "6DB6FF", "9C7CFF", "5FCB91", "EEF0F5", "E5553E"]
+public enum AvatarPalette {
+    public static let skin = ["FFE3C9", "F7CBA4", "E8B08A", "C98B60", "8F5B3C", "5E3B27"].map(Color.init(hex:))
+    public static let hair = ["2C2B36", "5B3A26", "A3622F", "EBC46A", "F497BC", "6DB6FF", "9C7CFF", "5FCB91", "EEF0F5", "E5553E"]
         .map(Color.init(hex:))
-    static let outfit = ["4C7DFF", "E5553E", "F2A43B", "3CB274", "8F6DF0", "343B48", "F2F3F6", "6A4AC6", "F06495", "FFD551"]
+    public static let outfit = ["4C7DFF", "E5553E", "F2A43B", "3CB274", "8F6DF0", "343B48", "F2F3F6", "6A4AC6", "F06495", "FFD551"]
         .map(Color.init(hex:))
-    static let outline = Color(hex: "1D1922")
-    static let white = Color(hex: "FFFFFF")
-    static let mouth = Color(hex: "B8505F")
-    static let blush = Color(hex: "FF9EAD")
-    static let gold = Color(hex: "FFC83D")
-    static let shoe = Color(hex: "4A3426")
-    static let denim = Color(hex: "3F5A8C")
+    public static let outline = Color(hex: "1D1922")
+    public static let white = Color(hex: "FFFFFF")
+    public static let mouth = Color(hex: "B8505F")
+    public static let blush = Color(hex: "FF9EAD")
+    public static let gold = Color(hex: "FFC83D")
+    public static let shoe = Color(hex: "4A3426")
+    public static let denim = Color(hex: "3F5A8C")
 
-    static func tile(_ avatar: AgentAvatar) -> Color {
+    public static func tile(_ avatar: AgentAvatar) -> Color {
         outfit[avatar.outfitColor % outfit.count].mix(with: .white, by: 0.72)
     }
 }
 
 extension Color {
-    init(hex: String) {
+    public init(hex: String) {
         let value = UInt32(hex, radix: 16) ?? 0
         self.init(.sRGB, red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255,
                   blue: Double(value & 0xFF) / 255)
@@ -571,15 +543,4 @@ private struct Outfit {
             "....PPPPPPPP....",
         ], legs: .denim),
     ]
-}
-
-/// A crew member's sprite as a PNG, for the iPhone and iPad app.
-public enum AvatarPicture {
-    @MainActor
-    public static func png(_ avatar: AgentAvatar, pixel: CGFloat = 6) -> Data? {
-        let renderer = ImageRenderer(content: AvatarSprite(avatar: avatar, pixel: pixel))
-        renderer.scale = 1
-        guard let image = renderer.cgImage else { return nil }
-        return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
-    }
 }
