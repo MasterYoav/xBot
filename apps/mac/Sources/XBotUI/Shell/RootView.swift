@@ -62,6 +62,8 @@ public struct RootView: View {
                                 AbilitiesView(workspace: workspace)
                             case .automations:
                                 AutomationsView(workspace: workspace)
+                            case .workflows:
+                                WorkflowsView(workspace: workspace)
                             case .notes:
                                 NotesView(workspace: workspace, addProject: { addingProject = true })
                             case .main:

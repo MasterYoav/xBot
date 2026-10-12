@@ -386,7 +386,7 @@ public final class RemoteHost {
     private func remoteProjects() -> [RemoteProject] { workspace.projects.map { RemoteProject(id: $0.id, name: $0.name, path: $0.path) } }
 
     private func remoteChats() -> [RemoteChat] {
-        workspace.chats.filter { $0.automationID == nil }.map { chat in
+        workspace.chats.filter { $0.automationID == nil && $0.workflowID == nil }.map { chat in
             RemoteChat(id: chat.id, title: chat.title, projectID: chat.projectID, agent: chat.harness.rawValue,
                        agentName: chat.harness.displayName, model: chat.model, mode: chat.mode.rawValue,
                        effort: chat.effort?.rawValue, planMode: chat.planMode, crewName: workspace.agent(chat.agentID)?.name,

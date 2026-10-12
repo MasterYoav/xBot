@@ -26,9 +26,9 @@ public struct SidebarModel: Equatable, Sendable {
         showsAllRecent: Bool = false
     ) {
         let needle = query.trimmingCharacters(in: .whitespaces)
-        // An automation's runs are its history, on its page, not the sidebar's.
+        // An automation's or a workflow's runs are its history, on its page, not the sidebar's.
         let shown = chats
-            .filter { $0.automationID == nil }
+            .filter { $0.automationID == nil && $0.workflowID == nil }
             .filter { needle.isEmpty || $0.title.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
             .sorted { $0.updatedAt > $1.updatedAt }
         groups = projects.compactMap { project in
