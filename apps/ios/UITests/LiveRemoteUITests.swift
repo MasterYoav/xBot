@@ -307,7 +307,8 @@ final class LiveRemoteUITests: XCTestCase {
         }
         attach(app, "1 crew")
 
-        app.buttons["Hire"].firstMatch.tap()
+        app.buttons["Crew actions"].firstMatch.tap()
+        app.buttons["Hire someone"].firstMatch.tap()
         let name = app.textFields["Name"]
         XCTAssertTrue(name.waitForExistence(timeout: 10))
         app.buttons["Shuffle the look"].tap()
@@ -448,11 +449,14 @@ final class LiveRemoteUITests: XCTestCase {
         let status = app.descendants(matching: .any)["link-status"].firstMatch
         XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
         tab(app, "Agents")
-        app.buttons["Sky Realm"].firstMatch.tap()
         let menu = app.buttons["world-menu"].firstMatch
-        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'Sky Realm'").wait(for: menu, timeout: 10))
-        sleep(3)
-        attach(app, "1 sky realm")
+        for world in ["Moonbase", "Sky Realm"] {
+            menu.tap()
+            app.buttons[world].firstMatch.tap()
+            XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", world).wait(for: menu, timeout: 10))
+            sleep(3)
+            attach(app, world)
+        }
     }
 
     /// Home's plan board with 1, 3 and 6 providers (made up), and with the Mac's real ones.
@@ -471,6 +475,51 @@ final class LiveRemoteUITests: XCTestCase {
             attach(app, "board \(count) legend")
             app.terminate()
         }
+    }
+
+    /// The org chart: hire a CTO, organise like a company, see the tree; then let the CTO go.
+    func testOrgChart() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+        tab(app, "Agents")
+        sleep(3)
+        attach(app, "1 before")
+        func card(_ name: String) -> XCUIElement {
+            app.buttons.matching(identifier: "crew-card").matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+        }
+        // Leftovers from an earlier run.
+        while card("Nova").waitForExistence(timeout: 2) {
+            card("Nova").press(forDuration: 1.2)
+            app.buttons["Let go"].firstMatch.tap()
+            sleep(2)
+        }
+        let hire = app.buttons["Hire Nova"].firstMatch
+        for _ in 0..<4 where !hire.isHittable { app.swipeUp() }
+        hire.tap()
+        for _ in 0..<4 { app.swipeDown() }
+        XCTAssertTrue(card("Nova").waitForExistence(timeout: 15), "No CTO")
+        app.buttons["Crew actions"].tap()
+        app.buttons["Organise like a company"].tap()
+        sleep(4)
+        attach(app, "2 organised")
+        app.swipeUp()
+        sleep(1)
+        attach(app, "3 scrolled")
+        for _ in 0..<3 { app.swipeDown() }
+        card("Forge").tap()
+        let reports = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Nova' OR value CONTAINS 'Nova'")).firstMatch
+        XCTAssertTrue(reports.waitForExistence(timeout: 10), "Forge doesn't report to Nova")
+        attach(app, "4 forge")
+        back(app)
+        card("Nova").press(forDuration: 1.2)
+        app.buttons["Let go"].firstMatch.tap()
+        XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: card("Nova"), timeout: 10))
+        sleep(3)
+        attach(app, "5 after")
     }
 
     /// Suggested agents: hire one with a tap, see them on the crew, let them go.

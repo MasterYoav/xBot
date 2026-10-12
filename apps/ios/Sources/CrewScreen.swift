@@ -1,5 +1,6 @@
 import SwiftUI
 import XBotRemote
+import XBotWorld
 
 /// The sprite, crisp at any size.
 struct Sprite: View {
@@ -88,6 +89,16 @@ struct CrewDetail: View {
                 .frame(maxWidth: .infinity)
                 .listRowBackground(Color.clear)
             }
+            Section(String(localized: "In the company")) {
+                let crew = client.crew ?? []
+                let tree = OrgChart.tree(crew.map(\.orgMember))
+                LabeledContent(String(localized: "Reports to"),
+                               value: member.isHeadMaster ? String(localized: "You") : crew.first { $0.id == tree.manager(of: member.id) }?.name ?? "—")
+                let team = tree.reports(of: member.id).compactMap { id in crew.first { $0.id == id }?.name }
+                if !team.isEmpty {
+                    LabeledContent(String(localized: "Team"), value: team.joined(separator: ", "))
+                }
+            }
             Section(String(localized: "Works on")) {
                 LabeledContent(String(localized: "Agent"), value: client.agent(member.agent)?.name ?? member.agent)
                 LabeledContent(String(localized: "Home project"), value: client.project(member.projectID)?.name ?? String(localized: "None"))
@@ -159,6 +170,27 @@ struct CrewEditor: View {
                     TextField(String(localized: "Name"), text: $member.name)
                     TextField(String(localized: "Role, like “Writer”"), text: $member.role)
                     TextField(String(localized: "Instructions"), text: $member.instructions, axis: .vertical).lineLimit(3...8)
+                }
+                if !member.isHeadMaster {
+                    Section {
+                        let crew = client.crew ?? []
+                        let below = Set(OrgChart.tree(crew.map(\.orgMember)).below(member.id))
+                        let suggested = OrgChart.suggestedManager(role: member.role, id: member.id, among: crew.map(\.orgMember) + (isNew ? [] : []))
+                        Picker(String(localized: "Reports to"), selection: Binding(
+                            get: { member.managerID ?? crew.first(where: \.isHeadMaster)?.id },
+                            set: { member.managerID = $0 }
+                        )) {
+                            ForEach(crew.filter { $0.id != member.id && !below.contains($0.id) }) { boss in
+                                Text(boss.id == suggested ? String(localized: "\(boss.name) (suggested)") : boss.name).tag(UUID?.some(boss.id))
+                            }
+                        }
+                        .accessibilityIdentifier("reports-to")
+                        .onChange(of: member.role) {
+                            if isNew { member.managerID = OrgChart.suggestedManager(role: member.role, id: member.id, among: crew.map(\.orgMember)) }
+                        }
+                    } footer: {
+                        Text(String(localized: "When they finish work their manager gave them, the manager's chat hears about it. HeadMaster reports to you."))
+                    }
                 }
                 Section(String(localized: "Works on")) {
                     Picker(String(localized: "Agent"), selection: $member.agent) {
@@ -254,5 +286,11 @@ struct TalkSheet: View {
             }
             .onAppear { focused = true }
         }
+    }
+}
+
+extension RemoteCrewMember {
+    var orgMember: OrgChart.Member {
+        OrgChart.Member(id: id, name: name, role: role, isHeadMaster: isHeadMaster, managerID: managerID)
     }
 }

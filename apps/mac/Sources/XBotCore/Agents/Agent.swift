@@ -17,14 +17,17 @@ public struct Agent: Identifiable, Equatable, Hashable, Sendable {
     public var projectID: UUID?
     /// The founding orchestrator. Exactly one; it hands work to the others and cannot be deleted.
     public var isHeadMaster: Bool
+    /// Who they report to. Nil: HeadMaster (who itself reports to the person).
+    public var managerID: UUID?
     public var sortIndex: Int
     public var createdAt: Date
 
     public init(
         id: UUID = UUID(), name: String, role: String, instructions: String, avatar: AgentAvatar,
         harness: HarnessKind = .claude, model: String? = nil, projectID: UUID? = nil,
-        isHeadMaster: Bool = false, sortIndex: Int = 0, createdAt: Date = .now
+        isHeadMaster: Bool = false, managerID: UUID? = nil, sortIndex: Int = 0, createdAt: Date = .now
     ) {
+        self.managerID = isHeadMaster ? nil : managerID
         self.id = id
         self.name = name
         self.role = role

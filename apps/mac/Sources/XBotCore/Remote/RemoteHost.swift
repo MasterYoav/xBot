@@ -323,7 +323,7 @@ public final class RemoteHost {
         case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject,
              .listNotes, .saveNote, .deleteNote, .undoDeleteNote,
              .listAutomations, .saveAutomation, .deleteAutomation, .runAutomation, .setAutomationHelper,
-             .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar,
+             .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar, .organiseCrew,
              .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP, .getProfile:
             handleProject(message, link: client.link)
         case .openShell, .shellInput, .shellResize, .closeShell:
@@ -379,7 +379,7 @@ public final class RemoteHost {
             case .done: ("done", nil)
             }
             return RemoteResident(id: agent.id, name: agent.name, role: agent.role, avatar: Self.remote(agent.avatar),
-                                  isHeadMaster: agent.isHeadMaster, status: status, activity: activity)
+                                  isHeadMaster: agent.isHeadMaster, status: status, activity: activity, managerID: agent.managerID)
         })
     }
 

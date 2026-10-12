@@ -17,80 +17,120 @@ public struct WorldResident: Identifiable, Equatable, Sendable {
     public var avatar: AgentAvatar
     public var isHeadMaster: Bool
     public var status: Status
+    /// Who they report to (nil: HeadMaster).
+    public var managerID: UUID?
 
-    public init(id: UUID, name: String, role: String, avatar: AgentAvatar, isHeadMaster: Bool, status: Status) {
+    public init(id: UUID, name: String, role: String, avatar: AgentAvatar, isHeadMaster: Bool, status: Status, managerID: UUID? = nil) {
         self.id = id
         self.name = name
         self.role = role
         self.avatar = avatar
         self.isHeadMaster = isHeadMaster
         self.status = status
+        self.managerID = managerID
+    }
+
+    var orgMember: OrgChart.Member {
+        OrgChart.Member(id: id, name: name, role: role, isHeadMaster: isHeadMaster, managerID: managerID)
     }
 }
 
-/// The Agents page's map: a little MapleStory-like world where the crew wanders about, walks to
-/// a desk to work, and says what it's doing. Tap someone to open their chat.
-/// Drawn the same on the Mac and on the iPhone/iPad.
+/// The Agents page's map: a little MapleStory-like world where the crew lives in company order.
+/// HeadMaster on top, each manager's team on the tier below, under them; everyone strolls
+/// near their own desk, sits down at it to work, and says what they're doing. Tap someone to
+/// open their chat. Drawn the same on the Mac and on the iPhone/iPad.
 public struct WorldStage: View {
     let setting: WorkplaceSetting
     let residents: [WorldResident]
     let open: (UUID) -> Void
     let newChat: ((UUID) -> Void)?
     let edit: ((UUID) -> Void)?
+    let metrics: Metrics
     @State private var model = WorldModel()
     @State private var hovered: UUID?
     @State private var stillDate = Date.now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.motionPaused) private var motionPaused
 
+    /// The scenery's reference height (thumbnails and the sidebar draw it at this size).
     public static let height: CGFloat = 320
-    static let ground: CGFloat = 74
-    static let pixel: CGFloat = 4
 
-    public init(setting: WorkplaceSetting, residents: [WorldResident], open: @escaping (UUID) -> Void,
+    /// Sizes for a wide window, or a phone.
+    public struct Metrics: Sendable {
+        /// Points per sprite pixel.
+        public var pixel: CGFloat
+        /// Room each person has on their tier.
+        public var slot: CGFloat
+        /// From one tier's floor to the next.
+        public var tier: CGFloat
+        var scale: CGFloat { pixel / 4 }
+        /// Above the top tier's floor: the sprite, and a speech bubble over it.
+        var headroom: CGFloat { 96 * scale + 48 }
+        /// Below the bottom tier's floor: name tags and mounts.
+        var footroom: CGFloat { 84 * scale + 8 }
+
+        public static let regular = Metrics(pixel: 4, slot: 124, tier: 190)
+        public static let compact = Metrics(pixel: 3, slot: 100, tier: 158)
+    }
+
+    public init(setting: WorkplaceSetting, residents: [WorldResident], metrics: Metrics = .regular, open: @escaping (UUID) -> Void,
                 newChat: ((UUID) -> Void)? = nil, edit: ((UUID) -> Void)? = nil) {
         self.setting = setting
         self.residents = residents
+        self.metrics = metrics
         self.open = open
         self.newChat = newChat
         self.edit = edit
     }
 
+    /// How tall the stage is for this many tiers.
+    public static func height(levels: Int, metrics: Metrics) -> CGFloat {
+        metrics.headroom + CGFloat(max(levels, 1) - 1) * metrics.tier + metrics.footroom
+    }
+
     public var body: some View {
+        let tree = OrgChart.tree(residents.map(\.orgMember))
+        let layout = OrgChart.layout(tree, slot: Double(metrics.slot))
+        let height = Self.height(levels: layout.levels, metrics: metrics)
         GeometryReader { geometry in
-            let width = geometry.size.width
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused)) { context in
-                let agents = residents
-                let world = model.advance(to: context.date, width: width, ids: agents.map(\.id),
-                                          working: Set(agents.filter { $0.status.isWorking }.map(\.id)),
-                                          moving: !reduceMotion)
-                let floor = Self.height - Self.ground
-                let sceneDate = reduceMotion ? stillDate : context.date
-                ZStack(alignment: .topLeading) {
-                    ForEach(Array(agents.enumerated()), id: \.element.id) { index, agent in
-                        if setting != .village, let walker = world.walkers[agent.id] {
-                            rider(agent, walker, index: index, setting: setting, status: agent.status, date: sceneDate,
-                                  tagDrop: Self.tagDrop(agent.id, in: world, order: agents.map(\.id)))
-                        } else if let walker = world.walkers[agent.id] {
-                            let desk = world.desk(of: agent.id)
-                            Desk(working: agent.status.isWorking, date: sceneDate)
-                                .position(x: desk + 40, y: floor - 40)
-                                .zIndex(walker.pose == .sitting ? 1.5 : 0)
-                            Chair().position(x: desk - 2, y: floor - 20)
-                            figure(agent, walker, status: agent.status, date: sceneDate,
-                                   tagDrop: Self.tagDrop(agent.id, in: world, order: agents.map(\.id)))
-                                .position(x: walker.x, y: floor - 50 - (walker.pose == .sitting ? 10 : 0))
-                                .zIndex(hovered == agent.id ? 2 : 1)
+            let width = max(geometry.size.width, CGFloat(layout.width) + 24)
+            ScrollView(.horizontal, showsIndicators: false) {
+                stage(tree: tree, layout: layout, width: width, height: height)
+            }
+            .scrollDisabled(width <= geometry.size.width + 1)
+            .defaultScrollAnchor(.center)
+        }
+        .frame(height: height)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "The workplace") + ", " + setting.title)
+    }
+
+    private func floor(_ depth: Int) -> CGFloat { metrics.headroom + CGFloat(depth) * metrics.tier }
+
+    private func stage(tree: OrgChart.Tree, layout: OrgChart.Layout, width: CGFloat, height: CGFloat) -> some View {
+        let origin = (Double(width) - layout.width) / 2
+        let homes = layout.x.mapValues { origin + $0 }
+        let range = Double(max(metrics.slot / 2 - 34 * metrics.scale - 10, 4))
+        let slots = homes.mapValues { WorkplaceWorld.Slot(home: $0, range: range) }
+        return TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused)) { context in
+            let world = model.advance(to: context.date, width: Double(width), ids: residents.map(\.id), slots: slots,
+                                      working: Set(residents.filter { $0.status.isWorking }.map(\.id)), moving: !reduceMotion)
+            let sceneDate = reduceMotion ? stillDate : context.date
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(residents.enumerated()), id: \.element.id) { index, agent in
+                    if let walker = world.walkers[agent.id], let home = homes[agent.id] {
+                        let feet = floor(layout.depth[agent.id] ?? 0)
+                        if setting == .village {
+                            villager(agent, walker, home: CGFloat(home), feet: feet, date: sceneDate)
+                        } else {
+                            rider(agent, walker, index: index, feet: feet, date: sceneDate)
                         }
                     }
                 }
-                .frame(width: width, height: Self.height)
             }
+            .frame(width: width, height: height)
         }
-        .frame(height: Self.height)
-        .clipped()
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "The workplace") + ", " + setting.title)
+        .frame(width: width, height: height)
     }
 
     @ViewBuilder
@@ -104,40 +144,49 @@ public struct WorldStage: View {
         }
     }
 
-    /// In the Sky Realm: each agent on a golden cloud at an altitude of their own, bobbing. Working,
-    /// they sit on it with a floating screen in front of them.
+    /// In the village: a grassy ledge of their own with a desk; they stroll on it and sit to work.
     @ViewBuilder
-    private func rider(_ agent: WorldResident, _ walker: WorkplaceWorld.Walker, index: Int, setting: WorkplaceSetting, status: WorldResident.Status, date: Date,
-                       tagDrop: CGFloat) -> some View {
-        let altitudes: [CGFloat] = [-30, 8, -12, 22, -40, 0, 14, -22]
+    private func villager(_ agent: WorldResident, _ walker: WorkplaceWorld.Walker, home: CGFloat, feet: CGFloat, date: Date) -> some View {
+        let s = metrics.scale
+        let sitting = walker.pose == .sitting
+        Group {
+            Ledge(width: metrics.slot - 14 * s)
+                .position(x: home, y: feet + 7 * s)
+            Desk(working: agent.status.isWorking, date: date)
+                .scaleEffect(s * 0.72)
+                .position(x: home + 30 * s, y: feet - 40 * s * 0.72)
+                .zIndex(sitting ? 1.5 : 0)
+            Chair().scaleEffect(s * 0.8).position(x: home - 2 * s, y: feet - 20 * s * 0.8)
+            figure(agent, walker, status: agent.status, date: date)
+                .position(x: walker.x, y: feet - 48 * s - (sitting ? 8 * s : 0))
+                .zIndex(hovered == agent.id ? 2 : 1)
+        }
+    }
+
+    /// In the other worlds: each on their mount (a golden cloud, a sea turtle…) over their slot,
+    /// bobbing. Working, they sit on it with a floating screen in front of them.
+    @ViewBuilder
+    private func rider(_ agent: WorldResident, _ walker: WorkplaceWorld.Walker, index: Int, feet base: CGFloat, date: Date) -> some View {
+        let s = metrics.scale
         let t = date.timeIntervalSinceReferenceDate
-        let bob = reduceMotion ? 0 : CGFloat(sin(t * 1.4 + Double(index) * 1.7)) * 5
-        let feet = Self.height * 0.6 + altitudes[index % altitudes.count] + bob
+        let bob = reduceMotion ? 0 : CGFloat(sin(t * 1.4 + Double(index) * 1.7)) * 4 * s
+        let feet = base - 6 * s + bob
         let sitting = walker.pose == .sitting
         Group {
             mount(setting, walker: walker, date: date)
-                .position(x: walker.x, y: feet + 10)
+                .scaleEffect(s)
+                .position(x: walker.x, y: feet + 10 * s)
             if sitting {
-                HoloScreen(date: date).position(x: walker.x + 44, y: feet - 46)
+                HoloScreen(date: date).scaleEffect(s).position(x: walker.x + 44 * s, y: feet - 46 * s)
             }
-            figure(agent, walker, status: status, date: date, tagDrop: tagDrop + 30)
-                .position(x: walker.x, y: feet - 40 - (sitting ? 6 : 0))
+            figure(agent, walker, status: agent.status, date: date)
+                .position(x: walker.x, y: feet - 40 * s - (sitting ? 6 * s : 0))
         }
         // Names, speech and work screens remain readable above near scenery.
         .zIndex(hovered == agent.id ? 4.5 : 4)
     }
 
-    /// Name tags of people standing close drop one below the other instead of overlapping.
-    static func tagDrop(_ id: UUID, in world: WorkplaceWorld, order: [UUID]) -> CGFloat {
-        guard let me = world.walkers[id], let index = order.firstIndex(of: id) else { return 0 }
-        let crowd = order.prefix(index).filter { other in
-            world.walkers[other].map { abs($0.x - me.x) < 64 } ?? false
-        }.count
-        return CGFloat(crowd % 3) * 17
-    }
-
-    private func figure(_ agent: WorldResident, _ walker: WorkplaceWorld.Walker, status: WorldResident.Status, date: Date,
-                        tagDrop: CGFloat) -> some View {
+    private func figure(_ agent: WorldResident, _ walker: WorkplaceWorld.Walker, status: WorldResident.Status, date: Date) -> some View {
         let legs: AvatarSprite.Legs = switch walker.pose {
         case .walking: .stride
         case .sitting: .sit
@@ -145,12 +194,12 @@ public struct WorldStage: View {
         }
         let seed = agent.id.hashValue
         let frame = LivingAvatar.frame(at: date, seed: seed, legs: legs, talking: status.isWorking, headOnly: false)
-        return AvatarSprite(avatar: agent.avatar, frame: frame, pixel: Self.pixel)
+        return AvatarSprite(avatar: agent.avatar, frame: frame, pixel: metrics.pixel)
             .scaleEffect(x: walker.facing, y: 1)
             .overlay(alignment: .bottom) {
                 NameTag(name: agent.name, crown: agent.isHeadMaster, highlighted: hovered == agent.id)
                     .fixedSize()
-                    .offset(y: 24 + tagDrop)
+                    .offset(y: 24 * metrics.scale + (setting == .village ? 4 : 30 * metrics.scale))
             }
             .overlay(alignment: .top) {
                 if let line = Self.bubble(status, agent: agent, date: date, seed: seed) {
@@ -203,8 +252,10 @@ final class WorldModel {
     private var world = WorkplaceWorld(width: 900, seed: UInt64(Date.now.timeIntervalSince1970))
     private var last: Date?
 
-    func advance(to date: Date, width: Double, ids: [UUID], working: Set<UUID>, moving: Bool) -> WorkplaceWorld {
+    func advance(to date: Date, width: Double, ids: [UUID], slots: [UUID: WorkplaceWorld.Slot] = [:], working: Set<UUID>,
+                 moving: Bool) -> WorkplaceWorld {
         world.resize(width)
+        if !slots.isEmpty { world.arrange(slots) }
         if ids != world.order { world.sync(ids) }
         let dt = min(max(date.timeIntervalSince(last ?? date), 0), 0.1)
         last = date
@@ -362,7 +413,7 @@ struct Scenery: View {
                     }
                 }
             }
-            let floor = size.height - WorldStage.ground
+            let floor = size.height - 74
             // Two rows of stepped hills.
             for (layer, color) in [(0, Color(hex: night ? "2D3A5C" : "9ED8A6")), (1, Color(hex: night ? "26324F" : "6CC17E"))] {
                 let base = floor - CGFloat(layer == 0 ? 40 : 14)
@@ -416,7 +467,7 @@ struct Scenery: View {
             }
             for j in 0..<Int(size.width / 18) {
                 let px = CGFloat((j * 7_919) % Int(max(size.width, 1)))
-                let py = floor + 26 + CGFloat((j * 31) % Int(WorldStage.ground - 32))
+                let py = floor + 26 + CGFloat((j * 31) % Int(74 - 32))
                 block(px, py, 6, 4, Color(hex: "7D5434"))
             }
         }
@@ -430,5 +481,36 @@ struct Scenery: View {
         case 17..<20: [Color(hex: "FF8E6B"), Color(hex: "FFD3A1")]
         default: [Color(hex: "151B3D"), Color(hex: "39407A")]
         }
+    }
+}
+
+/// A grassy ledge floating in the village: someone's own spot on their tier.
+private struct Ledge: View {
+    let width: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            let px: CGFloat = 3
+            func block(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ color: Color) {
+                context.fill(Path(CGRect(x: x, y: y, width: w, height: h)), with: .color(color))
+            }
+            let w = size.width
+            block(0, 0, w, px * 4, AvatarPalette.outline)
+            block(px, px, w - 2 * px, px * 2, Color(hex: "6CCB5F"))
+            block(px, px * 2, w - 2 * px, px, Color(hex: "4FA84A"))
+            block(px * 2, px * 4, w - 4 * px, px * 2, AvatarPalette.outline)
+            block(px * 3, px * 3, w - 6 * px, px * 2, Color(hex: "9A6A43"))
+            // A few blades and a flower, from the width.
+            var x = px * 3
+            var i = 0
+            while x < w - px * 3 {
+                if i % 3 == 0 { block(x, -px, px, px, Color(hex: "6CCB5F")) }
+                if i % 11 == 5 { block(x, -px * 2, px, px, Color(hex: "FF9EAD")) }
+                x += px * 2
+                i += 1
+            }
+        }
+        .frame(width: width, height: 18)
+        .accessibilityHidden(true)
     }
 }

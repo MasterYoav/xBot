@@ -24,6 +24,21 @@ struct SuggestedAgent: Identifiable {
     }
 
     static let all: [SuggestedAgent] = [
+        SuggestedAgent(name: "Nova", role: String(localized: "CTO"),
+                       pitch: String(localized: "Leads engineering: architecture, tech choices, the dev team."),
+                       instructions: "You are the CTO. Own the technical direction: architecture, technology choices and quality. Break engineering work into clear tasks for your team, review what they deliver, and keep HeadMaster informed in plain words.",
+                       symbol: "cpu.fill", tint: .purple,
+                       look: AgentAvatar(skin: 1, hair: 2, hairColor: 8, eyes: 2, outfit: 5, outfitColor: 4, accessory: 2)),
+        SuggestedAgent(name: "Penny", role: String(localized: "CFO"),
+                       pitch: String(localized: "Leads finance: costs, budgets, pricing and numbers."),
+                       instructions: "You are the CFO. Watch costs, budgets and pricing; turn numbers into decisions. Ask for data before concluding, show your sums, and flag risks early.",
+                       symbol: "dollarsign.circle.fill", tint: .green,
+                       look: AgentAvatar(skin: 3, hair: 6, hairColor: 2, eyes: 4, outfit: 3, outfitColor: 3, accessory: 1)),
+        SuggestedAgent(name: "Marlo", role: String(localized: "Product manager"),
+                       pitch: String(localized: "Turns goals into specs, priorities and a roadmap."),
+                       instructions: "You are the product manager. Turn goals into short specs with clear acceptance criteria, keep a prioritised backlog, and make sure what gets built solves the real problem.",
+                       symbol: "list.bullet.rectangle.portrait.fill", tint: .orange,
+                       look: AgentAvatar(skin: 0, hair: 4, hairColor: 3, eyes: 1, outfit: 0, outfitColor: 2, accessory: 3)),
         SuggestedAgent(name: "Scout", role: String(localized: "Researcher"),
                        pitch: String(localized: "Digs through docs, code and the web for answers."),
                        instructions: "You research. Before answering, read the relevant code, docs and sources; quote what you found and where. Say how sure you are, separate facts from guesses, and end with a short recommendation.",
