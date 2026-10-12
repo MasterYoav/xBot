@@ -27,7 +27,7 @@ Docker/OpenBot engine and its milestones M0–M7) is in git and in the [changelo
 | 5 | The machine: Containerization driver, image, `xbot-agentd`, shell and file tools | Not started |
 | 6 | Browser and live screen: CDP, screencast inspector, take over | Not started |
 | 7 | Licensing: the Pro licence gate | Not started |
-| — | A signed 2.0 release | Not started: see the [launch checklist](13-launch-checklist.md) |
+| — | A signed 2.0 release | **Automated**: CI publishes `v<VERSION>` when `VERSION` changes on master; 2.0.0 publishes when the release PR merges. What's left: the [launch checklist](13-launch-checklist.md) |
 
 Every merged step passes CI (`swift build --build-tests && swift test` on macOS 26). Each open PR
 was built test-first, run live against a real Mac, and installed on a real iPhone.

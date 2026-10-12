@@ -9,7 +9,7 @@ public 2.0 is in the [launch checklist](13-launch-checklist.md).
 
 | | Channel | State |
 | --- | --- | --- |
-| **Mac app** | One `.dmg` from GitHub Releases, Developer ID signed, notarized and stapled, updated by Sparkle | The pipeline works: it published xBot 1.0.0 (a pre-release, 29 September 2026, the old Docker app). Nothing of the redesign is released; local builds say `2.0.0-dev` |
+| **Mac app** | One `.dmg` from GitHub Releases, Developer ID signed, notarized and stapled, updated by Sparkle | Published by CI whenever `VERSION` changes on master ([Releasing](#releasing)); 2.0.0 is the first. The pipeline published xBot 1.0.0 by hand (a pre-release, 29 September 2026, the old Docker app). A Developer ID build has no iCloud entitlement yet, so it reaches the phone on the same network only |
 | **iPhone and iPad app** | None yet | Installed from Xcode onto your own devices. No TestFlight or App Store build |
 
 The DMG holds three things: `XBot.app`, an alias to Applications, and `Uninstall xBot.command`. The
@@ -31,7 +31,7 @@ Requirements: macOS 26 and Apple silicon (`LSMinimumSystemVersion` is 26.0; the 
 scripts/generate-app-icon.sh                                  # xBot.icon → Assets.car + xBot.icns (Xcode 26)
 cd apps/mac && swift build --build-tests && swift test && cd ../..
 cd apps/mac && swift build -c release --arch arm64 && cd ../..
-XBOT_VERSION=2.0.0-dev scripts/bundle-mac-app.sh              # → apps/mac/XBot.app
+XBOT_VERSION=2.0.0-dev scripts/bundle-mac-app.sh              # → apps/mac/XBot.app (without it: VERSION)
 scripts/create-dmg.sh                                         # → dist/xBot.dmg
 ```
 
@@ -41,7 +41,7 @@ SwiftPM's per-target resource bundles (without them `Bundle.module` traps at lau
 
 | Variable | Sets | Notes |
 | --- | --- | --- |
-| `XBOT_VERSION` | `CFBundleShortVersionString` | Always set from here; without it, `2.0.0-dev` |
+| `XBOT_VERSION` | `CFBundleShortVersionString` | Always set from here; without it, the `VERSION` file at the repository root, and `2.0.0-dev` only if that is missing |
 | `XBOT_BUILD_NUMBER` | `CFBundleVersion` | Sparkle compares this, so it must rise with every release. CI uses the run number |
 
 Two things a fresh checkout needs that aren't obvious, both found as CI failures:
@@ -59,27 +59,65 @@ Two things a fresh checkout needs that aren't obvious, both found as CI failures
 | Workflow | When | What it does |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | Every pull request and push to master | `macos-26`: Metal toolchain, icon, `swift build --build-tests`, `swift test` |
-| `.github/workflows/mac-release.yml` ("Mac release") | By hand (`workflow_dispatch`) | Builds, signs, notarizes and, with a version, publishes. Below |
+| `.github/workflows/mac-release.yml` ("Mac release") | Push to master changing `VERSION` (or the workflow), a pushed `v*` tag, or by hand | Builds, signs, notarizes and publishes the release. Below |
 | `.github/workflows/pages.yml` ("Website") | Push to master touching `site/` | Publishes `site/` to GitHub Pages (live at masteryoav.github.io/xBot) |
 
 The iPhone app and its UI tests aren't built in CI.
 
-**Mac release**, in order: Metal toolchain → icon → `swift test` → release build (arm64, checked
-with `lipo`) → `bundle-mac-app.sh` (with the Sparkle keys) → `create-dmg.sh` (unsigned, so a run with
-no secrets still produces a DMG) → import the certificate into a throwaway keychain →
-`sign-mac-app.sh` → `generate-appcast.sh` → upload the `xbot-release` artifact. With a `version`
-input it then mounts the DMG and checks what a stranger's Mac will check (`spctl` says *Notarized
-Developer ID*, both staples validate, the appcast carries an `edSignature`, the version matches), and
-creates the GitHub release `v<version>` with three assets: `xBot.dmg`, `xBot-<version>.dmg` and
-`appcast.xml`. The `prerelease` box marks it a pre-release; otherwise it's marked latest.
+### Releasing
+
+**Bump `VERSION` in a pull request and merge it.** `VERSION` at the repository root holds the
+marketing version (`2.0.0`). The push to master that changes it runs "Mac release", which publishes
+`v<VERSION>` as a full release marked latest. Nothing else to do; the checks are in the workflow.
+
+**Mac release** has two jobs:
+
+1. **resolve** (Ubuntu, seconds). Picks the version: the `version` input of a manual run, else the
+   tag of a pushed `v*` tag, else `VERSION`. Fails unless it's `major.minor.patch[-pre]`. Then
+   decides whether to publish, and writes why not to the run summary when it won't:
+   - release `v<version>` already exists: no publish (a push that only changed the workflow, a
+     re-run after the release went out);
+   - a manual run with **build_only** ticked, or on a branch other than master: no publish;
+   - otherwise it publishes. A version with a `-` (`2.1.0-beta.1`), or the **prerelease** box, makes
+     it a pre-release.
+2. **build** (`macos-26`). Runs when there's something to publish, and on every manual run (so a
+   build-only artifact is still one click away); a push with nothing to publish stops after
+   resolve. Runs for the same version queue behind each other and are never cancelled midway. In
+   order: when publishing, **require all eight signing, notarization and Sparkle secrets** and fail
+   with their names if any is missing, rather than publish an unsigned build → Metal toolchain →
+   icon → `swift test` → release build (arm64, checked with `lipo`) → `bundle-mac-app.sh` (with the
+   Sparkle keys) → `create-dmg.sh` (unsigned, so a build-only run with no secrets still produces a
+   DMG) → import the certificate into a throwaway keychain → `sign-mac-app.sh` →
+   `generate-appcast.sh` → upload the `xbot-release` artifact. When publishing, it then mounts the
+   DMG and checks what a stranger's Mac will check (`spctl` says *Notarized Developer ID*, both
+   staples validate, the appcast carries an `edSignature`, the version matches), looks once more
+   for an existing release, and creates `v<version>` at the commit it built, with generated notes
+   and three assets:
+
+| Asset | For |
+| --- | --- |
+| `xBot.dmg` | A fixed name, so `https://github.com/MasterYoav/xBot/releases/latest/download/xBot.dmg` (the README's and the website's button) always serves the newest full release |
+| `xBot-<version>.dmg` | The archive the appcast's enclosure points at |
+| `appcast.xml` | Sparkle's feed, describing this release only |
+
+`CFBundleVersion` is the workflow's run number (1.0.0 was run 17), so it rises with every release.
 
 ```sh
-gh workflow run "Mac release" -R MasterYoav/xBot                      # build only, artifact
-gh workflow run "Mac release" -R MasterYoav/xBot -f version=2.0.0     # build and publish
+# The usual way: a PR that changes VERSION to 2.0.1, merged. Or, by hand:
+gh workflow run "Mac release" -R MasterYoav/xBot -f build_only=true    # build only, artifact
+gh workflow run "Mac release" -R MasterYoav/xBot                       # publish VERSION, if not yet released
+gh workflow run "Mac release" -R MasterYoav/xBot -f version=2.0.1      # publish another version from master
+git tag v2.0.1 && git push origin v2.0.1                               # or publish a tag
 ```
 
-**Secrets** (Settings › Secrets and variables › Actions). All nine are set on the repository; each
-optional step no-ops when its secret is absent.
+A tag publishes the tag's version even when `VERSION` at that commit says otherwise (the run warns).
+Keep `VERSION` the source of truth and prefer the PR. The tag the workflow itself creates doesn't
+start another run (GitHub doesn't trigger workflows from `GITHUB_TOKEN` events), and if one did,
+resolve would find the release and stop.
+
+**Secrets** (Settings › Secrets and variables › Actions). All nine are set on the repository. In a
+build-only run each optional step no-ops when its secret is absent; a run that publishes refuses to
+start the build without every one of them except `XBOT_APPCAST_URL` (and the optional prefix).
 
 | Secret | Purpose |
 | --- | --- |
@@ -87,10 +125,10 @@ optional step no-ops when its secret is absent.
 | `MACOS_CERTIFICATE_P12` | The certificate and its private key, base64 of a `.p12` export |
 | `MACOS_CERTIFICATE_PASSWORD` | The password set when exporting that `.p12` |
 | `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | Notarization (`notarytool`; an app-specific password) |
-| `XBOT_APPCAST_URL` | Feed URL for build-only runs. A run with a version uses `releases/latest/download/appcast.xml` instead |
+| `XBOT_APPCAST_URL` | Feed URL for build-only runs. A publishing run uses `releases/latest/download/appcast.xml` instead |
 | `XBOT_SPARKLE_PUBLIC_KEY` | EdDSA public key baked into the bundle |
 | `SPARKLE_EDDSA_PRIVATE_KEY` | Signs the update archive and the appcast |
-| `XBOT_RELEASE_DOWNLOAD_PREFIX` | Optional (not set): enclosure prefix for build-only runs. A run with a version points at its own release |
+| `XBOT_RELEASE_DOWNLOAD_PREFIX` | Optional (not set): enclosure prefix for build-only runs. A publishing run points at its own release |
 
 **Naming an identity doesn't make one exist.** `codesign` looks the identity up in the keychain
 search list, and a fresh runner's keychain holds no certificates. Without `MACOS_CERTIFICATE_P12`
@@ -165,8 +203,9 @@ Not set up. It needs, from the account holder:
   first use, and a distributed build uses production;
 - and a change to `sign-mac-app.sh`, which today passes no `--entitlements` and embeds no profile.
 
-Until then a Developer ID build is fine everywhere except the away lane: the phone pairs and works
-on the same network, and doesn't reach the Mac through iCloud. The [checklist](13-launch-checklist.md)
+Until then a Developer ID build, which is what Releases and the Download button serve, is fine
+everywhere except the away lane: the phone pairs and works on the same network, and doesn't reach
+the Mac through iCloud. The [checklist](13-launch-checklist.md)
 has the steps.
 
 ### Entitlements and the sandbox
@@ -209,13 +248,14 @@ environment is honoured in debug builds only (`AppUpdateTrust`), and the feed mu
 update channel is a code-execution channel, and the appcast also carries the version and the
 download URL, which is enough to stage a downgrade.
 
-**The feed.** A release run sets `SUFeedURL` to
+**The feed.** A publishing run sets `SUFeedURL` to
 `https://github.com/MasterYoav/xBot/releases/latest/download/appcast.xml`. GitHub redirects that to
-the newest release **that isn't a pre-release**, so each release's appcast only describes itself.
-Today the only release, 1.0.0, is a pre-release, so that URL answers 404 and installed 1.0.0 apps
-find nothing. A 2.0 published as a pre-release wouldn't be found either; publish it as a full
-release. Because 2.0's appcast carries `minimumSystemVersion` 26.0, a 1.0.0 install on an older
-macOS won't be offered it.
+the newest release **that isn't a pre-release**, so each release's appcast only describes itself,
+and a pre-release (a version with `-`) is never offered to installed apps. Until 2.0.0 is published
+the only release, 1.0.0, is a pre-release, so that URL answers 404 and installed 1.0.0 apps find
+nothing. Once 2.0.0 is out, every 1.0.0 install on macOS 26 is offered it (same bundle id, same key,
+higher build number); because 2.0's appcast carries `minimumSystemVersion` 26.0, a 1.0.0 install on
+an older macOS isn't.
 
 **Keys.** `scripts/generate-sparkle-keys.sh` finds Sparkle's own `generate_keys` in the SwiftPM
 artifacts (build once first), prints the public key, and only generates a pair if none exists, so it
@@ -238,11 +278,12 @@ mid-turn; it's the install that waits. Sparkle still asks before it installs.
 
 ## Versioning
 
-- **Mac app:** semantic versioning. `CFBundleShortVersionString` is the marketing version, set from
-  `XBOT_VERSION`; `CFBundleVersion` is a build number that only rises, from `XBOT_BUILD_NUMBER` (the
-  release workflow's run number). Without `XBOT_VERSION`, `bundle-mac-app.sh` stamps `2.0.0-dev`,
-  which is also what the committed `apps/mac/Resources/Info.plist` says; its `CFBundleVersion` is
-  `1` until `XBOT_BUILD_NUMBER` sets it.
+- **Mac app:** semantic versioning. The marketing version lives in `VERSION` at the repository
+  root; changing it on master publishes it. `CFBundleShortVersionString` is set from `XBOT_VERSION`
+  (the release workflow passes the version it publishes), else from `VERSION`, else `2.0.0-dev`,
+  which is also what the committed `apps/mac/Resources/Info.plist` says. `CFBundleVersion` is a build
+  number that only rises, from `XBOT_BUILD_NUMBER` (the release workflow's run number); it's `1`
+  until that sets it.
 - **iPhone app:** `MARKETING_VERSION` `2.0.0`, `CURRENT_PROJECT_VERSION` `1` in
   `apps/ios/project.yml`.
 - **The wire** between them has its own version (`Wire.version`, now 1); see

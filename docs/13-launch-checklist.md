@@ -8,8 +8,10 @@ The [roadmap](12-roadmap.md) says what's built. This says what to *do*, in order
 repository's settings, the Sparkle key). The rest is work in the repository. How the pieces work is
 in [packaging and updates](11-packaging-and-updates.md).
 
-The order matters: the PRs have to be on master before anything is built from it, the iCloud
-decision changes what gets signed, and the clean-machine run tests the build you're about to publish.
+The order matters: the iCloud decision changes what gets signed, and the clean-machine run tests
+the build you're about to publish. **Publishing is automatic**: `VERSION` already says `2.0.0` on the
+release branch (`release-on-version`), and merging that PR into master publishes xBot 2.0.0 as the
+latest release. So do steps 2–7 *before* merging it.
 
 ---
 
@@ -27,8 +29,12 @@ decision changes what gets signed, and the clean-machine run tests the build you
 - **Sparkle keys exist**, and 1.0.0 was built with the public key baked in.
 - **GitHub Pages is on** (source: GitHub Actions) and the site answers at
   masteryoav.github.io/xBot.
-- **CI is green** on every open PR in the stack (`swift build --build-tests && swift test` on
-  `macos-26`; 443 tests).
+- **CI is green** on master (`swift build --build-tests && swift test` on `macos-26`; 443 tests).
+- **Releases are automated.** "Mac release" publishes `v<VERSION>` when `VERSION` changes on master,
+  refuses to publish without the signing secrets, and skips a version that's already out
+  ([packaging › Releasing](11-packaging-and-updates.md#releasing)).
+- **The website is rewritten for 2.0**, with **Download for Mac** pointing at
+  `releases/latest/download/xBot.dmg` (live once 2.0.0 is published).
 - **The redesign runs signed with iCloud on a real Mac**: the installed app is signed by
   `scripts/sign-mac-remote.sh` (Apple Development, Xcode-managed profile with CloudKit and push), and
   an iPhone 15 Pro paired with it by QR, chatted over Wi-Fi, and got a new chat answered through
@@ -38,18 +44,10 @@ decision changes what gets signed, and the clean-machine run tests the build you
 
 ---
 
-## 1. Merge the open PRs — **needs you**
+## 1. Merge the open PRs — done
 
-In this order, each after its CI passes:
-
-1. **#30** — motion gate (animations pause while xBot isn't in view). Based on master.
-2. **#31 → #42** — the iPhone and iPad app and the org chart. #31 is based on master; each later PR
-   is based on the one before it (#32 on #31's branch, and so on up to #42 on #41's). Merge them
-   one at a time, bottom up, so each diff stays reviewable; after each merge, retarget the next PR at
-   master if GitHub hasn't.
-3. **The documentation refresh** (`docs-refresh`), which is stacked on #42.
-
-Then pull master and run the suite once more locally:
+The motion gate (#30's change) and #31–#44 (the iPhone and iPad app, the org chart, the documentation
+refresh and its fixes) are on master. Before releasing, pull master and run the suite once more locally:
 
 ```sh
 scripts/generate-app-icon.sh
@@ -70,7 +68,8 @@ The secrets were set on 18 and 29 September. Before relying on them:
 - The **Apple Developer Program membership** is current.
 
 The build-only run in step 6 proves all three at once; this step is so a failure there isn't a
-surprise.
+surprise. If one has lapsed, the release run after the merge fails at signing or notarization and
+publishes nothing; fix the secret and re-run it.
 
 ---
 
@@ -94,8 +93,9 @@ because an app can't verify an update signed by a key it has never seen.
 A Developer ID build today carries **no entitlements**, so the phone can pair and work on the same
 network but can't reach the Mac through iCloud; the Mac falls back to the local lane. Pick one:
 
-**A. Ship 2.0 with the local lane only.** Nothing to do here; say so in the release notes and on the
-website ("same Wi-Fi for now").
+**A. Ship 2.0 with the local lane only.** Nothing to do here. The README and the website already say
+the downloaded build reaches the phone on the same network only; add a line to the 2.0.0 release
+notes once it's published (`gh release edit v2.0.0 --notes-file …`).
 
 **B. Ship the away lane too.** Then:
 
@@ -116,25 +116,25 @@ website ("same Wi-Fi for now").
 
 ---
 
-## 5. Fix what ships stale
+## 5. Fix what ships stale — done
 
-Work in the repository, before anything is published:
-
-- **The website.** `site/index.html` still describes the Docker engine, OpenBot and the 1.x
-  uninstaller. Rewrite it for 2.0 (what xBot does now, that it needs an agent CLI, that it isn't
-  sandboxed and why, the phone app's status, uninstall). Pushing to master republishes it.
+The website (`site/index.html`) describes 2.0 and offers **Download for Mac**. It republishes on the
+same merge that publishes the release, so the button and the DMG arrive together.
 
 ---
 
 ## 6. A build-only release run
 
+Run it on the release branch, before merging: a manual run on any branch but master never publishes.
+
 ```sh
-gh workflow run "Mac release" -R MasterYoav/xBot
+gh workflow run "Mac release" -R MasterYoav/xBot --ref release-on-version -f build_only=true
 gh run watch -R MasterYoav/xBot
 gh run download -R MasterYoav/xBot -n xbot-release
 ```
 
-No version means nothing is published. Open the downloaded `xBot.dmg` and check:
+It builds the release exactly, stamped 2.0.0, but uploads an artifact instead of publishing. Open
+the downloaded `xBot.dmg` and check:
 
 ```sh
 spctl -a -vvv -t execute /Volumes/xBot/XBot.app   # → accepted, "Notarized Developer ID"
@@ -175,33 +175,37 @@ the 18 phone UI tests in `apps/ios/UITests/LiveRemoteUITests.swift` against a de
 
 ## 8. Publish 2.0.0 — **needs you**
 
-```sh
-gh workflow run "Mac release" -R MasterYoav/xBot -f version=2.0.0
-```
+**Merge the release PR** (branch `release-on-version`, `VERSION` = `2.0.0`). The push to master runs
+"Mac release", which checks the secrets, builds, signs, notarizes, verifies, and publishes **v2.0.0**
+as a full release marked latest, with `xBot.dmg`, `xBot-2.0.0.dmg` and `appcast.xml`. A full release
+matters: Sparkle's feed and the Download button use `releases/latest/download/…`, which GitHub
+resolves only to the newest release that isn't a pre-release. Today those URLs are a 404, because
+the only release, 1.0.0, is a pre-release.
 
-Leave **prerelease** unticked. Sparkle's feed is `releases/latest/download/appcast.xml`, which
-GitHub resolves only to the newest release that isn't a pre-release. Today that URL is a 404,
-because the only release, 1.0.0, is a pre-release.
+If the run fails, nothing is published; fix the cause and re-run it (or
+`gh workflow run "Mac release" -R MasterYoav/xBot` on master).
 
-Publishing 2.0.0 as a full release also means **every 1.0.0 install on macOS 26 will be offered
-2.0**: same bundle id, same key, and its feed starts answering. Decide whether that's wanted. Those
-people's Docker container and volumes stay behind; `Uninstall xBot.command` in the DMG is how they
-remove them.
+Publishing 2.0.0 also means **every 1.0.0 install on macOS 26 will be offered 2.0**: same bundle id,
+same key, a higher build number, and its feed starts answering. Decide whether that's wanted
+*before* merging. Those people's Docker container and volumes stay behind; `Uninstall xBot.command`
+in the DMG is how they remove them.
 
 Afterwards:
 
 ```sh
+gh run watch -R MasterYoav/xBot
 curl -sIL https://github.com/MasterYoav/xBot/releases/latest/download/appcast.xml | grep -i '^HTTP'
+curl -sIL https://github.com/MasterYoav/xBot/releases/latest/download/xBot.dmg | grep -i '^HTTP'
 ```
 
-ends in `200`, and **xBot › Check for Updates…** in the installed 2.0.0 says it's up to date.
+Both end in `200`, and **xBot › Check for Updates…** in the installed 2.0.0 says it's up to date.
 
 ---
 
 ## 9. Prove an update — **after the next release**
 
 An update channel isn't verified until an update has gone through it. Publish 2.0.1 the same way
-and check that 2.0.0 offers it, asks before installing, installs and relaunches as 2.0.1. Do it once
+(a PR that sets `VERSION` to `2.0.1`, merged) and check that 2.0.0 offers it, asks before installing, installs and relaunches as 2.0.1. Do it once
 with a long turn running too: the relaunch should wait until the turn ends.
 
 ---
