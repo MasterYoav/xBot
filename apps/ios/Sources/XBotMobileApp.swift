@@ -58,17 +58,10 @@ final class PushDelegate: NSObject, UIApplicationDelegate {
 }
 
 enum Theme {
-    static let accent = Color(red: 0.71, green: 0.37, blue: 0.55)
+    /// The colour chosen in Settings › Appearance.
+    @MainActor static var accent: Color { AccentStore.shared.color }
 
-    static func agentColor(_ id: String) -> Color {
-        switch id {
-        case "claude": Color(red: 0.85, green: 0.47, blue: 0.34)
-        case "codex": .primary
-        case "antigravity": Color(red: 0.10, green: 0.45, blue: 0.91)
-        case "copilot": Color(red: 0.51, green: 0.31, blue: 0.87)
-        default: .secondary
-        }
-    }
+    static func agentColor(_ id: String) -> Color { ProviderStyle.of(id).primary }
 }
 
 /// Somewhere a tab can push.
@@ -108,7 +101,7 @@ enum Tool: String, Identifiable, CaseIterable {
         }
     }
 
-    var tint: Color {
+    @MainActor var tint: Color {
         switch self {
         case .notes: .yellow
         case .automations: .orange
@@ -284,6 +277,7 @@ enum Appearance: String, CaseIterable, Identifiable {
 struct SettingsSheet: View {
     let client: RemoteClient
     @AppStorage("appearance") private var appearance = Appearance.system.rawValue
+    @AppStorage("markdownAsCode") private var markdownAsCode = false
     @Environment(\.dismiss) private var dismiss
     @State private var confirming = false
 
@@ -302,6 +296,16 @@ struct SettingsSheet: View {
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
+                }
+                Section {
+                    AccentPicker()
+                } header: {
+                    Text(String(localized: "Accent colour"))
+                } footer: {
+                    Text(String(localized: "Used for buttons, highlights and Home's glow."))
+                }
+                Section(String(localized: "Files")) {
+                    Toggle(String(localized: "Show .md files as code"), isOn: $markdownAsCode)
                 }
                 Section {
                     Button(String(localized: "Unpair this device"), role: .destructive) { confirming = true }

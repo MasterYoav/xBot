@@ -12,17 +12,6 @@ struct HomeScreen: View {
     private var today: [RemoteChat] { client.chats.filter { Calendar.current.isDateInToday($0.updatedAt) } }
     private var working: [RemoteResident] { client.world?.residents.filter { $0.status == "working" } ?? [] }
 
-    /// The plan with the least left, by its tightest window.
-    private var tightest: (usage: RemoteUsage, used: Double, window: String)? {
-        usage.compactMap { u -> (RemoteUsage, Double, String)? in
-            let windows = [(u.fiveHourUsed, String(localized: "5 hours")), (u.weeklyUsed, String(localized: "week"))]
-                .compactMap { used, name in used.map { ($0, name) } }
-            guard let worst = windows.max(by: { $0.0 < $1.0 }) else { return nil }
-            return (u, worst.0, worst.1)
-        }
-        .max { $0.1 < $1.1 }
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -52,7 +41,7 @@ struct HomeScreen: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .background(alignment: .top) {
-            RadialGradient(colors: [Glass.glow.opacity(0.22), .clear], center: .top, startRadius: 10, endRadius: 420)
+            RadialGradient(colors: [glowColor.opacity(0.24), .clear], center: .top, startRadius: 10, endRadius: 420)
                 .frame(height: 520).ignoresSafeArea().allowsHitTesting(false)
         }
         .refreshable { await loadUsage(refresh: true) }
@@ -71,8 +60,14 @@ struct HomeScreen: View {
                     .accessibilityLabel(String(localized: "Settings"))
             }
         }
-        .task { await loadUsage(refresh: false) }
+        // Again once connected: at launch Home appears before the Mac answers.
+        .task(id: client.link == .local || client.link == .cloud) {
+            if client.link == .local || client.link == .cloud { await loadUsage(refresh: false) }
+        }
     }
+
+    /// Home glows in the accent; the plans keep their own colours.
+    private var glowColor: Color { Glass.glow }
 
     private func loadUsage(refresh: Bool) async {
         if case .profile(_, let profile) = await client.call(quiet: true, { .getProfile(requestID: $0, refresh: refresh) }) {
@@ -100,48 +95,41 @@ struct HomeScreen: View {
         .accessibilityLabel(LinkStatus.text(client))
     }
 
-    @ViewBuilder
-    private var hero: some View {
-        let tight = tightest
-        let left = tight.map { max(0, 100 - $0.used) }
-        VStack(spacing: 14) {
-            ZStack {
-                ArcGauge(value: left.map { $0 / 100 } ?? arcFallback)
-                    .frame(width: 270, height: 270)
-                VStack(spacing: 2) {
-                    Text(left.map { "\(Int($0.rounded()))%" } ?? "\(today.count)")
-                        .font(.system(size: 64, weight: .heavy, design: .rounded))
-                        .foregroundStyle(LinearGradient(colors: [Glass.glow, Glass.violet], startPoint: .leading, endPoint: .trailing))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                }
-                .offset(y: 18)
-            }
-            .frame(height: 250)
-            Button { nav.tool = .profile } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: tight == nil ? "bubble.left.and.text.bubble.right" : "gauge.with.dots.needle.67percent")
-                    Text(tight.map { String(localized: "Left on \(client.agent($0.usage.agent)?.name ?? $0.usage.agent)") }
-                         ?? String(localized: "Chats today"))
-                    Image(systemName: "chevron.right")
-                }
-                .font(.system(.title2, design: .rounded, weight: .heavy))
-                .foregroundStyle(Glass.glow)
-            }
-            .buttonStyle(.plain)
-            sentence(tight)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.top, 4)
-        .accessibilityElement(children: .contain)
+    private var gauges: [PlanGauge] {
+        #if DEBUG
+        if let fake = ProcessInfo.processInfo.environment["XBOT_FAKE_USAGE"].flatMap(Int.init) { return PlanGauge.samples(fake) }
+        #endif
+        return usage.map { PlanGauge($0, name: client.agent($0.agent)?.name ?? ProviderStyle.of($0.agent).name) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    /// Without plan numbers: today's chats against a busy day's ten.
-    private var arcFallback: Double { Double(today.count) / Double(max(10, today.count)) }
+    @ViewBuilder
+    private var hero: some View {
+        let gauges = gauges
+        VStack(alignment: .leading, spacing: 18) {
+            if gauges.isEmpty {
+                ZStack {
+                    ArcGauge(value: Double(today.count) / Double(max(10, today.count)))
+                        .frame(width: 250, height: 250)
+                    VStack(spacing: 0) {
+                        Text("\(today.count)").font(.system(size: 60, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .foregroundStyle(LinearGradient(colors: [Glass.glow, Glass.violet], startPoint: .leading, endPoint: .trailing))
+                        Text(String(localized: "chats today")).font(.system(.subheadline, design: .rounded, weight: .semibold)).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 240)
+            } else {
+                UsageBoard(gauges: gauges) { nav.tool = .profile }
+            }
+            sentence(gauges.min { $0.left < $1.left })
+        }
+        .padding(.top, 4)
+    }
 
-    private func sentence(_ tight: (usage: RemoteUsage, used: Double, window: String)?) -> some View {
+    private func sentence(_ tight: PlanGauge?) -> some View {
         let dim: String = if let tight {
-            String(localized: "\(client.agent(tight.usage.agent)?.name ?? tight.usage.agent) has used \(Int(tight.used.rounded()))% of its \(tight.window).")
+            String(localized: "\(tight.name) has \(Int(tight.left.rounded()))% of its \(tight.limitPhrase) left.")
         } else {
             String(localized: "\(client.chats.count) chats on \(client.macName ?? String(localized: "your Mac")).")
         }

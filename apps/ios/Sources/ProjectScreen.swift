@@ -1,5 +1,6 @@
 import SwiftUI
 import XBotRemote
+import XBotMarkdown
 
 /// A project on the Mac: its files and its changes, like the Mac's inspector.
 struct ProjectScreen: View {
@@ -215,17 +216,31 @@ struct FileScreen: View {
     @State private var file: RemoteFile?
     @State private var failed = false
     @State private var wraps = false
+    @AppStorage("markdownAsCode") private var markdownAsCode = false
+    /// This file's own choice, once made from its menu.
+    @State private var asCode: Bool?
+    @State private var document = MarkdownDocument(blocks: [])
+    /// What the Mac has: saving checks it's still that.
+    @State private var saved = ""
+    @State private var editingText = false
+    @State private var text = ""
+    @State private var saving = false
+    @State private var savedNote = false
+
+    private var isMarkdown: Bool { ["md", "markdown", "mdown", "mkd"].contains((entry.name as NSString).pathExtension.lowercased()) }
+    private var showsCode: Bool { !isMarkdown || (asCode ?? markdownAsCode) }
+    private var canEdit: Bool { file?.text != nil && file?.truncated == false }
 
     var body: some View {
         Group {
             if let file {
-                if let text = file.text {
-                    CodeText(text: text, wraps: wraps)
+                if file.text != nil {
+                    content(file)
                         .safeAreaInset(edge: .top, spacing: 0) {
                             if file.truncated {
-                                Label(String(localized: "Showing the first \(RemoteFile.limit / 1024) KB of \(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))."),
+                                Label(String(localized: "Showing the first \(RemoteFile.limit / 1024) KB of \(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file)). Too big to edit here."),
                                       systemImage: "scissors")
-                                    .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(8).background(.bar)
+                                    .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(8)
                             }
                         }
                 } else {
@@ -240,19 +255,88 @@ struct FileScreen: View {
         }
         .navigationTitle(entry.name)
         .navigationBarTitleDisplayMode(.inline)
+        .overlay(alignment: .bottom) {
+            if savedNote {
+                Label(String(localized: "Saved on the Mac"), systemImage: "checkmark.circle.fill")
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .glassEffect(.regular, in: .capsule)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: savedNote)
         .toolbar {
+            if showsCode, canEdit {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if editingText {
+                        Button(String(localized: "Save")) { Task { await save(text); editingText = false } }
+                            .fontWeight(.semibold)
+                            .disabled(saving)
+                    } else {
+                        Button(String(localized: "Edit")) { text = saved; editingText = true }
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { startChat(projectID, "@\(entry.path) ") } label: { Label(String(localized: "Mention in a new chat"), systemImage: "at") }
-                    Button { UIPasteboard.general.string = file?.text } label: { Label(String(localized: "Copy text"), systemImage: "doc.on.doc") }
-                        .disabled(file?.text == nil)
-                    Toggle(isOn: $wraps) { Label(String(localized: "Wrap lines"), systemImage: "text.word.spacing") }
+                    Button { UIPasteboard.general.string = isMarkdown && !showsCode ? document.markdown : file?.text } label: {
+                        Label(String(localized: "Copy text"), systemImage: "doc.on.doc")
+                    }
+                    .disabled(file?.text == nil)
+                    if isMarkdown {
+                        Toggle(isOn: Binding(get: { showsCode }, set: { asCode = $0; editingText = false })) {
+                            Label(String(localized: "Show as code"), systemImage: "chevron.left.forwardslash.chevron.right")
+                        }
+                    }
+                    if showsCode {
+                        Toggle(isOn: $wraps) { Label(String(localized: "Wrap lines"), systemImage: "text.word.spacing") }
+                    }
                 } label: { Image(systemName: "ellipsis.circle") }
                 .accessibilityLabel(String(localized: "File actions"))
             }
         }
         .task {
-            if case .file(_, let f) = await client.call({ .readFile(requestID: $0, projectID: projectID, path: entry.path) }) { file = f } else { failed = true }
+            if case .file(_, let f) = await client.call({ .readFile(requestID: $0, projectID: projectID, path: entry.path) }) {
+                file = f
+                saved = f.text ?? ""
+                document = MarkdownDocument(parsing: saved)
+            } else {
+                failed = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ file: RemoteFile) -> some View {
+        if !showsCode {
+            MarkdownEditor(document: $document, committed: {
+                let markdown = document.markdown
+                if markdown != saved { Task { await save(markdown) } }
+            }, editable: canEdit)
+        } else if editingText {
+            TextEditor(text: $text)
+                .font(.system(size: 13, design: .monospaced))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 8)
+                .accessibilityIdentifier("file-text")
+        } else {
+            CodeText(text: saved, wraps: wraps)
+        }
+    }
+
+    private func save(_ new: String) async {
+        guard new != saved else { return }
+        saving = true
+        defer { saving = false }
+        if await client.act({ .fileAction(requestID: $0, projectID: projectID, action: .write(path: entry.path, text: new, expected: saved)) }) {
+            saved = new
+            if !isMarkdown || showsCode { document = MarkdownDocument(parsing: new) }
+            savedNote = true
+            try? await Task.sleep(for: .seconds(1.6))
+            savedNote = false
         }
     }
 }

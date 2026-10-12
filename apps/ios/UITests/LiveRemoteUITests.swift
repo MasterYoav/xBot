@@ -130,7 +130,8 @@ final class LiveRemoteUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["notes"].exists)
         attach(app, "1 files")
         readme.tap()
-        XCTAssertTrue(app.staticTexts["1"].waitForExistence(timeout: 15), "The file didn't open")
+        // A Markdown file opens as a document.
+        XCTAssertTrue(app.descendants(matching: .any)["markdown-document"].firstMatch.waitForExistence(timeout: 15), "The file didn't open")
         attach(app, "2 file")
         back(app)
 
@@ -452,6 +453,110 @@ final class LiveRemoteUITests: XCTestCase {
         XCTAssertTrue(NSPredicate(format: "label CONTAINS 'Sky Realm'").wait(for: menu, timeout: 10))
         sleep(3)
         attach(app, "1 sky realm")
+    }
+
+    /// Home's plan board with 1, 3 and 6 providers (made up), and with the Mac's real ones.
+    func testUsageBoardShapes() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        for count in [0, 1, 3, 6] {
+            let app = XCUIApplication()
+            app.launchEnvironment["XBOT_PAIR_URL"] = link
+            if count > 0 { app.launchEnvironment["XBOT_FAKE_USAGE"] = "\(count)" }
+            app.launch()
+            XCTAssertTrue(app.descendants(matching: .any)["usage-board"].firstMatch.waitForExistence(timeout: 20))
+            sleep(2)
+            attach(app, "board \(count)")
+            app.swipeUp()
+            sleep(1)
+            attach(app, "board \(count) legend")
+            app.terminate()
+        }
+    }
+
+    /// Suggested agents: hire one with a tap, see them on the crew, let them go.
+    func testSuggestedAgents() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+        tab(app, "Agents")
+        let hire = app.buttons["Hire Scout"].firstMatch
+        for _ in 0..<3 where !hire.isHittable { app.swipeUp() }
+        sleep(1)
+        attach(app, "1 suggestions")
+        hire.tap()
+        let card = app.buttons.matching(identifier: "crew-card").matching(NSPredicate(format: "label BEGINSWITH 'Scout'")).firstMatch
+        for _ in 0..<3 where !card.exists { app.swipeDown() }
+        XCTAssertTrue(card.waitForExistence(timeout: 15), "Scout wasn't hired")
+        XCTAssertFalse(app.buttons["Hire Scout"].exists, "Still suggested")
+        sleep(2)
+        attach(app, "2 hired")
+        card.press(forDuration: 1.2)
+        app.buttons["Let go"].firstMatch.tap()
+        XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: card, timeout: 10))
+    }
+
+    /// A Markdown file opens as a document; editing a paragraph saves Markdown on the Mac.
+    func testMarkdownEditing() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+        tab(app, "Projects")
+        app.buttons["Demo: files and changes"].firstMatch.tap()
+        app.staticTexts["GUIDE.md"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["markdown-document"].firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Getting started"].waitForExistence(timeout: 5), "Not shown as a document")
+        sleep(1)
+        attach(app, "1 document")
+        // Tick a task.
+        app.buttons["Not done"].firstMatch.tap()
+        sleep(1)
+        // Edit the heading "Setup".
+        app.staticTexts["Setup"].firstMatch.tap()
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.typeText(" and pairing")
+        attach(app, "2 editing")
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Saved on the Mac"].waitForExistence(timeout: 10), "Not saved")
+        attach(app, "3 saved")
+        // As code, from the file's menu.
+        app.buttons["File actions"].tap()
+        app.buttons["Show as code"].firstMatch.tap()
+        sleep(1)
+        attach(app, "4 as code")
+    }
+
+    /// Settings › Appearance › Accent colour: Blue, then back.
+    func testAccentColour() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+        app.buttons["Settings"].firstMatch.tap()
+        let blue = app.buttons["Blue"].firstMatch
+        for _ in 0..<3 where !blue.isHittable { app.swipeUp() }
+        attach(app, "1 settings")
+        blue.tap()
+        sleep(1)
+        attach(app, "2 blue settings")
+        app.buttons["Done"].firstMatch.tap()
+        sleep(2)
+        attach(app, "3 blue home")
+        tab(app, "Chats")
+        sleep(1)
+        attach(app, "4 blue chats")
+        tab(app, "Home")
+        app.buttons["Settings"].firstMatch.tap()
+        for _ in 0..<3 where !app.buttons["Orchid"].firstMatch.isHittable { app.swipeUp() }
+        app.buttons["Orchid"].firstMatch.tap()
     }
 
     /// The redesign: every tab, the world, a place from Home, someone on the crew.

@@ -30,6 +30,7 @@ struct AgentsWorldScreen: View {
     @State private var stageBottom: CGFloat = 400
     @State private var editing: RemoteCrewMember?
     @State private var talking: RemoteCrewMember?
+    @State private var hiring: String?
 
     private var setting: WorkplaceSetting { client.world.flatMap { WorkplaceSetting(rawValue: $0.setting) } ?? .village }
     private var residents: [RemoteResident] { client.world?.residents ?? [] }
@@ -45,10 +46,12 @@ struct AgentsWorldScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     crewCards
-                    SectionTitle(title: String(localized: "Worlds"))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.35), radius: 6)
-                    worlds
+                    if !suggestions.isEmpty {
+                        SectionTitle(title: String(localized: "Suggested agents"))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.35), radius: 6)
+                        suggested
+                    }
                 }
                 .padding(.horizontal, Glass.margin)
                 .padding(.top, 6)
@@ -119,8 +122,9 @@ struct AgentsWorldScreen: View {
             HStack(spacing: 7) {
                 Image(systemName: setting.symbol)
                 Text(setting.title).font(.system(.headline, design: .rounded, weight: .bold)).lineLimit(1)
-                Image(systemName: "chevron.down").font(.caption.bold()).foregroundStyle(.secondary)
+                Image(systemName: "chevron.down").font(.caption.bold()).opacity(0.7)
             }
+            .foregroundStyle(.white)
             .padding(.horizontal, 6)
         }
         .accessibilityIdentifier("world-menu")
@@ -153,22 +157,32 @@ struct AgentsWorldScreen: View {
         .scrollClipDisabled()
     }
 
-    private var worlds: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 12) {
-                ForEach(WorkplaceSetting.allCases, id: \.self) { world in
-                    Button { Task { await client.setWorld(world.rawValue) } } label: {
-                        WorldThumbnail(setting: world, chosen: world == setting)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(world.title)
-                    .accessibilityAddTraits(world == setting ? .isSelected : [])
+    /// Who isn't on the crew yet.
+    private var suggestions: [SuggestedAgent] {
+        let names = Set(residents.map { $0.name.lowercased() })
+        return SuggestedAgent.all.filter { !names.contains($0.name.lowercased()) }
+    }
+
+    private var suggested: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            ForEach(suggestions) { suggestion in
+                SuggestionCard(suggestion: suggestion, hiring: hiring == suggestion.id) {
+                    Task { await hire(suggestion) }
                 }
+                .onTapGesture { editing = suggestion.member(agent: defaultAgent, parts: client.avatarParts) }
+                .disabled(client.agents.isEmpty)
             }
-            .padding(.vertical, 2)
         }
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled()
+    }
+
+    private var defaultAgent: String {
+        client.agents.first { $0.id == "claude" }?.id ?? client.agents.first?.id ?? "claude"
+    }
+
+    private func hire(_ suggestion: SuggestedAgent) async {
+        hiring = suggestion.id
+        defer { hiring = nil }
+        client.applyCrew(await client.call { .saveCrew(requestID: $0, member: suggestion.member(agent: defaultAgent, parts: client.avatarParts)) })
     }
 }
 
@@ -220,31 +234,48 @@ private struct ResidentCard: View {
     }
 }
 
-/// A world's postcard: its scenery, still, with a tick on the one the crew lives in.
-private struct WorldThumbnail: View {
-    let setting: WorkplaceSetting
-    let chosen: Bool
-    private static let still = Date(timeIntervalSinceReferenceDate: 800_000_000)
+/// Someone you could hire: their look, what they'd do, and a one-tap Hire.
+private struct SuggestionCard: View {
+    let suggestion: SuggestedAgent
+    let hiring: Bool
+    let hire: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            WorldScenery(setting: setting, date: Self.still, width: 420)
-                .frame(width: 420, height: WorldStage.height)
-                .scaleEffect(0.36, anchor: .topLeading)
-                .frame(width: 151, height: WorldStage.height * 0.36, alignment: .topLeading)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(chosen ? Color.white : .white.opacity(0.15), lineWidth: chosen ? 3 : 1))
-                .overlay(alignment: .topTrailing) {
-                    if chosen {
-                        Image(systemName: "checkmark.circle.fill").font(.title3).symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, Theme.accent).padding(7)
-                    }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .bottom) {
+                LivingAvatar(avatar: suggestion.look, pixel: 3, seed: suggestion.id.hashValue)
+                    .frame(height: 60, alignment: .bottom)
+                Spacer(minLength: 4)
+                Image(systemName: suggestion.symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(suggestion.tint.gradient))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(suggestion.name).font(.system(.headline, design: .rounded, weight: .bold)).lineLimit(1)
+                Text(suggestion.role).font(.caption.weight(.semibold)).foregroundStyle(suggestion.tint).lineLimit(1)
+                Text(suggestion.pitch).font(.caption).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
+            }
+            Button(action: hire) {
+                Group {
+                    if hiring { ProgressView().controlSize(.small) } else { Label(String(localized: "Hire"), systemImage: "plus") }
                 }
-            Text(setting.title).font(.system(.footnote, design: .rounded, weight: .bold)).foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.5), radius: 4)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(suggestion.tint)
+            .disabled(hiring)
+            .accessibilityLabel(String(localized: "Hire \(suggestion.name)"))
         }
-        .environment(\.motionPaused, true)
+        .padding(14)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .contentShape(RoundedRectangle(cornerRadius: 24))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("suggestion")
     }
 }
 

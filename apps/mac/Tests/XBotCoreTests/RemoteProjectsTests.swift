@@ -145,6 +145,24 @@ import XBotRemote
         #expect(!FileManager.default.fileExists(atPath: repo.appending(path: "sub/notes.md").path))
     }
 
+    @Test func saveATextFileUnlessItChangedOnTheMac() async throws {
+        let (_, host, link, project, repo) = try await setUp()
+        defer { withExtendedLifetime(host) {} }
+        let url = repo.appending(path: "a.txt")
+        let before = try String(contentsOf: url, encoding: .utf8)
+        let save = UUID(), stale = UUID(), outside = UUID()
+        link.say(.fileAction(requestID: save, projectID: project.id, action: .write(path: "a.txt", text: "# New\n", expected: before)))
+        guard case .reply(_, true, _, _) = await answer(link, save) else { Issue.record("not saved"); return }
+        #expect(try String(contentsOf: url, encoding: .utf8) == "# New\n")
+        // The phone still thinks it's the old text: refused, the Mac's version stays.
+        link.say(.fileAction(requestID: stale, projectID: project.id, action: .write(path: "a.txt", text: "# Mine\n", expected: before)))
+        guard case .reply(_, false, let why, _) = await answer(link, stale) else { Issue.record("overwrote"); return }
+        #expect(why?.contains("changed") == true)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "# New\n")
+        link.say(.fileAction(requestID: outside, projectID: project.id, action: .write(path: "../evil.md", text: "x", expected: nil)))
+        guard case .reply(_, false, _, _) = await answer(link, outside) else { Issue.record("wrote outside"); return }
+    }
+
     @Test func pickAFolderOnTheMacAddItThenRemoveIt() async throws {
         let (w, host, link, project, repo) = try await setUp()
         defer { withExtendedLifetime(host) {} }

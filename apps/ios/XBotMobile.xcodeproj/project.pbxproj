@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		09CE436537C754C54945AAEA /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE658C7EDCEF1DD80AAE26E /* ProfileScreen.swift */; };
 		0AA3AC9BCD7CCBEDD0151A78 /* ChatScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */; };
+		0D37C885450056066E914358 /* Accent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA6EA21750888078413BECD /* Accent.swift */; };
+		19CF38B125EC2345106BDCA1 /* SuggestedAgents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184C22B9CAB7DCB30B92CE23 /* SuggestedAgents.swift */; };
 		22ADBB8F2523D798C45024B9 /* LiveRemoteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E527B4B364CD34AD7A71DEE3 /* LiveRemoteUITests.swift */; };
 		2CE93E9D0704A26BD67DB10C /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF031603ADB8FFF4984B948 /* HomeScreen.swift */; };
 		3717B2F278EF1BCD207AE7AA /* XBotMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A883A3922A318C099E51A12 /* XBotMobileApp.swift */; };
@@ -22,14 +24,17 @@
 		898C0B7FAEC7A7C4B84F21B7 /* NotesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */; };
 		8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */; };
 		9150F73FC8D9BEE039D1C682 /* xBot.icon in Resources */ = {isa = PBXBuildFile; fileRef = DE16AE4C9D778783F1CF8C3E /* xBot.icon */; };
+		92E7F5F78D3CC7A6E7DB2790 /* UsageBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D4D0FE266D7C737CC991EC /* UsageBoard.swift */; };
 		9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */; };
+		9E8B818C85AA7B0CD2A76443 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 17B84BFA2CB7063ECDB8E94B /* SwiftTerm */; };
 		9FBEB32B75F9EF2F1DFD3E29 /* XBotWorld in Frameworks */ = {isa = PBXBuildFile; productRef = DCD2934EDAFC8E5D38A814BD /* XBotWorld */; };
 		C370272E29EF48D4D0D0DEA8 /* XBotRemote in Frameworks */ = {isa = PBXBuildFile; productRef = CFBABEF90EEA64CF4E933F25 /* XBotRemote */; };
 		CEA6EC2D9A2F2FE90309947F /* TerminalScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */; };
 		CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */; };
 		D7D8149103FDFEB31417B776 /* AgentsWorldScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19AEA188BDDB67A6024A4602 /* AgentsWorldScreen.swift */; };
 		D8C7B67994EAA18365C2AF79 /* PairView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B152A45009833C7A36A3E078 /* PairView.swift */; };
-		EFDBC3A18E1BA6FC60EDB696 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 17B84BFA2CB7063ECDB8E94B /* SwiftTerm */; };
+		E20B315433A17E2F6A32BB84 /* MarkdownEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6FC0ABA9AE2CBE06C4DA68 /* MarkdownEditor.swift */; };
+		EFDBC3A18E1BA6FC60EDB696 /* XBotMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = 1D13C595AB8352C4F2D29991 /* XBotMarkdown */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,8 +50,10 @@
 /* Begin PBXFileReference section */
 		0A883A3922A318C099E51A12 /* XBotMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMobileApp.swift; sourceTree = "<group>"; };
 		0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalScreen.swift; sourceTree = "<group>"; };
+		184C22B9CAB7DCB30B92CE23 /* SuggestedAgents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedAgents.swift; sourceTree = "<group>"; };
 		19AEA188BDDB67A6024A4602 /* AgentsWorldScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsWorldScreen.swift; sourceTree = "<group>"; };
 		27AAFDD406B0794B6D209FB8 /* XBotMacSigning.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = XBotMacSigning.entitlements; sourceTree = "<group>"; };
+		2AA6EA21750888078413BECD /* Accent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accent.swift; sourceTree = "<group>"; };
 		35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesScreen.swift; sourceTree = "<group>"; };
 		36FEEA105889A9A3FB9EAD00 /* XBotMobileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = XBotMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B0EAB5C062853D055579E01 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
@@ -64,10 +71,12 @@
 		AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
 		AFB116660A0F17CC78A2A1AA /* ProjectScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectScreen.swift; sourceTree = "<group>"; };
 		B152A45009833C7A36A3E078 /* PairView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairView.swift; sourceTree = "<group>"; };
+		BF6FC0ABA9AE2CBE06C4DA68 /* MarkdownEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEditor.swift; sourceTree = "<group>"; };
 		C7482AE8AFDE95D3DCA1BB2A /* CrewScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrewScreen.swift; sourceTree = "<group>"; };
 		D93054C07F278927F4859966 /* mac */ = {isa = PBXFileReference; lastKnownFileType = folder; name = mac; path = ../mac; sourceTree = SOURCE_ROOT; };
 		DE16AE4C9D778783F1CF8C3E /* xBot.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = xBot.icon; sourceTree = "<group>"; };
 		E527B4B364CD34AD7A71DEE3 /* LiveRemoteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveRemoteUITests.swift; sourceTree = "<group>"; };
+		F5D4D0FE266D7C737CC991EC /* UsageBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageBoard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,7 +86,8 @@
 			files = (
 				C370272E29EF48D4D0D0DEA8 /* XBotRemote in Frameworks */,
 				9FBEB32B75F9EF2F1DFD3E29 /* XBotWorld in Frameworks */,
-				EFDBC3A18E1BA6FC60EDB696 /* SwiftTerm in Frameworks */,
+				EFDBC3A18E1BA6FC60EDB696 /* XBotMarkdown in Frameworks */,
+				9E8B818C85AA7B0CD2A76443 /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */,
+				2AA6EA21750888078413BECD /* Accent.swift */,
 				19AEA188BDDB67A6024A4602 /* AgentsWorldScreen.swift */,
 				9017CA0C50D9D73A5DFD7399 /* AutomationsScreen.swift */,
 				AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */,
@@ -96,13 +107,16 @@
 				C7482AE8AFDE95D3DCA1BB2A /* CrewScreen.swift */,
 				3E84F0628CC1A5A8725A5B9E /* Glass.swift */,
 				ACF031603ADB8FFF4984B948 /* HomeScreen.swift */,
+				BF6FC0ABA9AE2CBE06C4DA68 /* MarkdownEditor.swift */,
 				35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */,
 				B152A45009833C7A36A3E078 /* PairView.swift */,
 				9EE658C7EDCEF1DD80AAE26E /* ProfileScreen.swift */,
 				AFB116660A0F17CC78A2A1AA /* ProjectScreen.swift */,
 				9786224E2862DBB510C2416A /* ProjectsScreen.swift */,
 				8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */,
+				184C22B9CAB7DCB30B92CE23 /* SuggestedAgents.swift */,
 				0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */,
+				F5D4D0FE266D7C737CC991EC /* UsageBoard.swift */,
 				0A883A3922A318C099E51A12 /* XBotMobileApp.swift */,
 			);
 			path = Sources;
@@ -201,6 +215,7 @@
 			packageProductDependencies = (
 				CFBABEF90EEA64CF4E933F25 /* XBotRemote */,
 				DCD2934EDAFC8E5D38A814BD /* XBotWorld */,
+				1D13C595AB8352C4F2D29991 /* XBotMarkdown */,
 				17B84BFA2CB7063ECDB8E94B /* SwiftTerm */,
 			);
 			productName = XBotMobile;
@@ -306,6 +321,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */,
+				0D37C885450056066E914358 /* Accent.swift in Sources */,
 				D7D8149103FDFEB31417B776 /* AgentsWorldScreen.swift in Sources */,
 				868AADDC29A115E6576D7071 /* AutomationsScreen.swift in Sources */,
 				8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */,
@@ -314,13 +330,16 @@
 				56CFEB8BF1FE4A3ACC24D71F /* CrewScreen.swift in Sources */,
 				3F6C32D5E0611C68FCB2EE1C /* Glass.swift in Sources */,
 				2CE93E9D0704A26BD67DB10C /* HomeScreen.swift in Sources */,
+				E20B315433A17E2F6A32BB84 /* MarkdownEditor.swift in Sources */,
 				898C0B7FAEC7A7C4B84F21B7 /* NotesScreen.swift in Sources */,
 				D8C7B67994EAA18365C2AF79 /* PairView.swift in Sources */,
 				09CE436537C754C54945AAEA /* ProfileScreen.swift in Sources */,
 				8891F13C347624BA68E89B72 /* ProjectScreen.swift in Sources */,
 				4BF8A0663AD2C34BA6F3EFCC /* ProjectsScreen.swift in Sources */,
 				9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */,
+				19CF38B125EC2345106BDCA1 /* SuggestedAgents.swift in Sources */,
 				CEA6EC2D9A2F2FE90309947F /* TerminalScreen.swift in Sources */,
+				92E7F5F78D3CC7A6E7DB2790 /* UsageBoard.swift in Sources */,
 				3717B2F278EF1BCD207AE7AA /* XBotMobileApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -641,6 +660,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BDCE435789CD3B4FD89A5E18 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
 			productName = SwiftTerm;
+		};
+		1D13C595AB8352C4F2D29991 /* XBotMarkdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XBotMarkdown;
 		};
 		CFBABEF90EEA64CF4E933F25 /* XBotRemote */ = {
 			isa = XCSwiftPackageProductDependency;
