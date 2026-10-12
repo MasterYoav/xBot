@@ -26,6 +26,10 @@ public final class Workspace {
     /// Automations, in their order.
     public internal(set) var automations: [Automation] = []
     @ObservationIgnored var automationClock: Task<Void, Never>?
+    /// Jev workflows, in their order.
+    public internal(set) var workflows: [Workflow] = []
+    /// Jev for tests; nil: the real client, from Settings › AI.
+    @ObservationIgnored let jevOverride: (any JevDecider)?
     /// When each agent last finished a turn, and when the person last looked: Done in between.
     /// Set to ask the Agents page to open the editor on a new member; the page clears it.
     public var wantsToHire = false
@@ -34,7 +38,7 @@ public final class Workspace {
     /// A handed-off chat → HeadMaster's chat that handed it, to report back to.
     var handoffOrigins: [UUID: UUID] = [:]
     /// The reply being written right now, per chat. Saved as a message when the turn ends.
-    public private(set) var live: [UUID: [Part]] = [:]
+    public internal(set) var live: [UUID: [Part]] = [:]
     /// True until the installed CLIs have been looked for. Nothing claims one is missing before then.
     public private(set) var isDiscovering = true
     /// Set when xBot cannot save, so the window can say so instead of pretending.
@@ -93,9 +97,11 @@ public final class Workspace {
         defaults: UserDefaults = .standard,
         gitTool: GitTool? = GitTool.find(),
         indexer: HistoryIndexer? = nil,
-        jev: JevSettings? = nil
+        jev: JevSettings? = nil,
+        jevDecider: (any JevDecider)? = nil
     ) {
         self.jev = jev ?? JevSettings(defaults: defaults)
+        self.jevOverride = jevDecider
         self.gitTool = gitTool
         self.indexer = indexer
         self.store = store
@@ -108,6 +114,7 @@ public final class Workspace {
         chats = attempt { try store.chats() } ?? []
         agents = attempt { try store.agents() } ?? []
         automations = attempt { try store.automations() } ?? []
+        workflows = attempt { try store.workflows() } ?? []
         usage = attempt { try store.usage() } ?? [:]
         applyDraftDefaults()
     }
@@ -228,7 +235,8 @@ public final class Workspace {
 
     public func setHarness(_ kind: HarnessKind, for id: UUID) {
         // A session id means nothing to a different CLI, and neither does its model name.
-        update(id) { $0.harness = kind; $0.sessionID = nil; $0.model = nil }
+        // Picked by hand: Jev no longer chooses for this chat.
+        update(id) { $0.harness = kind; $0.sessionID = nil; $0.model = nil; $0.jevChooses = false }
     }
 
     public func setModel(_ model: String?, for id: UUID) { update(id) { $0.model = model } }
@@ -289,6 +297,11 @@ public final class Workspace {
         // Plan mode needs answers to a schema; on an agent that can't give them, the chat just runs.
         if chat.planMode && chat.harness.givesStructuredAnswers {
             startPlanning(turnPrompt, chat: chat, brain: brain)
+            return true
+        }
+
+        if jevChoosesActive(id) {
+            sendChoosingWithJev(turnPrompt, asked: prompt, in: id)
             return true
         }
 

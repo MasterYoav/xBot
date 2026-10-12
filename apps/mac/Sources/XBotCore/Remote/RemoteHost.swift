@@ -65,6 +65,7 @@ public final class RemoteHost {
         var messages: [UUID: [UUID: RemoteMessage]] = [:]
         var live: [UUID: [RemotePart]] = [:]
         var world: RemoteWorld?
+        var workflowsOn: Bool?
         var dirty = false
         var lastFlush = ContinuousClock.now - .seconds(60)
         init(_ link: any RemoteLink) { self.link = link }
@@ -92,8 +93,10 @@ public final class RemoteHost {
         for chat in chats { client.chats[chat.id] = chat }
         let world = remoteWorld()
         client.world = world
+        client.workflowsOn = workspace.showsWorkflows
         link.send([.hello(version: Wire.version, macName: macName, macID: macID),
-                   .workspace(projects: projects, chats: chats, agents: agents), .world(world)])
+                   .workspace(projects: projects, chats: chats, agents: agents), .world(world),
+                   .workflowsAvailable(workspace.showsWorkflows)])
         client.lastFlush = .now
         startWatching()
         refreshAwake()
@@ -143,6 +146,7 @@ public final class RemoteHost {
             _ = workspace.agents
             _ = workspace.workplace
             _ = workspace.isDiscovering
+            _ = workspace.showsWorkflows
         } onChange: { [weak self] in
             Task { @MainActor in self?.changed() }
         }
@@ -210,6 +214,10 @@ public final class RemoteHost {
         if world != client.world {
             client.world = world
             out.append(.world(world))
+        }
+        if client.workflowsOn != workspace.showsWorkflows {
+            client.workflowsOn = workspace.showsWorkflows
+            out.append(.workflowsAvailable(workspace.showsWorkflows))
         }
 
         for chatID in client.opened {
@@ -323,6 +331,7 @@ public final class RemoteHost {
         case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject,
              .listNotes, .saveNote, .deleteNote, .undoDeleteNote,
              .listAutomations, .saveAutomation, .deleteAutomation, .runAutomation, .setAutomationHelper,
+             .listWorkflows, .runWorkflow,
              .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar, .organiseCrew,
              .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP, .getProfile:
             handleProject(message, link: client.link)
@@ -386,7 +395,7 @@ public final class RemoteHost {
     private func remoteProjects() -> [RemoteProject] { workspace.projects.map { RemoteProject(id: $0.id, name: $0.name, path: $0.path) } }
 
     private func remoteChats() -> [RemoteChat] {
-        workspace.chats.filter { $0.automationID == nil }.map { chat in
+        workspace.chats.filter { $0.automationID == nil && $0.workflowID == nil }.map { chat in
             RemoteChat(id: chat.id, title: chat.title, projectID: chat.projectID, agent: chat.harness.rawValue,
                        agentName: chat.harness.displayName, model: chat.model, mode: chat.mode.rawValue,
                        effort: chat.effort?.rawValue, planMode: chat.planMode, crewName: workspace.agent(chat.agentID)?.name,

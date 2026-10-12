@@ -21,6 +21,7 @@ Docker/OpenBot engine and its milestones M0–M7) is in git and in the [changelo
 | — | Motion gate: animations pause while xBot isn't in view | **Open** (#30) |
 | — | The iPhone and iPad app | **Open**, a stack of PRs, each based on the one before: #31 pairing, lanes and chats → #32 managing chats → #33 projects → #34 notes → #35 automations → #36 crew → #37 abilities → #38 terminal → #39 profile → #40 Liquid Glass and the shared world → #41 accent, plan board, suggested agents, Markdown documents |
 | — | The crew as a company: who reports to whom | **Open** (#42, on top of the stack) |
+| — | Settings › AI with the TypeSafe Jev key; Jev workflows (agent and Jev steps, Jev picks, Let Jev choose, the phone's Workflows) | **Built**, on branches `jev-ai-settings` → `jev-workflows` ([design](superpowers/specs/2026-10-12-jev-workflows-design.md)); not merged |
 | 1b | Split panes, checkpoints, worktrees | Not started (the Changes inspector is built) |
 | 3 | Onboarding rewrite | Not started. Today's first run is in [06-onboarding.md](06-onboarding.md) |
 | 4 | Native brain: Anthropic, OpenAI, Google, Ollama tool loop | Not started |

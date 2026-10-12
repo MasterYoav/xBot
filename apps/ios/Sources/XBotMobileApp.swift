@@ -90,13 +90,14 @@ enum AppTab: Hashable {
 
 /// Places shown full screen from Home, each with its own navigation.
 enum Tool: String, Identifiable, CaseIterable {
-    case notes, automations, abilities, terminal, profile
+    case notes, automations, workflows, abilities, terminal, profile
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .notes: String(localized: "Notes")
         case .automations: String(localized: "Automations")
+        case .workflows: String(localized: "Workflows")
         case .abilities: String(localized: "Abilities")
         case .terminal: String(localized: "Terminal")
         case .profile: String(localized: "Profile")
@@ -107,6 +108,7 @@ enum Tool: String, Identifiable, CaseIterable {
         switch self {
         case .notes: "note.text"
         case .automations: "bolt.horizontal.fill"
+        case .workflows: "point.3.connected.trianglepath.dotted"
         case .abilities: "puzzlepiece.extension.fill"
         case .terminal: "terminal.fill"
         case .profile: "person.crop.circle.fill"
@@ -117,6 +119,7 @@ enum Tool: String, Identifiable, CaseIterable {
         switch self {
         case .notes: .yellow
         case .automations: .orange
+        case .workflows: .purple
         case .abilities: .teal
         case .terminal: .green
         case .profile: Glass.glow
@@ -202,6 +205,7 @@ struct RootView: View {
                     switch tool {
                     case .notes: NotesScreen(client: client)
                     case .automations: AutomationsScreen(client: client)
+                    case .workflows: WorkflowsScreen(client: client)
                     case .abilities: AbilitiesScreen(client: client)
                     case .profile: ProfileScreen(client: client)
                     case .terminal: NavigationStack { TerminalScreen(client: client, projectID: nil).closable() }

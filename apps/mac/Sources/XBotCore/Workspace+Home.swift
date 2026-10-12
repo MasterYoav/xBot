@@ -12,6 +12,8 @@ public struct ChatDraft: Equatable, Sendable {
     public var reviewPlan = true
     /// Nil: the agent's own default.
     public var effort: Effort?
+    /// "Let Jev choose" the agent for each message (only while Jev Workflows is on).
+    public var jevChooses = false
 
     public init() {}
 }
@@ -66,7 +68,8 @@ extension Workspace {
         let chat = Chat(
             projectID: projectID, title: String(localized: "New chat"), harness: harness,
             model: draft.harness == harness ? draft.model : nil, mode: draft.mode,
-            planMode: draft.planMode, reviewPlan: draft.reviewPlan, effort: draft.effort
+            planMode: draft.planMode, reviewPlan: draft.reviewPlan, effort: draft.effort,
+            jevChooses: draft.jevChooses && jev.workflowsEnabled
         )
         attempt { try store.save(chat) }
         chats.insert(chat, at: 0)

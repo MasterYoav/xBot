@@ -59,10 +59,10 @@ The content area shows one of these at a time.
 | A chat | a tab, the sidebar, ⌘1…⌘9 | yes |
 | A file's diff | a changed file in the inspector | yes |
 | Profile | the account menu | yes |
-| Abilities, Notes, Automations | the sidebar | no |
+| Abilities, Notes, Automations, Workflows | the sidebar (Workflows only while Jev Workflows is on) | no |
 | Agents | the sidebar's miniature world | no |
 
-Notes and Automations run to the top of the window; the inspector button floats over their
+Notes, Automations and Workflows run to the top of the window; the inspector button floats over their
 top-right corner.
 
 ### The tab strip
@@ -90,7 +90,8 @@ Top to bottom:
 
 1. **Title row** — hide sidebar (⌃⌘S) and new chat (⌘N).
 2. **Search** (⌘K). Filters chats by title, hiding projects with no match; Escape clears it.
-3. **Abilities**, **Notes**, **Automations**. Automations shows a spinner while one is running.
+3. **Abilities**, **Notes**, **Automations**, and **Workflows** while Jev Workflows is on
+   (Settings › AI). Automations and Workflows show a spinner while one is running.
 4. **Agents** — a miniature of the crew's world (hidden while searching). See below.
 5. **Projects**, with **+** to add a folder. With none, an **Add a folder** row. Each project is a
    folder row with a dot while any of its chats is working; click to fold it. Long lists end in
@@ -145,7 +146,11 @@ One composer, used on Home (where it writes the draft) and docked under a chat.
   been said in the chat.
 - **Text** grows to ten lines. ⏎ sends. A refused send keeps what was typed.
 - **Agent chip** — CLI and model, grouped by CLI, each with *Default model*. Locked while a turn
-  runs.
+  runs. While Jev Workflows is on, the menu starts with **Let Jev choose** (✦): the chip reads *Let
+  Jev choose*, and each message first asks Jev for the cheapest CLI, model and effort that can
+  answer it; the reply opens with a notice, *"Jev chose Codex · gpt-5-mini, low effort (0.82)"*, or,
+  if Jev can't be reached, *"Jev couldn't choose. Jev didn't answer in time. Claude Code is
+  answering."* Picking an agent by hand turns it off.
 - **Effort chip** — opens a card: *Effort · Medium*, a slider from *Faster* to *Smarter* with six
   stops (Low, Medium, High, Extra, Max, Galaxy), the agent's recommended stop marked
   *Recommended*. ← and → move it. At **Galaxy** the track fills with shimmering pixels and the knob
@@ -339,6 +344,41 @@ A trigger, then steps in plain words, carried out by an agent with full access.
 
 Empty: *"Automate anything you do on your Mac"* and **New automation**.
 
+## Workflows
+
+Agent steps and Jev decision steps, in order; only while **Jev Workflows** is on in Settings › AI
+([design](superpowers/specs/2026-10-12-jev-workflows-design.md)). Turned off while the page is
+open: *"Jev Workflows is off."* with **Open Settings › AI**. On without a key, a banner: *"Workflows
+need a TypeSafe Jev key to ask Jev anything."* and **Open Settings › AI**.
+
+- **Left**: the list (a clock for scheduled ones, a spinner while running, *off* when switched off),
+  **+**, and at the foot *"Scheduled workflows run while xBot is open, and through the automations
+  helper while it's closed, if that's on."*
+- **Editor**:
+  - The name, an on/off switch, ⋯ › **Run with…** (a sheet: the workflow's input, *"the first step
+    and Jev both see it"*) and **Delete…**, and **Run now**. Under them, why Run now is off when it
+    is (*"There's no Jev key yet. Add one in Settings › AI."*, *"It has no agent step to do yet."*).
+  - *If Jev can't pick: Claude Code · Sonnet* (the brain a Jev-picks step falls back to), the
+    project chip, *Next: …* when scheduled.
+  - **WHEN** — as for automations.
+  - **STEPS** — numbered cards, dragged to reorder, × on hover removes (a go-to that pointed at it
+    becomes Continue). An **agent step**: its title, the prompt, the brain (**Jev picks** ✦, or a
+    CLI and model with an effort), and the permission (Can edit by default). A **Jev step**: its
+    title, the question, and its branches as pickers (*Continue*, *Stop*, *Go to "…"*): a **gate**
+    has *Yes at* 0.50 (a slider), *Yes →* and *No →*; a **route** its options, each *→*; a **score**
+    its levels, lowest first (2–10), each *→*. A dashed drop zone at the end.
+  - **RUNS** — the last twenty, each a chat: running, *Stopped*, or *Open*.
+- **Right**: the palette — **AGENT**: *Agent step*; **JEV**: *Yes/no gate*, *Route*, *Score*. Drag a
+  tile into the steps, or click to add it at the end.
+
+A run is a chat: each agent step's prompt and reply, a notice for each Jev step (*"Gate: Is the
+build failing? — yes (0.91) → Fix it"*, *"Route: What next? — Code (0.88) → Code"*), Jev's pick
+before a Jev-picks step, and, when it stops on a failure, why in red (*"“Fix it” failed, so the run
+stopped."*, *"Gate: … — Jev couldn't answer. Jev is rate limiting this key. … The run stopped."*,
+*"“Draft” would run more than 5 times, so the run stopped."*).
+
+Empty: *"Let Jev steer your agents"* and **New workflow**.
+
 ## Agents
 
 The crew, as a company, in a living pixel world.
@@ -526,8 +566,9 @@ as you scroll down. Each tab keeps its own navigation; a chat pushed from any ta
 - **Working** and **Today** tiles (tap for Agents or Chats).
 - **Working now** — up to four running chats with what each is doing.
 - **Recent** — the latest four chats.
-- **Places** — round glass buttons for **Notes**, **Automations**, **Abilities**, **Terminal** and
-  **Profile**, each opening full screen with a zoom from its button, and × to close.
+- **Places** — round glass buttons for **Notes**, **Automations**, **Workflows** (only while the Mac
+  has Jev Workflows on), **Abilities**, **Terminal** and **Profile**, each opening full screen with
+  a zoom from its button, and × to close.
 
 The page glows in the accent from the top.
 
@@ -643,6 +684,10 @@ Full-screen pages from Home, each closed with ×.
   Weekdays, Once a week); **Steps** from the same apps and connectors as the Mac (*"Steps run in
   order, by an agent with full access on your Mac."*); **Agent**, Model, Reasoning, **Works in**;
   **Runs**; **Save** and **Run now**.
+- **Workflows** — only while the Mac has Jev Workflows on. Each workflow with its schedule in words
+  and its steps (*"Build → Failing? → Fix it"*), why it can't run if it can't, **Run now** (which
+  opens the run), and its last three runs. They're built on the Mac. Empty: *"No workflows yet"*;
+  turned off on the Mac meanwhile: *"Workflows are off"*.
 - **Abilities** — Connectors, Plugins, Skills, MCPs as a segmented picker, with search. Switches
   where allowed, status otherwise (*Connected*, *Needs sign-in*, *Failed*, *Checking*); swipe to
   **Remove**. **+**: **Browse plugins**, **Add an MCP server** (a command or an address, for which

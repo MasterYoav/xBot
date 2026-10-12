@@ -188,6 +188,12 @@ public enum HostMessage: Codable, Equatable, Sendable {
     /// Every automation, in order, with the step palette and whether the helper runs them while
     /// xBot is closed.
     case automations(requestID: UUID, automations: [RemoteAutomation], apps: [RemoteApp], runsWhileClosed: Bool)
+    /// Jev workflows, in order; `available` false (and none listed) while the Mac has Jev
+    /// Workflows off.
+    case workflows(requestID: UUID, workflows: [RemoteWorkflow], available: Bool)
+    /// Whether the Mac has Jev Workflows on: sent on connecting and whenever it changes. The phone
+    /// shows Workflows in Places only while it's on. (An older phone skips it.)
+    case workflowsAvailable(Bool)
     /// The crew, in order, and the parts of a look.
     case crew(requestID: UUID, members: [RemoteCrewMember], parts: [RemoteAvatarPart])
     /// A look drawn by the Mac (PNG), for the editor's preview.
@@ -256,6 +262,10 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case runAutomation(requestID: UUID, automationID: UUID)
     /// Installs or removes the background helper that runs automations while xBot is closed.
     case setAutomationHelper(requestID: UUID, on: Bool)
+    // Jev workflows: `listWorkflows` is answered with `workflows`; `runWorkflow` with a `reply`
+    // carrying the run's chat, or why it can't run. `input`: what Run with… gives it.
+    case listWorkflows(requestID: UUID)
+    case runWorkflow(requestID: UUID, workflowID: UUID, input: String?)
     // The crew: each answered with `crew`, except `talkTo` (a `reply` with the new chat) and
     // `drawAvatar` (an `avatarImage`).
     case listCrew(requestID: UUID)

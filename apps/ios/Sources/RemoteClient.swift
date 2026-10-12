@@ -28,6 +28,8 @@ final class RemoteClient {
     private(set) var agents: [RemoteAgent] = []
     /// The Agents world on the Mac: which one, and who's in it (pushed as it changes).
     private(set) var world: RemoteWorld?
+    /// The Mac has Jev Workflows on (Settings › AI there): Places shows Workflows.
+    private(set) var workflowsAvailable = false
     private(set) var transcripts: [UUID: [RemoteMessage]] = [:]
     private(set) var live: [UUID: [RemotePart]] = [:]
     /// Shown once: a refused request's reason.
@@ -101,6 +103,7 @@ final class RemoteClient {
         pairing = nil
         macName = nil
         projects = []; chats = []; agents = []; transcripts = [:]; live = [:]
+        workflowsAvailable = false
         link = .unpaired
     }
 
@@ -375,6 +378,8 @@ final class RemoteClient {
             self.agents = agents
         case .world(let world):
             self.world = world
+        case .workflowsAvailable(let on):
+            workflowsAvailable = on
         case .transcript(let chatID, let messages):
             transcripts[chatID] = messages
         case .message(let chatID, let message):
@@ -395,6 +400,7 @@ final class RemoteClient {
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: ok, reason: reason, chatID: chatID))
         case .folder(let requestID, _), .file(let requestID, _), .git(let requestID, _), .diff(let requestID, _),
              .macFolders(let requestID, _, _), .notes(let requestID, _, _), .automations(let requestID, _, _, _),
+             .workflows(let requestID, _, _),
              .crew(let requestID, _, _), .avatarImage(let requestID, _),
              .abilities(let requestID, _, _, _):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: true, reason: nil, chatID: nil, payload: message))

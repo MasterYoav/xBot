@@ -59,21 +59,21 @@ extension Workspace {
 // MARK: Pages
 
 public enum Page: Equatable, Sendable {
-    case main, profile, abilities, notes, agents, automations
+    case main, profile, abilities, notes, agents, automations, workflows
     case diff(projectID: UUID, file: GitFile)
 
     /// Whether the chat tabs show above it. Abilities, Notes, Automations and Agents are places
     /// of their own, so the strip hides there.
     public var showsTabs: Bool {
         switch self {
-        case .abilities, .notes, .automations, .agents: false
+        case .abilities, .notes, .automations, .workflows, .agents: false
         case .main, .profile, .diff: true
         }
     }
 
     /// Whether the page runs up to the window's top edge, with no bar above it: the window's
     /// buttons float over its corners instead.
-    public var reachesTop: Bool { self == .notes || self == .automations }
+    public var reachesTop: Bool { self == .notes || self == .automations || self == .workflows }
 }
 
 extension Workspace {
@@ -153,6 +153,7 @@ extension Workspace {
         draft.model = nil
         draft.effort = defaultEffort
         draft.mode = defaultMode
+        draft.jevChooses = false
     }
 
     /// Where an installed agent's CLI is.

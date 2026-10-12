@@ -74,6 +74,16 @@ xBot is now a native app that drives the agent CLIs you already have. See
   hire, and Markdown files you edit as documents.
 - Animations pause while xBot isn't the active app (idle CPU from about 19.6% to 0.0%).
 
+- Settings › AI (the Agents tab, renamed): a **TypeSafe Jev** API key, kept only in the Keychain
+  and shown as saved with its length, with **Check** (*"Jev answered in 120 ms."*), **Remove** and
+  the model; and the **Jev Workflows** toggle, off by default.
+- Jev workflows (with the toggle on): a Workflows page where agent steps and Jev steps — a yes/no
+  gate, a route, a score — run in order as one chat, Jev deciding in a blink whether to go on and
+  where; a step can let Jev pick the cheapest capable agent, model and effort. Run now, Run with…,
+  or on a schedule like automations (also through the helper while xBot is closed). Jev
+  unreachable stops a run rather than guessing. **Let Jev choose** in the composer's agent menu
+  does the same pick for each message. On the phone, Workflows in Places with Run now.
+
 ### Changed
 - Automations replace the Inbox in the sidebar; loose chats are listed under Recent.
 

@@ -22,8 +22,8 @@ XBotMarkdown                                    (Foundation; used by the iOS app
 | `XBotRemote` | The wire to the phone: `HostMessage` and `ClientMessage`, the value types they carry, `Frame` (length-prefixed JSON), `PairingKey` and `PairingInvite`, `LocalTransport` (TLS-PSK listener and browser, `FramedConnection`) and `CloudTransport` (`CloudChannel` over a `CloudMailbox`; `CloudKitMailbox` is the real one) |
 | `XBotWorld` | The crew's look and home, shared with the phone: `AgentAvatar` and `AvatarSprite` (pixel avatars), `WorkplaceWorld` (who stands and walks where), the five realms and `WorkplaceBackdrop`, `WorldStage` (the drawn world, in tiers by rank), `OrgChart` (who reports to whom, suggested managers), `Motion` (the `motionPaused` environment value) |
 | `XBotMarkdown` | `MarkdownDocument` (a Markdown file as blocks that keep their exact source, so an edit changes only what was touched) and `InlineMarkdown` |
-| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite, schema v6); `Workspace`, the `@MainActor @Observable` object every view and the remote talk to, split by feature (`+Plan`, `+Edit`, `+Panels`, `+Home`, `+Abilities`, `Agents/`, `Automations/`); `Git/` (status, diffs, pull requests through `gh`, a folder watcher); `History/` (the profile, built from the CLIs' own history); `Abilities/` (connectors, plugins, skills and MCP servers through the CLIs); `Notes`; `Usage`; `JevSettings` (the Jev key in the Keychain, the model, the Jev Workflows toggle); `Appearance` and `AsciiWallpaper`; `TerminalDeck` (each chat's terminal window and its tabs); `Remote/` (`RemoteService`: pairing, the lanes, keep-awake; `RemoteHost` and one extension per feature; `RemoteShell`). Re-exports `XBotBrain` and `XBotWorld` |
-| `XBotUI` | The design system and every view: `Shell/` (root, sidebar, top bar, Home), `Chat/` (transcript, composer, plan cards, effort control), `Inspector/`, `Agents/`, `Abilities/`, `Notes/`, `Automations/`, `Profile/`, `Account/`, `Settings/`, `Terminal/` (SwiftTerm views), `Components/` |
+| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite, schema v7); `Workspace`, the `@MainActor @Observable` object every view and the remote talk to, split by feature (`+Plan`, `+Edit`, `+Panels`, `+Home`, `+Abilities`, `Agents/`, `Automations/`, `Workflows/` — Jev workflows, `JevPick`, Let Jev choose); `Git/` (status, diffs, pull requests through `gh`, a folder watcher); `History/` (the profile, built from the CLIs' own history); `Abilities/` (connectors, plugins, skills and MCP servers through the CLIs); `Notes`; `Usage`; `JevSettings` (the Jev key in the Keychain, the model, the Jev Workflows toggle); `Appearance` and `AsciiWallpaper`; `TerminalDeck` (each chat's terminal window and its tabs); `Remote/` (`RemoteService`: pairing, the lanes, keep-awake; `RemoteHost` and one extension per feature; `RemoteShell`). Re-exports `XBotBrain` and `XBotWorld` |
+| `XBotUI` | The design system and every view: `Shell/` (root, sidebar, top bar, Home), `Chat/` (transcript, composer, plan cards, effort control), `Inspector/`, `Agents/`, `Abilities/`, `Notes/`, `Automations/`, `Workflows/`, `Profile/`, `Account/`, `Settings/`, `Terminal/` (SwiftTerm views), `Components/` |
 | `XBotApp` | `@main`, menus and commands, Sparkle, the app icon, quitting cleanly (`AppDelegate` stops running turns so their replies are saved), and the headless `--automations-tick` run for the automations helper |
 
 `XBotBrain` and `XBotRemote` never import SwiftUI. Views hold no logic: they read the workspace and
@@ -33,12 +33,12 @@ behave differently.
 ## Where things are stored
 
 `~/Library/Application Support/xBot/xbot.sqlite` (projects, chats, messages, usage, agents,
-automations) and `Inbox/` for loose chats; notes in `<project>/notes/`; settings in user defaults;
-pairing keys in the Keychain. See [architecture](02-architecture.md#storage).
+automations, workflows) and `Inbox/` for loose chats; notes in `<project>/notes/`; settings in user
+defaults; pairing keys and the TypeSafe Jev key in the Keychain. See [architecture](02-architecture.md#storage).
 
 ## Tests
 
-443 tests, Swift Testing, in six targets: `XBotBrainTests`, `XBotCoreTests`, `XBotRemoteTests`,
+562 tests, Swift Testing, in six targets: `XBotBrainTests`, `XBotCoreTests`, `XBotRemoteTests`,
 `XBotWorldTests`, `XBotMarkdownTests` and `XBotUITests`. (`Tests/XBotRuntimeTests` is an empty
 folder left from 1.x.)
 
@@ -50,6 +50,12 @@ folder left from 1.x.)
   failure.
 - **`Workspace`** is tested with a scripted `Brain` and an in-memory store: chats, plans, edits,
   hand-offs and the org chart (`OrgTests`), automations, panels, the profile.
+- **Jev**: `JevClient` against an injected transport (request bodies for each question type, a
+  response recorded from a real call, 401/422/429/529 and timeouts as sentences); `JevSettings`
+  with an in-memory key store and its own user defaults (the key reaches only the store); the
+  workflow engine with a scripted brain and a scripted `JevDecider` (gates, routes, scores, go-to,
+  the loop guard, Jev unreachable, Jev picks reaching the turn, the state, claims, schedules);
+  Let Jev choose; the v6 → v7 migration.
 - **Abilities** parsers are tested against CLI output recorded on a real Mac
   (`Tests/XBotCoreTests/Fixtures/abilities`, personal paths and secrets removed); the catalog's
   actions run against a scripted `CommandRunner`.
@@ -57,7 +63,8 @@ folder left from 1.x.)
   refused), the cloud channel against a fake mailbox, and `RemoteHost` for each feature.
 - **The world**: `OrgChartTests` (tiers, loops, suggestions by role) and `WorkplaceWorld`'s slots.
 - **Live**, opt-in: `LiveHarnessTests` runs real turns against the installed CLIs with
-  `XBOT_LIVE_HARNESS=1`; `scripts/e2e_automations.py` has launchd run automations through the
+  `XBOT_LIVE_HARNESS=1`; `LiveJevTests` asks Jev one question of each type with
+  `XBOT_LIVE_JEV=1` and a key saved in Settings › AI; `scripts/e2e_automations.py` has launchd run automations through the
   installed app (xBot must be closed). The phone's live tests are on
   [its page](14-iphone-and-ipad.md#tests).
 

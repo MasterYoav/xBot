@@ -80,6 +80,26 @@ import Testing
         #expect(try Frame.decode(HostMessage.self, from: &buffer) == [.chatRemoved(chatID), .chatRemoved(chatID)])
     }
 
+    @Test func workflowMessagesSurviveTheWire() throws {
+        let run = RemoteRun(id: UUID(), startedAt: Date(timeIntervalSince1970: 1_800_000_000), isRunning: false, failed: true)
+        let workflow = RemoteWorkflow(id: UUID(), name: "Nightly", schedule: .daily(hour: 2, minute: 0),
+                                      stepTitles: ["Build", "Failing?", "Fix"], isEnabled: true,
+                                      nextRun: Date(timeIntervalSince1970: 1_800_003_600), lastRunAt: nil, runs: [run],
+                                      blocked: "There's no Jev key yet.")
+        let host: [HostMessage] = [.workflowsAvailable(true), .workflows(requestID: UUID(), workflows: [workflow], available: true)]
+        let client: [ClientMessage] = [.listWorkflows(requestID: UUID()),
+                                       .runWorkflow(requestID: UUID(), workflowID: workflow.id, input: "v2"),
+                                       .runWorkflow(requestID: UUID(), workflowID: workflow.id, input: nil)]
+        for message in host {
+            var buffer = try Frame.encode(message)
+            #expect(try Frame.decode(HostMessage.self, from: &buffer) == [message])
+        }
+        for message in client {
+            var buffer = try Frame.encode(message)
+            #expect(try Frame.decode(ClientMessage.self, from: &buffer) == [message])
+        }
+    }
+
     @Test func anOversizedFrameIsRefused() {
         var length = UInt32(Frame.maximumLength + 1).bigEndian
         var buffer = Data(bytes: &length, count: 4)

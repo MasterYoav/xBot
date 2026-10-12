@@ -12,7 +12,7 @@ built yet, is the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-des
 | `XBot.app` | while you use it | — |
 | An agent CLI (`claude`, `codex`, `agy`, `copilot`) | for the length of one turn | its arguments, stdin, stdout and stderr |
 | A login shell | while a terminal window or tab is open (on the Mac or from the phone) | a pseudo-terminal |
-| `XBot --automations-tick` | once a minute, only if **Run when xBot is closed** is on and the app isn't open | the same SQLite file |
+| `XBot --automations-tick` | once a minute, only if **Run when xBot is closed** is on and the app isn't open; runs due automations and (with Jev Workflows on) due workflows | the same SQLite file |
 | A bot's VM (Apple Containerization) | *not built yet* | — |
 
 The app listens on one TCP port, and only after an iPhone or iPad has been paired: the local lane
@@ -46,13 +46,13 @@ How each CLI is run, its models and reasoning levels are in
 `~/Library/Application Support/xBot/`
 
 - `xbot.sqlite`: `projects`, `chats`, `messages` (a message's parts are JSON), `usage` (the plan
-  limits last read), `agents` (the crew, with each one's manager) and `automations`. WAL mode,
-  schema version 6, migrated forward in place.
+  limits last read), `agents` (the crew, with each one's manager), `automations` and `workflows`
+  (steps as JSON). WAL mode, schema version 7, migrated forward in place.
 - `Inbox/`: the working folder for chats that don't belong to a project.
 
 Notes live in the project itself, as Markdown in `<project>/notes/`, so they travel with it.
-Settings and appearance are in the app's user defaults. Pairing keys are in the Keychain. Nothing
-is kept on a server.
+Settings and appearance are in the app's user defaults (the Jev Workflows toggle and Jev's model
+too). Pairing keys and the TypeSafe Jev key are in the Keychain. Nothing is kept on a server.
 
 ## Permission modes
 
@@ -123,6 +123,36 @@ one turn with full access, run as a chat tagged with the automation. Before a ru
 claimed in the database, so the app and the background helper never both run one. The helper is a
 LaunchAgent (`dev.xbot.automations`) that starts xBot's own binary headless every minute, only
 while the toggle is on.
+
+## Jev and workflows
+
+[Jev](superpowers/specs/2026-10-12-jev-workflows-design.md) is TypeSafe AI's "System One" model: it
+never writes text; given a state and typed questions (yes/no, a choice, a score on a rubric) it
+answers each with calibrated probabilities in well under a second, for a fraction of a cent.
+xBot uses it to make the quick decisions between agent turns, so the expensive agents only do the
+work. Everything Jev-related is behind the **Jev Workflows** toggle in Settings › AI (off by
+default); off, nothing calls Jev.
+
+- `JevClient` (`XBotBrain`) is one `POST https://api.typesafe.ai/v1/systemone` with the key from the
+  Keychain (`JevSettings`, service `dev.xbot.jev`), its transport injected; every error becomes a
+  sentence (bad key, rate limited, overloaded, offline, timed out).
+- **A workflow** is a trigger (Run now or an automation's schedule), a project, and steps. An
+  **agent step** is a prompt, run as a turn in the workflow's run chat (`chats.workflow_id`), so the
+  CLI's session carries context from step to step; its brain is fixed, or **Jev picks**. A **Jev
+  step** asks one question about the run so far — the input and every earlier output under its
+  step's title, newest last, trimmed from the oldest end (`WorkflowState`) — and goes on, goes to
+  a step or stops: a gate (P(yes) against a threshold), a route (a choice) or a score (the nearest
+  level). Each is saved as a notice in the run. A step runs at most 5 times per run, so a loop of
+  go-tos always ends.
+- **Jev picks** (`JevPick`): one call with a choice over every installed CLI × model, each described
+  with its strength and relative cost, and a score for effort (Low…Max). The turn runs on the pick.
+  The composer's **Let Jev choose** does the same for each message of a chat (`chats.jev_chooses`).
+- **Fail closed**: if Jev can't answer, a gate, route or score stops the run with the reason; a
+  Jev-picks step falls back to the workflow's own brain, and a chat to its own agent, saying so.
+- Runs are claimed in the database like automations', and scheduled ones run from the same clock
+  while the app is open and through the automations helper while it's closed.
+- The decider is a protocol (`JevDecider`), scripted in tests; the engine is
+  `Workspace+Workflows.swift`.
 
 ## The remote
 

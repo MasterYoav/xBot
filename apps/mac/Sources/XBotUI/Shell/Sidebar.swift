@@ -1,7 +1,8 @@
 import SwiftUI
 import XBotCore
 
-/// Search, Abilities, Notes and Automations, projects with their chats, Recent, and the account button.
+/// Search, Abilities, Notes, Automations and (with Jev Workflows on) Workflows, projects with their
+/// chats, Recent, and the account button.
 struct Sidebar: View {
     let workspace: Workspace
     let addProject: () -> Void
@@ -44,6 +45,18 @@ struct Sidebar: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    // Only while Jev Workflows is on (Settings › AI).
+                    if workspace.showsWorkflows {
+                        Button { workspace.showWorkflows() } label: {
+                            SidebarRow(String(localized: "Workflows"), systemImage: "point.3.connected.trianglepath.dotted",
+                                       isSelected: workspace.page == .workflows) {
+                                if workspace.workflows.contains(where: { workspace.isRunning(workflow: $0.id) }) {
+                                    ProgressView().controlSize(.mini)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     if query.isEmpty { AgentsSidebarSection(workspace: workspace) }
 

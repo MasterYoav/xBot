@@ -333,7 +333,7 @@ private struct StepCard: View {
 
 // MARK: - Trigger
 
-private struct TriggerCard: View {
+struct TriggerCard: View {
     @Binding var trigger: Automation.Trigger
 
     private enum Kind: String, CaseIterable { case manual, hourly, daily, weekdays, weekly }

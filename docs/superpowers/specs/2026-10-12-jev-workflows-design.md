@@ -102,8 +102,10 @@ xBot is open, and through the automations helper while it's closed, if that's on
 
 ### Storage
 
-Schema v7: table `workflows` (id, name, trigger JSON, steps JSON, project_id, enabled, last_run_at,
-created_at, sort_index) and column `chats.workflow_id`.
+Schema v7: table `workflows` (id, name, trigger JSON, steps JSON, harness, model, effort,
+project_id, enabled, last_run_at, created_at, sort_index) and columns `chats.workflow_id` and
+`chats.jev_chooses`. (As built: `harness`/`model`/`effort` hold the brain a Jev-picks step falls
+back to, and `jev_chooses` is the composer's "Let Jev choose", kept per chat.)
 
 ### Where it shows
 

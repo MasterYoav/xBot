@@ -5,24 +5,39 @@ import XBotCore
 /// found), and about xBot.
 public struct SettingsView: View {
     let workspace: Workspace
+    @AppStorage(SettingsTab.key) private var tab = SettingsTab.general.rawValue
 
     public init(workspace: Workspace) { self.workspace = workspace }
 
     public var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             GeneralSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "General"), systemImage: "gearshape") }
+                .tag(SettingsTab.general.rawValue)
             AppearanceSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Appearance"), systemImage: "paintpalette") }
+                .tag(SettingsTab.appearance.rawValue)
             AISettings(workspace: workspace)
                 .tabItem { Label(String(localized: "AI"), systemImage: "cpu") }
+                .tag(SettingsTab.ai.rawValue)
             DevicesSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Devices"), systemImage: "iphone") }
+                .tag(SettingsTab.devices.rawValue)
             AboutSettings()
                 .tabItem { Label(String(localized: "About"), systemImage: "info.circle") }
+                .tag(SettingsTab.about.rawValue)
         }
         .frame(width: Metrics.settingsWidth)
     }
+}
+
+/// The Settings window's tabs; a page that sends the person to one (Workflows › Open Settings › AI)
+/// selects it first.
+enum SettingsTab: String {
+    case general, appearance, ai, devices, about
+    static let key = "settings.tab"
+
+    @MainActor static func select(_ tab: SettingsTab) { UserDefaults.standard.set(tab.rawValue, forKey: key) }
 }
 
 private struct GeneralSettings: View {
