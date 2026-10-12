@@ -121,6 +121,7 @@ struct XBotApp: App {
         let remote = RemoteService(workspace: workspace)
         workspace.remote = remote
         remote.wantsPushes = { NSApplication.shared.registerForRemoteNotifications() }
+        remote.host.drawAvatar = { AvatarPicture.png($0) }
         remote.start()
         return workspace
     }

@@ -264,3 +264,58 @@ public struct RemoteApp: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.isConnector = isConnector
     }
 }
+
+// MARK: The crew (Agents)
+
+/// A crew member's look: one choice per part, as the Mac draws them.
+public struct RemoteAvatar: Codable, Equatable, Hashable, Sendable {
+    /// Keyed by part ("skin", "hair", "hairColor", "eyes", "outfit", "outfitColor", "accessory").
+    public var parts: [String: Int]
+    public init(parts: [String: Int]) { self.parts = parts }
+}
+
+/// A part of the look and how many choices it has.
+public struct RemoteAvatarPart: Codable, Equatable, Sendable, Identifiable {
+    public var key: String
+    public var title: String
+    public var count: Int
+    public var id: String { key }
+    public init(key: String, title: String, count: Int) { self.key = key; self.title = title; self.count = count }
+}
+
+public struct RemoteCrewMember: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var name: String
+    public var role: String
+    public var instructions: String
+    public var avatar: RemoteAvatar
+    /// The CLI it works on ("claude", "codex", …).
+    public var agent: String
+    public var model: String?
+    public var projectID: UUID?
+    // Filled in by the Mac; ignored when saving.
+    public var isHeadMaster: Bool
+    /// "idle", "working", or "done" (finished and not looked at yet).
+    public var status: String
+    /// What it's doing while working.
+    public var activity: String?
+    /// The pixel sprite, drawn by the Mac (PNG).
+    public var image: Data?
+
+    public init(id: UUID = UUID(), name: String, role: String = "", instructions: String = "", avatar: RemoteAvatar, agent: String,
+                model: String? = nil, projectID: UUID? = nil, isHeadMaster: Bool = false, status: String = "idle",
+                activity: String? = nil, image: Data? = nil) {
+        self.id = id
+        self.name = name
+        self.role = role
+        self.instructions = instructions
+        self.avatar = avatar
+        self.agent = agent
+        self.model = model
+        self.projectID = projectID
+        self.isHeadMaster = isHeadMaster
+        self.status = status
+        self.activity = activity
+        self.image = image
+    }
+}

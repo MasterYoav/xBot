@@ -188,6 +188,10 @@ public enum HostMessage: Codable, Equatable, Sendable {
     /// Every automation, in order, with the step palette and whether the helper runs them while
     /// xBot is closed.
     case automations(requestID: UUID, automations: [RemoteAutomation], apps: [RemoteApp], runsWhileClosed: Bool)
+    /// The crew, in order, and the parts of a look.
+    case crew(requestID: UUID, members: [RemoteCrewMember], parts: [RemoteAvatarPart])
+    /// A look drawn by the Mac (PNG), for the editor's preview.
+    case avatarImage(requestID: UUID, image: Data?)
 }
 
 /// Phone → Mac.
@@ -239,6 +243,17 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case runAutomation(requestID: UUID, automationID: UUID)
     /// Installs or removes the background helper that runs automations while xBot is closed.
     case setAutomationHelper(requestID: UUID, on: Bool)
+    // The crew: each answered with `crew`, except `talkTo` (a `reply` with the new chat) and
+    // `drawAvatar` (an `avatarImage`).
+    case listCrew(requestID: UUID)
+    /// Hires (new id) or updates.
+    case saveCrew(requestID: UUID, member: RemoteCrewMember)
+    case deleteCrew(requestID: UUID, memberID: UUID)
+    /// Brings back the last member deleted from a phone, with their chats.
+    case undoDeleteCrew(requestID: UUID)
+    /// A new chat with the member (in its home project), starting with `text`.
+    case talkTo(requestID: UUID, memberID: UUID, text: String)
+    case drawAvatar(requestID: UUID, avatar: RemoteAvatar)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }

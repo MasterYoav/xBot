@@ -284,6 +284,70 @@ final class LiveRemoteUITests: XCTestCase {
         XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: row, timeout: 10))
     }
 
+    /// Agents: the crew with sprites, hire someone on Codex, message them, let them go, undo, let go.
+    func testAgents() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+
+        app.buttons["Agents"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["HeadMaster"].firstMatch.waitForExistence(timeout: 15), "No crew")
+        // Leftovers from an earlier run.
+        while app.staticTexts["Testy"].firstMatch.waitForExistence(timeout: 2) {
+            app.staticTexts["Testy"].firstMatch.press(forDuration: 1.2)
+            app.buttons["Let go"].firstMatch.tap()
+            sleep(2)
+        }
+        attach(app, "1 crew")
+
+        app.buttons["Hire"].firstMatch.tap()
+        let name = app.textFields["Name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        app.buttons["Shuffle the look"].tap()
+        name.tap()
+        name.typeText("Testy")
+        app.textFields["Role, like “Writer”"].tap()
+        app.textFields["Role, like “Writer”"].typeText("Tester\n")
+        app.swipeUp()
+        let agent = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Agent'")).firstMatch
+        XCTAssertTrue(agent.waitForExistence(timeout: 5))
+        agent.tap()
+        app.buttons["Codex"].firstMatch.tap()
+        attach(app, "2 hire")
+        app.buttons["save-crew"].tap()
+
+        let card = app.staticTexts["Testy"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 15), "Not hired")
+        card.tap()
+        app.buttons["Message Testy"].tap()
+        let text = app.textFields["talk-text"].exists ? app.textFields["talk-text"] : app.textViews["talk-text"]
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        text.typeText("Reply with exactly the word: pong. Don't use any tools.")
+        app.navigationBars.buttons["Send"].tap()
+        let pong = app.staticTexts.matching(NSPredicate(format: "label MATCHES[c] '\\W*pong\\W*'")).firstMatch
+        XCTAssertTrue(pong.waitForExistence(timeout: 180), "Testy didn't answer")
+        attach(app, "3 chat")
+
+        // Back to Testy, let go, undo, let go.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let letGo = app.buttons["Let Testy go"]
+        if !letGo.waitForExistence(timeout: 5) { app.swipeUp() }
+        attach(app, "4 detail")
+        letGo.tap()
+        app.buttons["Let go"].firstMatch.tap()
+        if !app.buttons["Undo"].waitForExistence(timeout: 10) { print("HIERARCHY\n" + app.debugDescription) }
+        attach(app, "5 after let go")
+        XCTAssertTrue(app.buttons["Undo"].exists)
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "Undo didn't bring Testy back")
+        card.press(forDuration: 1.2)
+        app.buttons["Let go"].firstMatch.tap()
+        XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: card, timeout: 10))
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name

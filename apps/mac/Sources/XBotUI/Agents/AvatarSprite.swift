@@ -572,3 +572,14 @@ private struct Outfit {
         ], legs: .denim),
     ]
 }
+
+/// A crew member's sprite as a PNG, for the iPhone and iPad app.
+public enum AvatarPicture {
+    @MainActor
+    public static func png(_ avatar: AgentAvatar, pixel: CGFloat = 6) -> Data? {
+        let renderer = ImageRenderer(content: AvatarSprite(avatar: avatar, pixel: pixel))
+        renderer.scale = 1
+        guard let image = renderer.cgImage else { return nil }
+        return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+    }
+}
