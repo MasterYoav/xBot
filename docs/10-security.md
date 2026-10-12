@@ -105,7 +105,7 @@ code the agent will run as you; xBot doesn't vet it.
 | `…/xBot/Inbox/` | The working folder for chats without a project |
 | `…/xBot/profile.png` | The account picture, if you set one |
 | `<project>/notes/*.md` | Notes, in the project |
-| User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names, iCloud change tokens |
+| User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names and installation ids, the identities of outstanding invites, iCloud change tokens and replay marks |
 | Keychain | Pairing keys, nothing else (below) |
 | `~/Library/LaunchAgents/dev.xbot.automations.plist` | Only while **Run when xBot is closed** is on |
 
@@ -143,26 +143,48 @@ the Mac.
 Nothing listens until you ask to pair. Pressing **Pair an iPhone or iPad…** starts one TCP
 listener on a port the system picks, advertised over Bonjour as `_xbot._tcp` with the Mac's id and
 the protocol version in its TXT record (and the Mac's name as the service name). At launch it
-starts again only if a device is paired. Removing the last device stops it. The iCloud lane
-listens on nothing.
+starts again only if a device is paired. Removing the last device, or closing the pairing sheet
+with nothing paired, stops it. The iCloud lane listens on nothing.
 
 ### Pairing
 
 The QR code is an `xbot://pair?v=…` link holding, in base64 JSON, the Mac's id and name, its
 Wi-Fi/Ethernet IPv4 address and port when known, and **the pairing key itself**: a UUID identity
 and 256 random bits (`PairingKey.generate`, `SecRandomCopyBytes`). Whoever sees the code, or a
-photo or screen recording of it, has the key and can pair. The sheet says so: "The code pairs one
-device. Keep it to yourself: it's the key to this Mac."
+photo or screen recording of it, while it's still valid has the key and can pair, if they use it
+before your device does. The sheet says so: "The code pairs one device and works for 10 minutes,
+until you close this. Keep it to yourself: it's the key to this Mac."
 
-On the phone, scanning the code or opening the link saves it to the Keychain and connects. A device
-appears in Settings › Devices the first time it connects.
+A code is an **invite**, and it's short-lived (`RemoteService.invite`, `withdraw`):
+
+- **Until the sheet closes.** Closing or cancelling the sheet, however it closes, withdraws an
+  invite nobody used: its key leaves the Keychain, the listener restarts without it, and the
+  iCloud lane stops reading mail sent with it.
+- **For 10 minutes at most.** Left open, the code expires on its own and the sheet offers a new one.
+- **Not across a relaunch.** Outstanding invites are noted in user defaults (identities only); at
+  the next launch their keys are removed.
+- **Once.** The phone makes an installation id when it pairs and sends it, inside the encrypted
+  channel, in its hello. The first installation to say hello with an invite's key becomes the
+  device, and the invite is used up. From then on the Mac refuses that key from any other
+  installation, on both lanes. (A device paired before this was recorded claims its key with its
+  next hello.)
+
+The Mac accepts only the keys of paired devices and of live invites. Any other key in the Keychain
+under `dev.xbot.remote.pairing` (an invite left by an older build, say) opens nothing.
+
+On the phone, scanning the code, pasting the link or opening it saves it to the Keychain and
+connects. Opening a pairing link while already paired asks first ("Replace the pairing with …?"),
+so a link someone sends you can't silently point your phone at their Mac. A device appears in
+Settings › Devices the first time it says hello.
 
 ### The local lane
 
 TLS 1.2 with the pairing key as a pre-shared key, cipher suite `TLS_PSK_WITH_AES_128_GCM_SHA256`
 (`LocalTLS`). There are no certificates: a peer without one of the keys can't complete the
-handshake, and the Mac only answers a device whose identity it holds a key for. Frames are a 4-byte
-length and JSON.
+handshake. The listener's PSK selection block picks the key for the identity the phone offers and
+notes which one it chose (`PSKChoices`); the first message must be a hello naming that same
+identity, or the Mac closes the connection. So a phone holding one device's key can't say hello as
+another. Frames are a 4-byte length and JSON.
 
 ### The iCloud lane
 
@@ -170,8 +192,15 @@ Messages are batched into records in the **private** CloudKit database of your o
 (container `iCloud.dev.xbot`), so the phone and the Mac must be signed in to the same account. Each
 batch is sealed with AES-GCM under the pairing key before it's written (`CloudChannel`), so iCloud
 holds ciphertext. Alongside it, each record carries in the clear who it's from and to (device
-identity or `mac`) and a sequence number. Batches are opened in order, once, and deleted after
-reading; one older than the last delivered is dropped as a replay.
+identity or `mac`) and a sequence number; those three are sealed in as authenticated data, so a
+batch that's been re-addressed or renumbered doesn't open. Batches are opened in order, once, and
+deleted after reading. A batch numbered at or below the last one delivered is dropped as a replay,
+and that mark is kept in user defaults on both sides, so it holds across relaunches.
+
+Every batch from a phone starts with its hello. The Mac checks each one against the installation
+that paired and drops any that doesn't match; only a batch it takes moves the replay mark, so a
+refused sender can't push the mark ahead and lock the real one out. Mail for the Mac sent with a
+key it doesn't accept is deleted unread.
 
 This lane needs the Mac app signed with the iCloud entitlement. Builds signed by
 `scripts/sign-mac-remote.sh` have it; the Developer ID release script signs without entitlements,
@@ -247,10 +276,10 @@ don't exist yet. Don't read this page as describing them.
 | --- | --- | --- |
 | The agent itself, doing something you didn't mean | Anything its mode allows; in Full access, anything you can | The permission mode, enforced by the CLI. Plan mode's read-only planning. Stop (⌘.). The Changes inspector to see and discard edits. No checkpoints, no gate of xBot's own |
 | Prompt injection (a web page, file, issue or tool output the agent reads) | Steer the agent within its mode; write `handoff` blocks; put a harmful command in a shell block you then **Run** | The CLI's own defences and its mode. Hand-offs only reach the manager's team, in Can edit. **Run** needs your click. Nothing else |
-| Someone who sees the pairing QR or link | Pair a device and get everything a paired device gets, the shell included, over the local network; over iCloud only if signed in to your iCloud account | Keep the code private; close the sheet. Remove unknown devices in Settings › Devices |
+| Someone who sees the pairing QR or link | If they use it before your device does, and within 10 minutes, before the sheet closes: pair a device and get everything a paired device gets, the shell included, over the local network; over iCloud only if signed in to your iCloud account | The code works once, and only while the sheet is open (10 minutes at most). Keep it private; close the sheet. Remove unknown devices in Settings › Devices |
 | Someone on the same network without a key | See the Bonjour advertisement (the Mac's name and id); open a TCP connection | TLS-PSK: no key, no handshake |
 | A lost or stolen paired phone | If unlocked, everything a paired device can do | The phone's passcode (keys are kept after first unlock, this device only). Remove it on the Mac |
-| Anyone who can read your iCloud data | See records' sender, recipient, sequence numbers, sizes and timing | AES-GCM with the pairing key over the contents |
+| Anyone who can read your iCloud data | See records' sender, recipient, sequence numbers, sizes and timing; post or re-post records | AES-GCM with the pairing key over the contents, with sender, recipient and sequence number authenticated. Replays and re-addressed records are refused |
 | Another process running as you on the Mac | Read `xbot.sqlite` and transcripts, the CLIs' own logs and credentials, Antigravity and Copilot prompts in process arguments | Nothing of xBot's. Your macOS account is the boundary, as for every app you run |
 | An MCP server or plugin you add | Run code as you when an agent uses it | You choosing it. xBot installs only what you ask, through the CLI |
 | A tampered update | Run code as you | EdDSA signatures, HTTPS-only feed, key only from the signed bundle in release. Inert until configured |
@@ -262,18 +291,13 @@ Found while writing this page and not fixed yet.
 
 - **No forward secrecy on the local lane.** Plain PSK suites don't add an ephemeral key exchange,
   so someone who records the traffic and later gets the pairing key can read it.
-- **Invites stay valid until relaunch.** A code shown and then cancelled, or never scanned, is
-  still accepted on the local lane until xBot quits, and its key stays in the Keychain. Because
-  the iCloud lane accepts any sender whose key is in the Keychain, it stays valid there across
-  relaunches too.
-- **One code, more than one device.** The key is the device's identity, so a second device that
-  scans the same code connects as the first.
-- **The hello isn't bound to the handshake.** On the local lane the device names itself after the
-  TLS handshake; the Mac checks it holds a key for that name, not that it's the key the handshake
-  used.
-- **The iCloud record's addressing isn't authenticated.** Sender, recipient and sequence number
-  sit outside the sealed box, so whoever can write to your private database could replay an old
-  batch under a higher sequence number.
+- **First to use a code wins.** An invite pairs whichever installation says hello with it first.
+  Someone who copies the code and uses it before your phone does is paired instead, and your phone
+  is then refused. Settings › Devices shows the name the device gave; remove one you don't
+  recognise.
+- **The sequence number follows the phone's clock.** It starts from the time in milliseconds when
+  the lane starts. A phone whose clock is set back has its iCloud batches refused as replays until
+  the clock passes the last one the Mac read.
 - **Uninstalling leaves the remote behind.** `scripts/uninstall-xbot.command` doesn't delete the
   `dev.xbot.remote.pairing` Keychain items or the automations LaunchAgent. Remove your devices and
   turn **Run when xBot is closed** off before uninstalling.
@@ -292,8 +316,9 @@ In plain words, and all of it true today:
 > **What xBot reads.** The agents' own logs, to show your usage and your profile. Never their
 > passwords or sign-in tokens.
 >
-> **Pairing a phone.** The pairing code is the key to this Mac: anyone who sees it can pair. A
-> paired phone can do everything you can do here, including open a terminal. On the same Wi-Fi it
+> **Pairing a phone.** The pairing code is the key to this Mac: anyone who sees it can pair, until
+> a device has used it, the sheet is closed or ten minutes pass. A paired phone can do everything
+> you can do here, including open a terminal. On the same Wi-Fi it
 > connects directly and encrypted; away, through your own iCloud, encrypted with the same key.
 > Remove a phone in Settings › Devices and it can't connect again.
 >

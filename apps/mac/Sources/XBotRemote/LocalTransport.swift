@@ -6,14 +6,26 @@ import Network
 /// Bonjour as `_xbot._tcp` with the Mac's id in its TXT record. Messages are length-prefixed JSON
 /// frames (`Frame`). Waits on the kernel; no timers or polling.
 public enum LocalTLS {
-    /// Parameters for either side. The listener takes every paired device's key; a phone, its own.
-    public static func parameters(keys: [PairingKey]) -> NWParameters {
+    /// Parameters for either side. The listener takes every paired device's key and notes in
+    /// `choices` which one each handshake used; a phone, its own key.
+    public static func parameters(keys: [PairingKey]) -> NWParameters { parameters(keys: keys, choices: nil) }
+
+    static func parameters(keys: [PairingKey], choices: PSKChoices?) -> NWParameters {
         let tls = NWProtocolTLS.Options()
         let options = tls.securityProtocolOptions
         for key in keys {
             let secret = key.secret.withUnsafeBytes { DispatchData(bytes: $0) }
             let identity = Data(key.identity.utf8).withUnsafeBytes { DispatchData(bytes: $0) }
             sec_protocol_options_add_pre_shared_key(options, secret as __DispatchData, identity as __DispatchData)
+        }
+        if let choices {
+            // On the server this block is handed the identity the phone offered; the key used is
+            // the one for the identity it completes with (nil: the handshake fails). Recording
+            // the choice is what lets the Mac hold a phone's hello to the key it really used.
+            sec_protocol_options_set_pre_shared_key_selection_block(options, { (metadata: sec_protocol_metadata_t, offered: __DispatchData?, complete: @escaping sec_protocol_pre_shared_key_selection_complete_t) in
+                let identity = offered.map { Data($0 as DispatchData) }.flatMap { choices.choose($0, for: metadata) }
+                complete(identity.map { Data($0.utf8).withUnsafeBytes { DispatchData(bytes: $0) } as __DispatchData })
+            }, choices.queue)
         }
         // PSK suites exist in TLS 1.2 only.
         sec_protocol_options_set_min_tls_protocol_version(options, .TLSv12)
@@ -28,6 +40,40 @@ public enum LocalTLS {
         let parameters = NWParameters(tls: tls, tcp: tcp)
         parameters.includePeerToPeer = true
         return parameters
+    }
+}
+
+/// The listener's note of which key each handshake used. Its PSK selection block records the
+/// identity it chose against that handshake's metadata; the connection takes it once ready. A
+/// connection whose choice can't be found is refused rather than trusted.
+final class PSKChoices: @unchecked Sendable {
+    let queue = DispatchQueue(label: "xbot.remote.psk")
+    private let identities: Set<String>
+    private let lock = NSLock()
+    private var chosen: [(metadata: AnyObject, identity: String, at: Date)] = []
+
+    init(identities: Set<String>) { self.identities = identities }
+
+    /// The identity to use for a handshake that offered `offered`, or nil to refuse it.
+    func choose(_ offered: Data, for metadata: sec_protocol_metadata_t) -> String? {
+        guard let identity = String(data: offered, encoding: .utf8), identities.contains(identity) else { return nil }
+        lock.withLock {
+            // Handshakes that never finish (a wrong key) leave a note behind; drop the old ones.
+            let stale = Date.now.addingTimeInterval(-60)
+            chosen.removeAll { $0.at < stale }
+            chosen.append((metadata as AnyObject, identity, .now))
+        }
+        return identity
+    }
+
+    /// The identity chosen for this connection's handshake, once.
+    func take(for connection: NWConnection) -> String? {
+        guard let tls = connection.metadata(definition: NWProtocolTLS.definition) as? NWProtocolTLS.Metadata else { return nil }
+        let metadata = tls.securityProtocolMetadata as AnyObject
+        return lock.withLock {
+            guard let index = chosen.firstIndex(where: { $0.metadata === metadata }) else { return nil }
+            return chosen.remove(at: index).identity
+        }
     }
 }
 
@@ -69,6 +115,12 @@ public struct PairingInvite: Codable, Equatable, Sendable {
         return parts.url!
     }
 
+    /// A link as text: scanned from the QR code, or pasted.
+    public init?(link: String) {
+        guard let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)), let invite = PairingInvite(url: url) else { return nil }
+        self = invite
+    }
+
     public init?(url: URL) {
         guard url.scheme == "xbot", url.host == "pair",
               let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "v" })?.value,
@@ -92,6 +144,13 @@ public final class FramedConnection<Incoming: Decodable & Sendable>: @unchecked 
 
     public init(_ connection: NWConnection) { self.connection = connection }
 
+    /// On the Mac's side: the identity of the key this connection's handshake used, once ready.
+    public var pskIdentity: String? { lock.withLock { identity } }
+    /// Set by the listener: finds the identity its handshake chose.
+    var identify: (@Sendable (NWConnection) -> String?)?
+    private let lock = NSLock()
+    private var identity: String?
+
     public convenience init(to endpoint: NWEndpoint, key: PairingKey) {
         self.init(NWConnection(to: endpoint, using: LocalTLS.parameters(keys: [key])))
     }
@@ -100,7 +159,12 @@ public final class FramedConnection<Incoming: Decodable & Sendable>: @unchecked 
         connection.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             switch state {
-            case .ready: self.report(.ready)
+            case .ready:
+                if let identify = self.identify {
+                    guard let identity = identify(self.connection) else { return self.close("No key for this connection.") }
+                    self.lock.withLock { self.identity = identity }
+                }
+                self.report(.ready)
             case .failed(let error): self.close(error.localizedDescription)
             case .cancelled: self.close(nil)
             case .waiting(let error):
@@ -176,7 +240,8 @@ public final class LocalListener: @unchecked Sendable {
     public func start(keys: [PairingKey], macID: UUID, macName: String, advertise: Bool = true, port: UInt16? = nil) throws {
         stop()
         guard !keys.isEmpty else { return }
-        let parameters = LocalTLS.parameters(keys: keys)
+        let choices = PSKChoices(identities: Set(keys.map(\.identity)))
+        let parameters = LocalTLS.parameters(keys: keys, choices: choices)
         let listener = try port.flatMap(NWEndpoint.Port.init(rawValue:)).map { try NWListener(using: parameters, on: $0) }
             ?? NWListener(using: parameters)
         if advertise {
@@ -185,6 +250,7 @@ public final class LocalListener: @unchecked Sendable {
         }
         listener.newConnectionHandler = { [weak self] connection in
             let framed = FramedConnection<ClientMessage>(connection)
+            framed.identify = { (connection: NWConnection) -> String? in choices.take(for: connection) }
             let handler = self?.onConnection
             DispatchQueue.main.async { MainActor.assumeIsolated { handler?(framed) } }
         }

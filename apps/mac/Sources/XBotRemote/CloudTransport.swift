@@ -3,7 +3,9 @@ import CryptoKit
 import Foundation
 
 /// One posting in the iCloud mailbox: some frames from one side to the other, sealed with the
-/// pairing key (AES-GCM), so iCloud only ever holds ciphertext.
+/// pairing key (AES-GCM), so iCloud only ever holds ciphertext. The sender, recipient and sequence
+/// number travel in the clear (they're how the record is found) but are sealed in as
+/// authenticated data, so a batch can't be re-addressed or renumbered (`authenticated`).
 public struct CloudBatch: Equatable, Sendable, Identifiable {
     public var id: String
     public var from: String
@@ -14,6 +16,11 @@ public struct CloudBatch: Equatable, Sendable, Identifiable {
 
     public init(id: String = UUID().uuidString, from: String, to: String, seq: Int64, sealed: Data, createdAt: Date = .now) {
         self.id = id; self.from = from; self.to = to; self.seq = seq; self.sealed = sealed; self.createdAt = createdAt
+    }
+
+    /// What the seal covers besides the frames.
+    static func authenticated(from: String, to: String, seq: Int64) -> Data {
+        (try? JSONEncoder().encode(["xbot.remote.batch", from, to, String(seq)])) ?? Data()
     }
 }
 
@@ -38,11 +45,16 @@ public actor CloudChannel<Outgoing: Encodable & Sendable, Incoming: Decodable & 
     private var lastSeq: Int64 = -1
     private var handler: (@Sendable ([Incoming]) -> Void)?
 
-    public init(me: String, peer: String, secret: Data, mailbox: any CloudMailbox) {
+    /// The sequence number of the last batch delivered: save it, and hand it back as `after`
+    /// when the channel is made again, so a batch read before isn't read again.
+    public var delivered: Int64 { lastSeq }
+
+    public init(me: String, peer: String, secret: Data, mailbox: any CloudMailbox, after delivered: Int64 = -1) {
         self.me = me
         self.peer = peer
         self.key = SymmetricKey(data: secret)
         self.mailbox = mailbox
+        self.lastSeq = delivered
         // Rising across relaunches without storing a counter.
         self.seq = Int64(Date.now.timeIntervalSince1970 * 1000)
     }
@@ -52,8 +64,8 @@ public actor CloudChannel<Outgoing: Encodable & Sendable, Incoming: Decodable & 
     public func send(_ messages: [Outgoing]) async throws {
         guard !messages.isEmpty else { return }
         let body = try Wire.encoder.encode(messages)
-        let sealed = try AES.GCM.seal(body, using: key).combined ?? Data()
         seq += 1
+        let sealed = try AES.GCM.seal(body, using: key, authenticating: CloudBatch.authenticated(from: me, to: peer, seq: seq)).combined ?? Data()
         try await mailbox.post(CloudBatch(from: me, to: peer, seq: seq, sealed: sealed))
     }
 
@@ -67,26 +79,47 @@ public actor CloudChannel<Outgoing: Encodable & Sendable, Incoming: Decodable & 
     /// every phone's channel (a change token can only be read once).
     @discardableResult
     public func receive(_ fetched: [CloudBatch]) async -> [Incoming] {
+        var out: [Incoming] = []
+        for batch in await open(fetched) {
+            accept(batch.seq)
+            out += batch.messages
+        }
+        if !out.isEmpty { handler?(out) }
+        return out
+    }
+
+    /// One batch, opened.
+    public struct Opened: Sendable {
+        public var seq: Int64
+        public var messages: [Incoming]
+    }
+
+    /// This channel's new batches in a fetch, opened, in order, each once (and deleted from the
+    /// mailbox), without delivering them: the caller decides which to take and `accept`s those.
+    /// Only an accepted batch moves the replay mark, so a batch that's refused can't push it
+    /// ahead and lock out the real sender.
+    public func open(_ fetched: [CloudBatch]) async -> [Opened] {
         let batches = fetched
             .filter { $0.to == me && $0.from == peer && !seen.contains($0.id) }
             .sorted { $0.seq < $1.seq }
-        var out: [Incoming] = []
+        var out: [Opened] = []
         var done: [String] = []
         for batch in batches {
             seen.insert(batch.id)
             done.append(batch.id)
             // Older than what was already delivered: a replay, dropped.
-            guard batch.seq > lastSeq else { continue }
+            guard batch.seq > lastSeq, batch.seq > (out.last?.seq ?? .min) else { continue }
             guard let box = try? AES.GCM.SealedBox(combined: batch.sealed),
-                  let body = try? AES.GCM.open(box, using: key),
+                  let body = try? AES.GCM.open(box, using: key, authenticating: CloudBatch.authenticated(from: batch.from, to: batch.to, seq: batch.seq)),
                   let messages = try? Wire.decoder.decode([Incoming].self, from: body) else { continue }
-            lastSeq = batch.seq
-            out += messages
+            out.append(Opened(seq: batch.seq, messages: messages))
         }
         if !done.isEmpty { try? await mailbox.delete(done) }
-        if !out.isEmpty { handler?(out) }
         return out
     }
+
+    /// Takes an opened batch: nothing at or below its sequence number is read again.
+    public func accept(_ seq: Int64) { lastSeq = max(lastSeq, seq) }
 }
 
 /// The real mailbox: a zone in the private CloudKit database, read with zone changes and a

@@ -34,6 +34,10 @@ final class RemoteClient {
     var notice: String?
 
     private(set) var pairing: PairingInvite?
+    /// A pairing link opened while already paired, waiting for the person to confirm it.
+    var offered: PairingInvite?
+    /// This installation, as the Mac knows it: made when pairing, so a code can only pair one device.
+    @ObservationIgnored private var installID: String?
     @ObservationIgnored private var opened: Set<UUID> = []
     @ObservationIgnored private var local: FramedConnection<HostMessage>?
     @ObservationIgnored private let browser = LocalBrowser()
@@ -46,6 +50,14 @@ final class RemoteClient {
 
     init() {
         pairing = PairingStore.load()
+        if pairing != nil {
+            // Paired before installations had an id: make one now; the Mac takes it at the next hello.
+            installID = PairingStore.loadInstallID() ?? {
+                let made = UUID().uuidString
+                PairingStore.saveInstallID(made)
+                return made
+            }()
+        }
         link = pairing == nil ? .unpaired : .searching
         if let cached = Cache.load() { projects = cached.projects; chats = cached.chats; agents = cached.agents; macName = cached.macName }
     }
@@ -54,18 +66,37 @@ final class RemoteClient {
 
     // MARK: Pairing
 
+    /// A pairing link from outside the app (the camera, Messages): pairs at once when unpaired;
+    /// otherwise waits for confirmation (`offered`).
+    func offer(_ invite: PairingInvite) {
+        if pairing == nil {
+            pair(with: invite)
+        } else if pairing?.key != invite.key {
+            offered = invite
+        }
+    }
+
     func pair(with invite: PairingInvite) {
+        stop()
         PairingStore.save(invite)
+        let made = UUID().uuidString
+        PairingStore.saveInstallID(made)
+        installID = made
+        CloudMark.clear()
+        // A different Mac: what's cached is the old one's.
+        Cache.clear()
         pairing = invite
+        offered = nil
         macName = invite.macName
         projects = []; chats = []; transcripts = [:]; live = [:]
-        stop()
         start()
     }
 
     func unpair() {
         stop()
         PairingStore.clear()
+        CloudMark.clear()
+        installID = nil
         Cache.clear()
         pairing = nil
         macName = nil
@@ -123,7 +154,7 @@ final class RemoteClient {
                 self.stopCloud()
                 self.link = .local
                 self.lastEndpoint = endpoint
-                connection.send([ClientMessage.hello(version: Wire.version, deviceID: pairing.key.identity, deviceName: self.deviceName)])
+                connection.send([self.hello(pairing)])
                 connection.send(self.opened.map { ClientMessage.open(chatID: $0) })
             case .closed(let reason):
                 self.local = nil
@@ -155,12 +186,11 @@ final class RemoteClient {
         }
         guard running, local == nil else { return }
         let channel = CloudChannel<ClientMessage, HostMessage>(me: pairing.key.identity, peer: "mac", secret: pairing.key.secret,
-                                                                mailbox: mailbox)
+                                                                mailbox: mailbox, after: CloudMark.load())
         cloud = channel
         link = .cloud
-        let hello: [ClientMessage] = [.hello(version: Wire.version, deviceID: pairing.key.identity, deviceName: deviceName), .away]
-            + opened.map { .open(chatID: $0) }
-        try? await channel.send(hello)
+        let first: [ClientMessage] = [hello(pairing), .away] + opened.map { .open(chatID: $0) }
+        try? await channel.send(first)
         // While on screen: read every 2 s (pushes can lag), and say "still here" each minute.
         cloudTimer = Task { [weak self] in
             var ticks = 0
@@ -169,14 +199,22 @@ final class RemoteClient {
                 guard let self, let channel = self.cloud else { return }
                 await self.cloudPoll()
                 ticks += 1
-                if ticks % 30 == 0 { try? await channel.send([.away]) }
+                if ticks % 30 == 0, let pairing = self.pairing { try? await channel.send([self.hello(pairing), .away]) }
             }
         }
     }
 
     func cloudPoll() async {
         guard let cloud, let messages = try? await cloud.poll() else { return }
+        // What was read stays read across launches: the Mac's old batches can't be replayed.
+        CloudMark.save(await cloud.delivered)
         for message in messages { receive(message) }
+    }
+
+    /// Who this is: the key's identity, the device's name and this installation. Every iCloud
+    /// batch starts with it, because the Mac checks each one came from the device that paired.
+    private func hello(_ pairing: PairingInvite) -> ClientMessage {
+        .hello(version: Wire.version, deviceID: pairing.key.identity, deviceName: deviceName, installID: installID)
     }
 
     private func stopCloud() {
@@ -195,7 +233,10 @@ final class RemoteClient {
 
     func post(_ messages: [ClientMessage]) {
         if let local { local.send(messages); return }
-        if let cloud { Task { try? await cloud.send(messages) } }
+        if let cloud, let pairing {
+            let batch = [hello(pairing)] + messages
+            Task { try? await cloud.send(batch) }
+        }
     }
 
     func request(_ make: (UUID) -> ClientMessage) async -> Answer {
@@ -430,7 +471,36 @@ enum PairingStore {
 
     static func clear() {
         SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service] as CFDictionary)
+        SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: installService] as CFDictionary)
     }
+
+    /// This installation's id, beside the pairing (and, like it, kept on this device only).
+    static let installService = "dev.xbot.mobile.install"
+
+    static func loadInstallID() -> String? {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: installService,
+                                    kSecReturnData as String: true]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func saveInstallID(_ id: String) {
+        SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: installService] as CFDictionary)
+        let item: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: installService,
+                                   kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+                                   kSecValueData as String: Data(id.utf8)]
+        SecItemAdd(item as CFDictionary, nil)
+    }
+}
+
+/// The sequence number of the last iCloud batch read from the Mac, so a relaunch doesn't read an
+/// old one again.
+enum CloudMark {
+    static let key = "remote.cloud.mark"
+    static func load() -> Int64 { (UserDefaults.standard.object(forKey: key) as? NSNumber)?.int64Value ?? -1 }
+    static func save(_ mark: Int64) { if mark > load() { UserDefaults.standard.set(NSNumber(value: mark), forKey: key) } }
+    static func clear() { UserDefaults.standard.removeObject(forKey: key) }
 }
 
 /// The last chat list, so the app opens on something while it finds the Mac.
