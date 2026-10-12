@@ -1,3 +1,4 @@
+import AppKit
 import Sparkle
 import XBotCore
 
@@ -7,6 +8,10 @@ import XBotCore
 final class SparkleAppUpdateController: NSObject, AppUpdateControlling, SPUUpdaterDelegate {
     private var controller: SPUStandardUpdaterController!
     private var isBlocked: () -> Bool = { false }
+    /// Holds the relaunch that installs an update until no turn is running.
+    private lazy var installDeferral = UpdateInstallDeferral { [weak self] in self?.isBlocked() ?? false }
+    /// Looks again every hour whether the daily check is due: the app can stay open for days.
+    private var dailyCheck: Timer?
 
     var isConfigured: Bool {
         resolvedFeedURL != nil && resolvedPublicKey != nil
@@ -29,13 +34,30 @@ final class SparkleAppUpdateController: NSObject, AppUpdateControlling, SPUUpdat
     }
 
     func checkForUpdates(userInitiated: Bool) {
-        guard isConfigured, !isBlocked() else { return }
-        controller.checkForUpdates(nil)
-        AppUpdateCheckStore.markChecked()
+        switch AppUpdateGate.userCheck(configured: isConfigured) {
+        case .notSetUp:
+            let alert = NSAlert()
+            alert.messageText = String(localized: "Updates aren't set up in this build")
+            alert.informativeText = String(localized: "This copy of xBot was built without an update feed, so it can't look for a newer version. Copies downloaded from the xBot website update themselves.")
+            alert.runModal()
+        case .check:
+            // Even mid-turn: looking is harmless, and installing waits for the turn (see below).
+            controller.checkForUpdates(nil)
+            AppUpdateCheckStore.markChecked()
+        }
     }
 
+    /// At launch, and every hour after: the daily background check, when it's due and no turn runs.
     func scheduleAutomaticCheckIfDue() {
-        guard isConfigured, AppUpdateCheckStore.shouldCheck(), !isBlocked() else { return }
+        checkInBackgroundIfDue()
+        guard isConfigured, dailyCheck == nil else { return }
+        dailyCheck = Timer.scheduledTimer(withTimeInterval: 3_600, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkInBackgroundIfDue() }
+        }
+    }
+
+    private func checkInBackgroundIfDue() {
+        guard AppUpdateGate.backgroundCheck(configured: isConfigured, due: AppUpdateCheckStore.shouldCheck(), busy: isBlocked()) else { return }
         controller.updater.checkForUpdatesInBackground()
         AppUpdateCheckStore.markChecked()
     }
@@ -44,10 +66,17 @@ final class SparkleAppUpdateController: NSObject, AppUpdateControlling, SPUUpdat
         resolvedFeedURL
     }
 
+    /// Sparkle's own scheduled checks wait for the turns too; a person asking doesn't.
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
-        if isBlocked() {
+        if !AppUpdateGate.mayCheck(userInitiated: updateCheck == .updates, busy: isBlocked()) {
             throw CancellationError()
         }
+    }
+
+    /// Installing relaunches the app, which would cut off a reply: it waits until no turn runs.
+    func updater(_ updater: SPUUpdater, shouldPostponeRelaunchForUpdate item: SUAppcastItem,
+                 untilInvokingBlock installHandler: @escaping () -> Void) -> Bool {
+        installDeferral.deferIfBusy { installHandler() }
     }
 
     /// The appcast, from the signed bundle — and from the environment only in a debug build.

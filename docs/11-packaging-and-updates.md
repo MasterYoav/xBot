@@ -41,7 +41,7 @@ SwiftPM's per-target resource bundles (without them `Bundle.module` traps at lau
 
 | Variable | Sets | Notes |
 | --- | --- | --- |
-| `XBOT_VERSION` | `CFBundleShortVersionString` | Without it the bundle keeps the committed plist's `1.0.0` |
+| `XBOT_VERSION` | `CFBundleShortVersionString` | Always set from here; without it, `2.0.0-dev` |
 | `XBOT_BUILD_NUMBER` | `CFBundleVersion` | Sparkle compares this, so it must rise with every release. CI uses the run number |
 
 Two things a fresh checkout needs that aren't obvious, both found as CI failures:
@@ -150,8 +150,8 @@ scripts/sign-mac-remote.sh                    # signs apps/mac/XBot.app
 scripts/sign-mac-remote.sh /path/to/XBot.app  # or another bundle
 ```
 
-The helper's DerivedData goes to `XBOT_SIGN_DERIVED_DATA`, or `~/.hermes/cache/scratch/dd-sign` if
-unset. The installed app on the development Mac is signed this way: `Apple Development`, team
+The helper's DerivedData goes to `XBOT_SIGN_DERIVED_DATA`, or `apps/ios/DerivedData/sign` (git-ignored)
+if unset. The installed app on the development Mac is signed this way: `Apple Development`, team
 `N6883L5366`, with `aps-environment` `development`, CloudKit and `iCloud.dev.xbot`.
 
 ### A Developer ID release with iCloud
@@ -178,7 +178,8 @@ project folder, and installs a LaunchAgent for automations. That's the reason it
 App Store.
 
 `Info.plist` carries the usage strings macOS shows when an automation or agent first controls
-another app (`NSAppleEventsUsageDescription`) or reads calendars and reminders.
+another app (`NSAppleEventsUsageDescription`) or reads calendars and reminders, and the copyright
+line "Copyright © 2026 xBot contributors. MIT.", the holder named in `LICENSE`.
 
 The iPhone app's entitlements (`apps/ios/XBotMobile.entitlements`) are CloudKit with
 `iCloud.dev.xbot` and `aps-environment` `development`.
@@ -191,7 +192,7 @@ The iPhone app's entitlements (`apps/ios/XBotMobile.entitlements`) are CloudKit 
 
 **Inert until configured.** The updater starts only when the bundle's `Info.plist` has both
 `SUFeedURL` and `SUPublicEDKey`. A plain `swift run` or an unconfigured bundle has neither, and
-**xBot › Check for Updates…** does nothing.
+**xBot › Check for Updates…** says "Updates aren't set up in this build" (`AppUpdateGate`).
 
 **The keys come from the signed bundle only.** `scripts/inject-sparkle-plist.sh` writes, when
 `XBOT_APPCAST_URL` and `XBOT_SPARKLE_PUBLIC_KEY` are both set:
@@ -224,11 +225,14 @@ strands every installed copy**: an app can't verify an update signed by a key it
 space: GitHub renames spaces in asset names to dots) and runs `generate_appcast` with the private
 key from `SPARKLE_EDDSA_PRIVATE_KEY` or `SPARKLE_EDDSA_PRIVATE_KEY_FILE`.
 
-**Not built in 2.0:** there's no update settings page, no beta channel, and no hold while a turn is
-streaming. `SparkleAppUpdateController` has a hook for that (`bindUpdateBlockingActivity`) and its
-own daily check (`scheduleAutomaticCheckIfDue`), but nothing in the redesigned app calls either, so
-automatic checks are Sparkle's own and can prompt mid-turn. Sparkle asks before it installs, so
-nothing restarts under a running agent without a click.
+**Never mid-turn.** At launch the app binds the updater to its turns
+(`bindUpdateBlockingActivity`) and starts its daily check (`scheduleAutomaticCheckIfDue`, looked at
+again every hour while the app stays open). While any turn is running, background checks, Sparkle's
+own included, are skipped, and the relaunch that installs an update waits until none is
+(`UpdateInstallDeferral`), so an update never cuts off a reply. **Check for Updates…** looks even
+mid-turn; it's the install that waits. Sparkle still asks before it installs.
+
+**Not built in 2.0:** there's no update settings page and no beta channel.
 
 ---
 
@@ -236,8 +240,9 @@ nothing restarts under a running agent without a click.
 
 - **Mac app:** semantic versioning. `CFBundleShortVersionString` is the marketing version, set from
   `XBOT_VERSION`; `CFBundleVersion` is a build number that only rises, from `XBOT_BUILD_NUMBER` (the
-  release workflow's run number). Local builds of the redesign use `XBOT_VERSION=2.0.0-dev`. The
-  committed `apps/mac/Resources/Info.plist` still says `1.0.0` / `1`.
+  release workflow's run number). Without `XBOT_VERSION`, `bundle-mac-app.sh` stamps `2.0.0-dev`,
+  which is also what the committed `apps/mac/Resources/Info.plist` says; its `CFBundleVersion` is
+  `1` until `XBOT_BUILD_NUMBER` sets it.
 - **iPhone app:** `MARKETING_VERSION` `2.0.0`, `CURRENT_PROJECT_VERSION` `1` in
   `apps/ios/project.yml`.
 - **The wire** between them has its own version (`Wire.version`, now 1); see
@@ -290,7 +295,7 @@ Mac; that's a decision on the [checklist](13-launch-checklist.md).
 2. Open xBot. **Gatekeeper checks the notarization ticket**; because the app is stapled, this works
    offline and shows no warning.
 3. Home. With no agent CLI installed it says "xBot works through an agent you already have", with
-   links to get Claude Code or Codex. There's no onboarding flow in the redesigned app yet
+   links to get Claude Code, Codex, Antigravity and GitHub Copilot. There's no onboarding flow in the redesigned app yet
    ([06-onboarding.md](06-onboarding.md) describes today's first run).
 
 Step 2 is the one that goes wrong. An unsigned or unstapled build shows "xBot cannot be opened
@@ -318,7 +323,8 @@ app; what it stored stays until removed:
 | Each project's `notes/` folder | Notes. These belong to the project and stay |
 
 **Turn off Run when xBot is closed before deleting the app.** That boots the LaunchAgent out and
-deletes its plist. Left behind, launchd keeps trying to start a binary that's gone.
+deletes its plist. Left behind, launchd keeps trying to start a binary that's gone (the uninstaller
+below removes it too).
 
 **`Uninstall xBot.command`** (in the DMG, from `scripts/uninstall-xbot.command`) asks you to type
 `remove`, refuses while xBot is running, and then:
@@ -326,20 +332,13 @@ deletes its plist. Left behind, launchd keeps trying to start a binary that's go
 - removes xBot 1.x's Docker container `xbot-engine` and volumes `xbot-data`, `xbot-workspace`,
   `xbot-profiles`, when Docker (or the Colima xBot 1.x installed) is available. It leaves Docker and
   Colima themselves alone;
-- deletes xBot 1.x's Keychain items (`dev.xbot.provider-key`, `dev.xbot.engine-token`,
-  `dev.xbot.key-encryption-key`, `dev.xbot.intelligence-key`, `dev.xbot.copilotkit-license`);
+- unloads the automations LaunchAgent (`launchctl bootout gui/<uid>/dev.xbot.automations`) and
+  deletes `~/Library/LaunchAgents/dev.xbot.automations.plist`;
+- deletes every Keychain item of the pairing service `dev.xbot.remote.pairing` (one per paired
+  device), and xBot 1.x's (`dev.xbot.provider-key`, `dev.xbot.engine-token`,
+  `dev.xbot.key-encryption-key`, `dev.xbot.intelligence-key`, `dev.xbot.copilotkit-license`), each by
+  service name, never a wildcard sweep;
 - deletes `~/Library/Application Support/xBot` and the `dev.xbot.app` preferences.
 
-It hasn't been updated for 2.0. It **doesn't** unload or delete the automations LaunchAgent, and it
-**doesn't** delete the pairing keys (`dev.xbot.remote.pairing`). Its header and its opening text
-still describe 1.x (an in-app "Settings → Advanced → Uninstall" that no longer exists, and "the
-websites your agents are signed in to"). Until it's fixed, remove those two by hand:
-
-```sh
-launchctl bootout gui/$(id -u)/dev.xbot.automations 2>/dev/null
-rm -f ~/Library/LaunchAgents/dev.xbot.automations.plist
-while security delete-generic-password -s dev.xbot.remote.pairing >/dev/null 2>&1; do :; done
-```
-
-Nothing on the phone is touched by either: delete the iPhone app as usual, and remove the device in
+Nothing on the phone is touched: delete the iPhone app as usual, and remove the device in
 the Mac's Settings › Devices first if the Mac is staying.

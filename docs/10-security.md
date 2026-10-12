@@ -56,9 +56,11 @@ default (Settings › General › Default permission).
 
 - **Hand-offs.** A manager's reply can contain fenced `handoff` blocks. xBot acts only on names in
   that manager's own team (below them, at any depth); anything else is refused with a notice in the
-  manager's reply. Each accepted hand-off starts a new chat with the member in **Can edit** mode,
-  in the manager chat's project, whatever mode the manager's own chat was in. A manager chat in
-  Read only can therefore start Can edit work, and for an Antigravity member that is full access.
+  manager's reply. Each accepted hand-off starts a new chat with the member, in the manager chat's
+  project, in **Can edit** at most and never in more than the manager's own chat has: from a Read
+  only chat the member works Read only, and from a Full access chat it gets Can edit
+  (`Handoff.mode`). Antigravity can only edit with full access, so an Antigravity member stays Read
+  only unless the manager's chat is in Full access, and the manager's reply says so in a notice.
 - **Automations** run with **full access**, always (`Workspace+Automations`); the editor says
   "Automations run with full access: they can do anything you can on this Mac." They run while
   xBot is open. **Run when xBot is closed** (off by default) installs a LaunchAgent,
@@ -78,7 +80,7 @@ Copilot's.
 
 | File | What for | What is used |
 | --- | --- | --- |
-| `~/.claude.json` | Plan, "Signed in", Claude Code's MCP servers | The whole file is parsed; only `oauthAccount` (its presence, and `organizationType` for the plan) and `mcpServers` (your user ones and the open project's) are looked at. For a server, its name and its command line or URL are shown |
+| `~/.claude.json` | Plan, "Signed in", Claude Code's MCP servers | The whole file is parsed; only `oauthAccount` (its presence, and `organizationType` for the plan) and `mcpServers` (your user ones and the open project's) are looked at. For a server, its name and its command line or URL are shown, with what looks like a secret masked (below) |
 | Claude Code's stream | Usage left | Its `rate_limit_event` lines, as each turn runs |
 | `~/.claude/projects/**/*.jsonl` | Profile | Read incrementally: tokens per day, tasks, tool, skill and effort counts, project paths. No message text is kept |
 | `~/.codex/sessions/…/rollout-*.jsonl` | Profile, usage left | As above; for limits, the last 512 KB of the newest five logs |
@@ -87,6 +89,13 @@ Copilot's.
 | `~/.claude/skills`, `~/.codex/skills`, a project's `.claude/skills`, plugin folders | Abilities | Each skill's `SKILL.md` |
 
 Antigravity's model list comes from running `agy` itself.
+
+**An MCP server's command line or URL can hold a token**, so before it's shown on the Abilities page
+or sent to a paired phone, xBot masks what looks like one (`SecretRedaction`): a URL's user name and
+password and every query value, the value after a flag or a `NAME=` whose name has `token`, `key`,
+`secret`, `password` or `auth` in it (`--token …`, `--api-key=…`, `GITHUB_TOKEN=…`), and the word
+after `Bearer`. It's a pattern match, not a guarantee: a secret passed as a bare argument with no
+name in front of it is shown as it is.
 
 **Abilities changes go through the CLIs.** Plugins and MCP servers are switched, installed and
 removed with the CLIs' own commands (`claude plugin …`, `claude mcp add|remove`, `codex plugin …`,
@@ -220,7 +229,8 @@ it has no more and no fewer rights than Terminal.app.
   HTTPS. A release takes both values only from the signed bundle; reading them from the
   environment (`XBOT_APPCAST_URL`, `XBOT_SPARKLE_PUBLIC_KEY`) is allowed in debug builds only
   (`AppUpdateTrust`). Automatic installs are off: the injected plist sets `SUAutomaticallyUpdate`
-  to false.
+  to false. An update is never installed while a turn is running: the relaunch that installs it
+  waits until none is (`UpdateInstallDeferral`), and background checks wait too.
 - **Code signing.** `scripts/sign-mac-app.sh` signs with Developer ID and the hardened runtime,
   then notarises and staples when the credentials are present. `scripts/sign-mac-remote.sh` signs
   a local build with Apple Development and the iCloud and push entitlements. The app is **not
@@ -246,7 +256,7 @@ don't exist yet. Don't read this page as describing them.
 | Who or what | What they could do | What stops them |
 | --- | --- | --- |
 | The agent itself, doing something you didn't mean | Anything its mode allows; in Full access, anything you can | The permission mode, enforced by the CLI. Plan mode's read-only planning. Stop (⌘.). The Changes inspector to see and discard edits. No checkpoints, no gate of xBot's own |
-| Prompt injection (a web page, file, issue or tool output the agent reads) | Steer the agent within its mode; write `handoff` blocks; put a harmful command in a shell block you then **Run** | The CLI's own defences and its mode. Hand-offs only reach the manager's team, in Can edit. **Run** needs your click. Nothing else |
+| Prompt injection (a web page, file, issue or tool output the agent reads) | Steer the agent within its mode; write `handoff` blocks; put a harmful command in a shell block you then **Run** | The CLI's own defences and its mode. Hand-offs only reach the manager's team, never with more than the manager's chat has. **Run** needs your click. Nothing else |
 | Someone who sees the pairing QR or link | Pair a device and get everything a paired device gets, the shell included, over the local network; over iCloud only if signed in to your iCloud account | Keep the code private; close the sheet. Remove unknown devices in Settings › Devices |
 | Someone on the same network without a key | See the Bonjour advertisement (the Mac's name and id); open a TCP connection | TLS-PSK: no key, no handshake |
 | A lost or stolen paired phone | If unlocked, everything a paired device can do | The phone's passcode (keys are kept after first unlock, this device only). Remove it on the Mac |
@@ -274,9 +284,8 @@ Found while writing this page and not fixed yet.
 - **The iCloud record's addressing isn't authenticated.** Sender, recipient and sequence number
   sit outside the sealed box, so whoever can write to your private database could replay an old
   batch under a higher sequence number.
-- **Uninstalling leaves the remote behind.** `scripts/uninstall-xbot.command` doesn't delete the
-  `dev.xbot.remote.pairing` Keychain items or the automations LaunchAgent. Remove your devices and
-  turn **Run when xBot is closed** off before uninstalling.
+- **MCP masking is a pattern match.** A token passed as a bare argument, with no flag or name
+  in front of it, is shown on the Abilities page and sent to a paired phone as it is.
 
 ## What we tell the user
 

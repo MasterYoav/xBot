@@ -33,7 +33,9 @@ struct LiveHarnessTests {
         #expect(second.parts.contains { if case .text(let t) = $0 { t.lowercased().contains("plum") } else { false } })
     }
 
-    @Test(arguments: HarnessKind.allCases)
+    /// Only the CLIs that answer to a schema can plan (Antigravity and Copilot can't, and xBot
+    /// doesn't offer them Plan).
+    @Test(arguments: HarnessKind.allCases.filter(\.givesStructuredAnswers))
     func aRealPlanRunsToTheEnd(kind: HarnessKind) async throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "xbot-live-plan-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

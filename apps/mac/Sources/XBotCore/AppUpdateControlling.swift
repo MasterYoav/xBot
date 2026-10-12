@@ -6,10 +6,11 @@ public protocol AppUpdateControlling: AnyObject {
     /// Whether an appcast URL and public key are configured for this build.
     var isConfigured: Bool { get }
 
-    /// Called once so the controller can defer checks while a turn is streaming.
+    /// Called once at launch so the controller can hold background checks, and the relaunch that
+    /// installs an update, while a turn is running.
     func bindUpdateBlockingActivity(_ isBlocked: @escaping () -> Bool)
 
-    /// User-initiated check from Settings → Updates.
+    /// "Check for Updates…". In a build without an appcast it says so instead of doing nothing.
     func checkForUpdates(userInitiated: Bool)
 
     /// Daily automatic check — skipped while `isBlocked` returns true.
@@ -28,6 +29,59 @@ public final class DisabledAppUpdateController: AppUpdateControlling {
     public func checkForUpdates(userInitiated: Bool) {}
 
     public func scheduleAutomaticCheckIfDue() {}
+}
+
+/// What the update controller decides, apart from Sparkle, so it can be tested.
+public enum AppUpdateGate {
+    public enum UserCheck: Equatable, Sendable {
+        /// A build without an appcast and key (a development build): say updates aren't set up.
+        case notSetUp
+        case check
+    }
+
+    public static func userCheck(configured: Bool) -> UserCheck { configured ? .check : .notSetUp }
+
+    /// The daily check in the background: configured, due, and no turn running.
+    public static func backgroundCheck(configured: Bool, due: Bool, busy: Bool) -> Bool {
+        configured && due && !busy
+    }
+
+    /// Whether Sparkle may look now. A person asking may; a background check waits for the turns.
+    /// Looking is harmless either way: installing is what waits (`UpdateInstallDeferral`).
+    public static func mayCheck(userInitiated: Bool, busy: Bool) -> Bool { userInitiated || !busy }
+}
+
+/// Holds the relaunch that installs an update until no turn is running, so an update never lands
+/// in the middle of a reply (the relaunch would cut it off).
+@MainActor
+public final class UpdateInstallDeferral {
+    private let isBusy: () -> Bool
+    private let interval: Duration
+    private var waiting: Task<Void, Never>?
+
+    public init(interval: Duration = .seconds(2), isBusy: @escaping () -> Bool) {
+        self.interval = interval
+        self.isBusy = isBusy
+    }
+
+    /// Whether the install is waiting. False: nothing is running, install now. True: `install`
+    /// runs once nothing is (a later call replaces an earlier wait).
+    public func deferIfBusy(_ install: @escaping @MainActor () -> Void) -> Bool {
+        guard isBusy() else { return false }
+        waiting?.cancel()
+        let interval = interval
+        waiting = Task { @MainActor [weak self] in
+            while self?.isBusy() == true {
+                try? await Task.sleep(for: interval)
+                if Task.isCancelled { return }
+            }
+            guard self != nil else { return }
+            install()
+        }
+        return true
+    }
+
+    public var isWaiting: Bool { waiting != nil }
 }
 
 /// When the app last looked for a newer xBot build.

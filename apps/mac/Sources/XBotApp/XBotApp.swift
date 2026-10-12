@@ -43,6 +43,11 @@ struct XBotApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let appUpdates = SparkleAppUpdateController()
     @State private var workspace = Self.makeWorkspace()
+
+    init() {
+        // Bound to the turns and scheduled once launch finishes (AppDelegate).
+        AppDelegate.appUpdates = appUpdates
+    }
     @AppStorage("inspectorShown") private var inspectorShown = false
 
     var body: some Scene {
