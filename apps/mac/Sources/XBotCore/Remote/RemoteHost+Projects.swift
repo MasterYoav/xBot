@@ -89,15 +89,15 @@ extension RemoteHost {
             let projectPaths = Set(workspace.projects.map(\.path))
             let urls = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
                                                                      options: [.skipsHiddenFiles])) ?? []
-            let folders = urls.filter { url in
+            let folders: [RemoteFolder] = urls.filter { (url: URL) -> Bool in
                 let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
                 return values?.isDirectory == true && values?.isPackage != true
             }
-            .map { url in
+            .map { (url: URL) -> RemoteFolder in
                 let full = url.standardizedFileURL.path(percentEncoded: false).trimmingSuffix("/")
                 return RemoteFolder(name: url.lastPathComponent, path: full, isProject: projectPaths.contains(full))
             }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .sorted { (a: RemoteFolder, b: RemoteFolder) in a.name.localizedStandardCompare(b.name) == .orderedAscending }
             let shown = folder.standardizedFileURL.path(percentEncoded: false).trimmingSuffix("/")
             return (request, .macFolders(requestID: request, path: shown.isEmpty ? "/" : shown, folders: folders))
 
