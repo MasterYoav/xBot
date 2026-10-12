@@ -35,6 +35,27 @@ struct PairView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    // No camera (a simulator, an iPad on a stand), or the link came in a message.
+                    VStack(spacing: 12) {
+                        Button { use(UIPasteboard.general.string ?? "") } label: {
+                            Label(String(localized: "Paste a pairing link"), systemImage: "doc.on.clipboard")
+                                .frame(maxWidth: .infinity).padding(.vertical, 4)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        HStack {
+                            TextField(String(localized: "Or type it: xbot://pair?…"), text: $pasted)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.URL)
+                                .submitLabel(.go)
+                                .onSubmit { use(pasted) }
+                            Button(String(localized: "Pair")) { use(pasted) }
+                                .disabled(pasted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                    }
                     if let problem { Text(problem).font(.footnote).foregroundStyle(.red) }
                 }
                 .padding(24)
@@ -42,15 +63,22 @@ struct PairView: View {
                 .frame(maxWidth: .infinity)
             }
             .fullScreenCover(isPresented: $scanning) {
-                ScannerScreen { code in
+                ScannerScreen { (code: String) in
                     scanning = false
-                    if let url = URL(string: code), let invite = PairingInvite(url: url) {
-                        client.pair(with: invite)
-                    } else {
-                        problem = String(localized: "That isn't an xBot pairing code.")
-                    }
+                    use(code)
                 }
             }
+        }
+    }
+
+    /// A pairing link, scanned, pasted or typed.
+    private func use(_ text: String) {
+        if let invite = PairingInvite(link: text) {
+            problem = nil
+            pasted = ""
+            client.pair(with: invite)
+        } else {
+            problem = String(localized: "That isn't an xBot pairing code.")
         }
     }
 }

@@ -19,7 +19,19 @@ struct XBotMobileApp: App {
                 .environment(\.motionPaused, phase != .active)
                 .preferredColorScheme(Appearance(rawValue: appearance)?.scheme)
                 .onOpenURL { url in
-                    if let invite = PairingInvite(url: url) { client.pair(with: invite) }
+                    if let invite = PairingInvite(url: url) { client.offer(invite) }
+                }
+                // A pairing link opened while paired replaces nothing until it's confirmed: a link
+                // someone sends you shouldn't silently point this phone at their Mac.
+                .alert(String(localized: "Replace the pairing with \(client.offered?.macName ?? "")?"),
+                       isPresented: Binding(get: { client.offered != nil }, set: { (shown: Bool) in if !shown { client.offered = nil } })) {
+                    Button(String(localized: "Replace"), role: .destructive) {
+                        if let invite = client.offered { client.pair(with: invite) }
+                        client.offered = nil
+                    }
+                    Button(String(localized: "Cancel"), role: .cancel) { client.offered = nil }
+                } message: {
+                    Text(String(localized: "This device will forget \(client.macName ?? String(localized: "your Mac")) and work with \(client.offered?.macName ?? "") instead."))
                 }
                 .onAppear {
                     PushDelegate.client = client

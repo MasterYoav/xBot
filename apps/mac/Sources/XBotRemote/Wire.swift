@@ -206,8 +206,11 @@ public enum HostMessage: Codable, Equatable, Sendable {
 
 /// Phone → Mac.
 public enum ClientMessage: Codable, Equatable, Sendable {
-    /// `deviceID`: the pairing key's identity (only a device holding that key gets this far).
-    case hello(version: Int, deviceID: String, deviceName: String)
+    /// `deviceID`: the pairing key's identity. It must be the key the connection's TLS handshake
+    /// used, or the one the iCloud batch was sealed with; the Mac refuses any other.
+    /// `installID`: this installation of the app, made when it paired. A pairing code pairs one
+    /// device: once one installation has used a key, the Mac refuses it from any other.
+    case hello(version: Int, deviceID: String, deviceName: String, installID: String? = nil)
     /// Start receiving this chat's transcript and live reply; `close` stops it.
     case open(chatID: UUID)
     case close(chatID: UUID)
