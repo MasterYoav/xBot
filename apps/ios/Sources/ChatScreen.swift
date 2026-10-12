@@ -5,6 +5,8 @@ import XBotRemote
 struct ChatScreen: View {
     let client: RemoteClient
     let chatID: UUID
+    /// For a chat the list doesn't have (an automation's run): its title; no composer.
+    var fallbackTitle: String?
     @State private var text = ""
     @State private var editing: RemoteMessage?
     @State private var renaming: RemoteChat?
@@ -53,12 +55,12 @@ struct ChatScreen: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let chat { Composer(client: client, chat: chat, text: $text, focused: $focused) }
         }
-        .navigationTitle(chat?.title ?? "")
+        .navigationTitle(chat?.title ?? fallbackTitle ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 0) {
-                    Text(chat?.title ?? "").font(.headline).lineLimit(1)
+                    Text(chat?.title ?? fallbackTitle ?? "").font(.headline).lineLimit(1)
                     if let chat {
                         Text([chat.crewName, chat.agentName, client.project(chat.projectID)?.name].compactMap { $0 }.joined(separator: " · "))
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -68,6 +70,7 @@ struct ChatScreen: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                if chat != nil {
                 Menu {
                     Button { renaming = chat } label: { Label(String(localized: "Rename"), systemImage: "pencil") }
                     Button { Task { await client.retry(chatID) } } label: { Label(String(localized: "Ask again"), systemImage: "arrow.clockwise") }
@@ -77,6 +80,7 @@ struct ChatScreen: View {
                     Button(role: .destructive) { deleting = true } label: { Label(String(localized: "Delete"), systemImage: "trash") }
                 } label: { Image(systemName: "ellipsis.circle") }
                 .accessibilityLabel(String(localized: "Chat actions"))
+                }
             }
         }
         .renameAlert(chat: $renaming, client: client)

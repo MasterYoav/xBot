@@ -157,7 +157,7 @@ extension RemoteHost {
             return (request, notesAnswer(request, project, saved: nil))
 
         default:
-            return (nil, nil)
+            return answerAutomations(message)
         }
     }
 

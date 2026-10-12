@@ -59,7 +59,7 @@ import XBotRemote
 
     static func requestID(of message: HostMessage) -> UUID? {
         switch message {
-        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _): r
+        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _): r
         default: nil
         }
     }
@@ -226,5 +226,73 @@ import XBotRemote
         link.say(.undoDeleteNote(requestID: undo, projectID: project.id))
         guard case .notes(_, let back, nil) = await tests.answer(link, undo) else { Issue.record("not undone"); return }
         #expect(back.map(\.name) == ["summer-trip.md"])
+    }
+}
+
+/// Automations from the phone.
+@MainActor @Suite(.serialized) struct RemoteAutomationsTests {
+    let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+
+    @Test func createEditRunAndDelete() async throws {
+        let brain = ScriptedBrain([.textDelta("done"), .done])
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: brain] })
+        await w.refreshHarnesses()
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        defer { withExtendedLifetime(host) {} }
+        let link = FakeLink()
+        host.attach(link)
+        let tests = RemoteProjectsTests()
+
+        let list = UUID()
+        link.say(.listAutomations(requestID: list))
+        guard case .automations(_, let none, let apps, _) = await tests.answer(link, list) else { Issue.record("no list"); return }
+        #expect(none.isEmpty)
+        #expect(apps.prefix(3).map(\.key) == ["mail", "calendar", "reminders"])
+
+        // Made on the phone: a weekday schedule and two steps.
+        var made = RemoteAutomation(name: "Morning brief", schedule: .weekdays(hour: 8, minute: 30),
+                                    steps: [RemoteStep(app: "calendar", text: "List today's events"),
+                                            RemoteStep(app: "connector:Gmail", text: "Summarise unread mail")],
+                                    agent: "claude", effort: "low")
+        let save = UUID()
+        link.say(.saveAutomation(requestID: save, automation: made))
+        guard case .automations(_, let one, _, _) = await tests.answer(link, save) else { Issue.record("not saved"); return }
+        let saved = try #require(one.first)
+        #expect(saved.name == "Morning brief" && saved.schedule == .weekdays(hour: 8, minute: 30) && saved.nextRun != nil)
+        let stored = try #require(w.automation(made.id))
+        #expect(stored.trigger == .schedule(.weekdays(hour: 8, minute: 30)))
+        #expect(stored.steps.map(\.app) == [.calendar, .connector("Gmail")] && stored.effort == .low)
+
+        // Edited: manual, off.
+        made.schedule = nil
+        made.isEnabled = false
+        let edit = UUID()
+        link.say(.saveAutomation(requestID: edit, automation: made))
+        guard case .automations(_, let edited, _, _) = await tests.answer(link, edit) else { Issue.record("not edited"); return }
+        #expect(edited.first?.schedule == nil && edited.first?.isEnabled == false && w.automation(made.id)?.trigger == .manual)
+
+        // An unknown step app is refused.
+        var bad = made
+        bad.steps = [RemoteStep(app: "spaceship", text: "fly")]
+        let refused = UUID()
+        link.say(.saveAutomation(requestID: refused, automation: bad))
+        guard case .reply(_, false, _, _) = await tests.answer(link, refused) else { Issue.record("saved nonsense"); return }
+
+        // Run now: a run chat the phone can open.
+        let run = UUID()
+        link.say(.runAutomation(requestID: run, automationID: made.id))
+        guard case .reply(_, true, _, let chatID?) = await tests.answer(link, run) else { Issue.record("didn't run"); return }
+        #expect(w.chat(chatID)?.automationID == made.id)
+        let end = Date.now.addingTimeInterval(20)
+        while w.isRunning(chatID), Date.now < end { try? await Task.sleep(for: .milliseconds(20)) }
+        let again = UUID()
+        link.say(.listAutomations(requestID: again))
+        guard case .automations(_, let after, _, _) = await tests.answer(link, again) else { Issue.record("no list"); return }
+        #expect(after.first?.runs.map(\.id) == [chatID] && after.first?.lastRunAt != nil)
+
+        let delete = UUID()
+        link.say(.deleteAutomation(requestID: delete, automationID: made.id))
+        guard case .automations(_, let gone, _, _) = await tests.answer(link, delete) else { Issue.record("not deleted"); return }
+        #expect(gone.isEmpty && w.automations.isEmpty)
     }
 }

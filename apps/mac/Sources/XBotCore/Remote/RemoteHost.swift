@@ -297,7 +297,8 @@ public final class RemoteHost {
             workspace.restoreChat(deleted.remove(at: index))
             answer(client, request, workspace.chat(chatID) != nil, chatID: chatID)
         case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject,
-             .listNotes, .saveNote, .deleteNote, .undoDeleteNote:
+             .listNotes, .saveNote, .deleteNote, .undoDeleteNote,
+             .listAutomations, .saveAutomation, .deleteAutomation, .runAutomation, .setAutomationHelper:
             handleProject(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
