@@ -1,14 +1,26 @@
 name: Mac release
 
+# A release is cut by bumping VERSION on master: the push publishes v<VERSION>. A pushed tag v*
+# publishes that version; a manual run publishes VERSION (or the version typed in) unless that
+# release already exists, or builds without publishing.
 on:
+  push:
+    branches: [master]
+    # Path filters only apply to the branch push. GitHub doesn't evaluate them for tag pushes.
+    paths: ["VERSION", ".github/workflows/mac-release.yml"]
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
-        description: "Marketing version to publish, e.g. 1.0.0. Leave empty to build without publishing."
+        description: "Marketing version, e.g. 2.0.1. Empty = the VERSION file."
         required: false
         default: ""
       prerelease:
-        description: "Mark the GitHub release as a pre-release"
+        description: "Mark the GitHub release as a pre-release (a version with '-' always is)"
+        type: boolean
+        default: false
+      build_only:
+        description: "Build, sign and upload the artifact, but don't publish a release"
         type: boolean
         default: false
 
@@ -16,7 +28,7 @@ on:
 permissions:
   contents: write
 
-# Hoisted to the job so the optional steps can be gated on them.
+# Hoisted to the workflow so the optional steps can be gated on them.
 #
 # `if: ${{ secrets.X != '' }}` is not valid — the `secrets` context is not available in a step's
 # `if`, and GitHub rejects the whole file rather than the one expression, so the workflow could
@@ -26,18 +38,137 @@ env:
   MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
   MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
   SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
-  XBOT_VERSION: ${{ inputs.version }}
-  # Sparkle compares CFBundleVersion, so it must rise with every release. The run number does.
+  # Sparkle compares CFBundleVersion, so it must rise with every release. The run number does
+  # (a re-run keeps its number, and only one run per version ever publishes).
   XBOT_BUILD_NUMBER: ${{ github.run_number }}
 
 jobs:
+  # Cheap and first: which version, and whether this run publishes it. A push that changed only this
+  # file, or a re-run after the release went out, finds the release already there and stops here
+  # instead of spending a macOS runner on a build nobody will publish — and instead of failing on
+  # "release already exists".
+  resolve:
+    name: resolve version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      publish: ${{ steps.resolve.outputs.publish }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+          INPUT_BUILD_ONLY: ${{ inputs.build_only }}
+        run: |
+          set -euo pipefail
+          file_version=""
+          [[ -f VERSION ]] && file_version="$(tr -d '[:space:]' < VERSION)"
+
+          # Dispatch input, then the tag, then the VERSION file.
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            version="${INPUT_VERSION#v}"
+          elif [[ "${REF_TYPE}" == "tag" ]]; then
+            version="${REF_NAME#v}"
+          else
+            version="${file_version}"
+          fi
+
+          # The version ends up in a plist, a tag, an asset name and a URL. Anything but semver is
+          # a typo, and is cheaper to catch here than as a release called "v2.0".
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Version '${version}' is not semantic (major.minor.patch[-pre]). Fix VERSION or the input."
+            exit 1
+          fi
+          if [[ "${REF_TYPE}" == "tag" && -n "${file_version}" && "${file_version}" != "${version}" ]]; then
+            echo "::warning::Tag ${REF_NAME} publishes ${version}, but VERSION at that commit says ${file_version}."
+          fi
+
+          # A '-' is a pre-release (2.1.0-beta.1). Sparkle's feed is releases/latest/download, which
+          # GitHub resolves to the newest full release, so a pre-release never reaches installed apps.
+          prerelease=false
+          [[ "${version}" == *-* || "${INPUT_PRERELEASE}" == "true" ]] && prerelease=true
+
+          publish=true
+          reason=""
+          if [[ "${EVENT}" == "workflow_dispatch" && "${INPUT_BUILD_ONLY}" == "true" ]]; then
+            publish=false; reason="build_only was ticked"
+          elif [[ "${EVENT}" == "workflow_dispatch" && "${REF}" != "refs/heads/master" && "${REF_TYPE}" != "tag" ]]; then
+            # A release is what master (or a tag) says it is, never a feature branch's VERSION.
+            publish=false; reason="run on ${REF_NAME}; only master or a v* tag publishes"
+          elif gh release view "v${version}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            publish=false; reason="release v${version} already exists; bump VERSION to publish a new one"
+          fi
+
+          if [[ "${publish}" == "true" ]]; then
+            echo "Publishing v${version} (prerelease=${prerelease})." | tee -a "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "Not publishing v${version}: ${reason}." | tee -a "${GITHUB_STEP_SUMMARY}"
+            echo "::notice::Not publishing v${version}: ${reason}."
+          fi
+          {
+            echo "version=${version}"
+            echo "publish=${publish}"
+            echo "prerelease=${prerelease}"
+          } >> "${GITHUB_OUTPUT}"
+
   build:
     name: mac — release build + dmg
+    needs: resolve
+    # A manual run always builds (that's how to get a build-only artifact); a push builds only when
+    # there's something to publish.
+    if: needs.resolve.outputs.publish == 'true' || github.event_name == 'workflow_dispatch'
+    # One run per version at a time, and never cancelled halfway: a cancelled run can leave a
+    # notarization in flight or a release half-uploaded. The second run then finds the release and
+    # stops at the publish step's own check.
+    concurrency:
+      group: mac-release-${{ needs.resolve.outputs.version }}
+      cancel-in-progress: false
     # macos-26, not macos-15: xBot.icon is Icon Composer's format and only Xcode 26's actool can
     # compile it. On the older image the step ran and reported "actool did not produce Assets.car",
     # and the Swift build then failed on the resources Package.swift declares.
     runs-on: macos-26
+    env:
+      XBOT_VERSION: ${{ needs.resolve.outputs.version }}
+      PUBLISH: ${{ needs.resolve.outputs.publish }}
+      PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
     steps:
+      # Before the build and notarization, not after: a run that is going to publish
+      # needs every signing and Sparkle secret. sign-mac-app.sh and generate-appcast.sh quietly skip
+      # when theirs are missing — right for a build-only run, wrong for a release, where the result
+      # would be an unsigned DMG that the verify step rejects at the very end, or worse, a
+      # half-configured updater.
+      - name: Require the signing secrets for a release
+        if: env.PUBLISH == 'true'
+        env:
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          XBOT_SPARKLE_PUBLIC_KEY: ${{ secrets.XBOT_SPARKLE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in MACOS_SIGNING_IDENTITY MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD \
+            APPLE_ID APPLE_TEAM_ID APPLE_APP_PASSWORD SPARKLE_EDDSA_PRIVATE_KEY XBOT_SPARKLE_PUBLIC_KEY; do
+            [[ -n "${!name:-}" ]] || missing+=("${name}")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::error::Refusing to publish v${XBOT_VERSION} unsigned. Missing secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "All signing, notarization and Sparkle secrets present."
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -64,7 +195,7 @@ jobs:
 
       - name: Bundle .app
         env:
-          XBOT_APPCAST_URL: ${{ inputs.version != '' && format('https://github.com/{0}/releases/latest/download/appcast.xml', github.repository) || secrets.XBOT_APPCAST_URL }}
+          XBOT_APPCAST_URL: ${{ needs.resolve.outputs.publish == 'true' && format('https://github.com/{0}/releases/latest/download/appcast.xml', github.repository) || secrets.XBOT_APPCAST_URL }}
           XBOT_SPARKLE_PUBLIC_KEY: ${{ secrets.XBOT_SPARKLE_PUBLIC_KEY }}
         run: scripts/bundle-mac-app.sh
 
@@ -112,6 +243,8 @@ jobs:
 
           # Added to the search list rather than replacing it, so the system keychains that hold
           # Apple's intermediate certificates stay reachable — the signature needs to chain to them.
+          # Unquoted on purpose: one argument per keychain path (none has a space on the runner).
+          # shellcheck disable=SC2046
           security list-keychains -d user -s "${keychain}" \
             $(security list-keychains -d user | tr -d '"')
 
@@ -132,7 +265,7 @@ jobs:
       - name: Generate Sparkle appcast
         if: env.SPARKLE_EDDSA_PRIVATE_KEY != ''
         env:
-          XBOT_RELEASE_DOWNLOAD_PREFIX: ${{ inputs.version != '' && format('https://github.com/{0}/releases/download/v{1}/', github.repository, inputs.version) || secrets.XBOT_RELEASE_DOWNLOAD_PREFIX }}
+          XBOT_RELEASE_DOWNLOAD_PREFIX: ${{ needs.resolve.outputs.publish == 'true' && format('https://github.com/{0}/releases/download/v{1}/', github.repository, needs.resolve.outputs.version) || secrets.XBOT_RELEASE_DOWNLOAD_PREFIX }}
         run: scripts/generate-appcast.sh
 
       - uses: actions/upload-artifact@v4
@@ -145,7 +278,7 @@ jobs:
       # Only a signed, notarized build is published: an unsigned DMG on the download page is the
       # "cannot be opened" dialog that stops a non-technical person for good.
       - name: Verify what a stranger's Mac will check
-        if: inputs.version != ''
+        if: env.PUBLISH == 'true'
         run: |
           set -euo pipefail
           mnt="$(mktemp -d)"
@@ -158,17 +291,31 @@ jobs:
           grep -q 'sparkle:edSignature=' dist/releases/appcast.xml
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${mnt}/XBot.app/Contents/Info.plist")" = "${XBOT_VERSION}"
 
+      # xBot.dmg under a fixed name, so https://github.com/<repo>/releases/latest/download/xBot.dmg
+      # (the README's and the website's button) always serves the newest full release;
+      # xBot-<version>.dmg is the one the appcast's enclosure names; appcast.xml is Sparkle's feed.
       - name: Publish GitHub release
-        if: inputs.version != ''
+        if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="v${XBOT_VERSION}"
+          # Checked again here, not only in resolve: a run queued behind another for the same
+          # version (the concurrency group) reaches this point after that one has published.
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "::notice::Release ${tag} already exists; not publishing it twice."
+            exit 0
+          fi
           flags=()
-          [[ "${{ inputs.prerelease }}" == "true" ]] && flags+=(--prerelease) || flags+=(--latest)
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            flags+=(--prerelease --latest=false)
+          else
+            flags+=(--latest)
+          fi
           gh release create "${tag}" --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" \
             --title "xBot ${XBOT_VERSION}" --generate-notes "${flags[@]}" \
             "dist/xBot.dmg#xBot.dmg" \
             "dist/releases/xBot-${XBOT_VERSION}.dmg" \
             "dist/releases/appcast.xml"
+          echo "Published ${tag}: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}" >> "${GITHUB_STEP_SUMMARY}"
