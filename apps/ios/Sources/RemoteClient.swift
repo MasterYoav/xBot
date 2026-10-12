@@ -186,7 +186,12 @@ final class RemoteClient {
 
     // MARK: Sending
 
-    private func post(_ messages: [ClientMessage]) {
+    /// Open shells: where their output goes, and what to do when they end.
+    @ObservationIgnored var shells: [UUID: (output: (Data) -> Void, ended: () -> Void)] = [:]
+    /// Output for a shell whose opening answer hasn't been handled yet.
+    @ObservationIgnored var earlyShellOutput: [UUID: Data] = [:]
+
+    func post(_ messages: [ClientMessage]) {
         if let local { local.send(messages); return }
         if let cloud { Task { try? await cloud.send(messages) } }
     }
@@ -335,6 +340,12 @@ final class RemoteClient {
             transcripts[chatID]?.removeAll { $0.id == messageID }
         case .live(let chatID, let parts):
             live[chatID] = parts.isEmpty ? nil : parts
+        case .shellOutput(let id, let data):
+            if let shell = shells[id] { shell.output(data) } else { earlyShellOutput[id, default: Data()].append(data) }
+        case .shellEnded(let id):
+            shells.removeValue(forKey: id)?.ended()
+        case .shellOpened(let requestID, _, _):
+            pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: true, reason: nil, chatID: nil, payload: message))
         case .reply(let requestID, let ok, let reason, let chatID):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: ok, reason: reason, chatID: chatID))
         case .folder(let requestID, _), .file(let requestID, _), .git(let requestID, _), .diff(let requestID, _),

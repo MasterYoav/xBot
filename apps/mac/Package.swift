@@ -30,7 +30,8 @@ let package = Package(
         .target(name: "XBotBrain", swiftSettings: strict),
         // The wire between the Mac and the iPhone/iPad app. Foundation and Network only.
         .target(name: "XBotRemote", swiftSettings: strict),
-        .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotRemote"], swiftSettings: strict),
+        .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotRemote", .product(name: "SwiftTerm", package: "SwiftTerm")],
+                swiftSettings: strict),
         .target(
             name: "XBotUI",
             dependencies: ["XBotCore", .product(name: "SwiftTerm", package: "SwiftTerm")],

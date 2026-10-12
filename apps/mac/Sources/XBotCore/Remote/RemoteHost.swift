@@ -47,6 +47,8 @@ public final class RemoteHost {
     /// Draws a crew member's sprite as PNG for phones; set by the app (the sprite lives in XBotUI).
     public var drawAvatar: (@MainActor (AgentAvatar) -> Data?)?
     var abilityCatalogOverride: AbilityCatalog?
+    /// Phones' shells, and whose they are.
+    var shells: [UUID: (shell: RemoteShell, client: UUID)] = [:]
     /// Brings back the last crew member a phone let go.
     var undoCrewDelete: (@MainActor () -> Void)?
     /// The last note a phone deleted: where it was, and where the Trash put it.
@@ -97,6 +99,7 @@ public final class RemoteHost {
 
     public func detach(_ id: UUID) {
         guard clients.removeValue(forKey: id) != nil else { return }
+        endShells(of: id)
         if clients.isEmpty {
             watching = false
             flushTask?.cancel()
@@ -307,6 +310,8 @@ public final class RemoteHost {
              .listCrew, .saveCrew, .deleteCrew, .undoDeleteCrew, .talkTo, .drawAvatar,
              .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP:
             handleProject(message, link: client.link)
+        case .openShell, .shellInput, .shellResize, .closeShell:
+            handleShell(message, client: id, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
             if let reason = apply(settings, to: chatID) { return answer(client, request, refused: reason) }

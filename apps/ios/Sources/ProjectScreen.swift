@@ -37,6 +37,9 @@ struct ProjectScreen: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button { startChat(projectID, "") } label: { Label(String(localized: "New chat here"), systemImage: "square.and.pencil") }
+                        NavigationLink { TerminalScreen(client: client, projectID: projectID) } label: {
+                            Label(String(localized: "Terminal here"), systemImage: "terminal")
+                        }
                         if let path = project?.path {
                             Button { UIPasteboard.general.string = path } label: { Label(String(localized: "Copy path on the Mac"), systemImage: "doc.on.doc") }
                         }
