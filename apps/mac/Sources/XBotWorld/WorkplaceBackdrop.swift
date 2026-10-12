@@ -1,16 +1,20 @@
 import SwiftUI
-import XBotCore
 
 /// The Agents tab's single environment, extending behind its header, crew and cards.
 /// The stage's measured bottom keeps the terrain aligned with the interactive crew.
-struct WorkplaceBackdrop: View {
+public struct WorkplaceBackdrop: View {
     let setting: WorkplaceSetting
     let stageBottom: CGFloat
     @State private var stillDate = Date.now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.motionPaused) private var motionPaused
 
-    var body: some View {
+    public init(setting: WorkplaceSetting, stageBottom: CGFloat) {
+        self.setting = setting
+        self.stageBottom = stageBottom
+    }
+
+    public var body: some View {
         GeometryReader { geometry in
             let sceneHeight = WorkplaceBackdropLayout.sceneHeight(
                 stageBottom: stageBottom, viewportHeight: geometry.size.height
@@ -31,8 +35,8 @@ struct WorkplaceBackdrop: View {
     }
 }
 
-enum WorkplaceBackdropLayout {
-    static func sceneHeight(stageBottom: CGFloat, viewportHeight _: CGFloat) -> CGFloat {
+public enum WorkplaceBackdropLayout {
+    public static func sceneHeight(stageBottom: CGFloat, viewportHeight _: CGFloat) -> CGFloat {
         // Keep the scenery in the crew's measured coordinates; the view clips to
         // the viewport separately. Use only a one-point safe minimum for its frame.
         max(1, stageBottom)
@@ -40,12 +44,18 @@ enum WorkplaceBackdropLayout {
 }
 
 /// Shared full-size artwork, also used by the sidebar's miniature world.
-struct WorldScenery: View {
+public struct WorldScenery: View {
     let setting: WorkplaceSetting
     let date: Date
     let width: CGFloat
 
-    var body: some View {
+    public init(setting: WorkplaceSetting, date: Date, width: CGFloat) {
+        self.setting = setting
+        self.date = date
+        self.width = width
+    }
+
+    public var body: some View {
         ZStack {
             switch setting {
             case .village: Scenery(date: date, width: width)

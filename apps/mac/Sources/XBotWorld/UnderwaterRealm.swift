@@ -1,5 +1,4 @@
 import SwiftUI
-import XBotCore
 
 /// A submerged kingdom, with a clear middle-water lane reserved for the crew.
 /// Time comes entirely from the scene's clock, so a frozen date freezes every creature.

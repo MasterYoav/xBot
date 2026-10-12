@@ -46,6 +46,7 @@ struct NotesScreen: View {
                 }
             }
             .refreshable { await load() }
+            .closable()
             .navigationTitle(String(localized: "Notes"))
             .toolbar {
                 ToolbarItem(placement: .principal) {

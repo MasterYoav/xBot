@@ -155,18 +155,3 @@ public enum WorkplaceSetting: String, CaseIterable, Sendable {
         }
     }
 }
-
-extension Workspace {
-    static let workplaceKey = "workplace"
-
-    public var workplace: WorkplaceSetting {
-        get {
-            access(keyPath: \.workplaceRevision)
-            return defaults.string(forKey: Self.workplaceKey).flatMap(WorkplaceSetting.init(rawValue:)) ?? .village
-        }
-        set {
-            defaults.set(newValue.rawValue, forKey: Self.workplaceKey)
-            workplaceRevision += 1
-        }
-    }
-}

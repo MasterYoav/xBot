@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import XBotRemote
+import XBotWorld
 
 @main
 struct XBotMobileApp: App {
@@ -13,6 +14,9 @@ struct XBotMobileApp: App {
         WindowGroup {
             RootView(client: client)
                 .tint(Theme.accent)
+                .fontDesign(.rounded)
+                // The world's animations stop while xBot isn't on screen.
+                .environment(\.motionPaused, phase != .active)
                 .preferredColorScheme(Appearance(rawValue: appearance)?.scheme)
                 .onOpenURL { url in
                     if let invite = PairingInvite(url: url) { client.pair(with: invite) }
@@ -67,16 +71,52 @@ enum Theme {
     }
 }
 
-/// What the detail column shows.
+/// Somewhere a tab can push.
 enum Destination: Hashable {
     case chat(UUID)
     case project(UUID)
-    case notes
-    case automations
-    case agents
-    case abilities
-    case terminal
-    case profile
+    case member(UUID)
+}
+
+/// The tabs, along the bottom (a sidebar on iPad).
+enum AppTab: Hashable {
+    case home, chats, agents, projects, search
+}
+
+/// Places shown full screen from Home, each with its own navigation.
+enum Tool: String, Identifiable, CaseIterable {
+    case notes, automations, abilities, terminal, profile
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .notes: String(localized: "Notes")
+        case .automations: String(localized: "Automations")
+        case .abilities: String(localized: "Abilities")
+        case .terminal: String(localized: "Terminal")
+        case .profile: String(localized: "Profile")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .notes: "note.text"
+        case .automations: "bolt.horizontal.fill"
+        case .abilities: "puzzlepiece.extension.fill"
+        case .terminal: "terminal.fill"
+        case .profile: "person.crop.circle.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .notes: .yellow
+        case .automations: .orange
+        case .abilities: .teal
+        case .terminal: .green
+        case .profile: Glass.glow
+        }
+    }
 }
 
 /// A new chat to start, maybe in a project, maybe with text already in it.
@@ -86,65 +126,108 @@ struct ComposeRequest: Identifiable {
     var text = ""
 }
 
+/// Which tab is showing, what each has pushed, and what's presented over them.
+@MainActor @Observable
+final class Navigator {
+    var tab = AppTab.home
+    var paths: [AppTab: [Destination]] = [:]
+    var tool: Tool?
+    var compose: ComposeRequest?
+    var addingProject = false
+    var settings = false
+
+    func path(_ tab: AppTab) -> Binding<[Destination]> {
+        Binding(get: { self.paths[tab] ?? [] }, set: { self.paths[tab] = $0 })
+    }
+
+    /// Shows something on the current tab.
+    func push(_ destination: Destination) { paths[tab, default: []].append(destination) }
+
+    func newChat(in projectID: UUID? = nil, text: String = "") { compose = ComposeRequest(projectID: projectID, text: text) }
+
+    /// Leaves a chat or project that's gone.
+    func drop(_ destination: Destination) {
+        for key in paths.keys { paths[key]?.removeAll { $0 == destination } }
+    }
+}
+
 struct RootView: View {
     let client: RemoteClient
-    @State private var selection: Destination?
-    @State private var settings = false
-    @State private var compose: ComposeRequest?
-    @State private var addingProject = false
+    @State private var nav = Navigator()
+    @Namespace private var tools
 
     var body: some View {
         if client.pairing == nil {
             PairView(client: client)
         } else {
-            NavigationSplitView {
-                ChatListView(client: client, selection: $selection, showSettings: { settings = true },
-                             compose: { compose = ComposeRequest(projectID: $0, text: $1) },
-                             addProject: { addingProject = true })
-            } detail: {
-                switch selection {
-                case .chat(let id) where client.chat(id) != nil:
-                    ChatScreen(client: client, chatID: id).id(id)
-                case .project(let id) where client.project(id) != nil:
-                    ProjectScreen(client: client, projectID: id) { project, text in
-                        compose = ComposeRequest(projectID: project, text: text)
-                    }
-                    .id(id)
-                case .notes:
-                    NotesScreen(client: client)
-                case .automations:
-                    AutomationsScreen(client: client)
-                case .agents:
-                    CrewScreen(client: client)
-                case .abilities:
-                    AbilitiesScreen(client: client)
-                case .profile:
-                    ProfileScreen(client: client)
-                case .terminal:
-                    NavigationStack { TerminalScreen(client: client, projectID: nil) }
-                default:
-                    ContentUnavailableView(String(localized: "Choose a chat"), systemImage: "bubble.left.and.text.bubble.right",
-                                           description: Text(String(localized: "Or start a new one with ✎.")))
+            TabView(selection: $nav.tab) {
+                Tab(String(localized: "Home"), systemImage: "sparkles", value: AppTab.home) {
+                    stack(.home) { HomeScreen(client: client, nav: nav, tools: tools) }
+                }
+                Tab(String(localized: "Chats"), systemImage: "bubble.left.and.bubble.right.fill", value: AppTab.chats) {
+                    stack(.chats) { ChatListView(client: client, nav: nav) }
+                }
+                Tab(String(localized: "Agents"), systemImage: "person.3.fill", value: AppTab.agents) {
+                    stack(.agents) { AgentsWorldScreen(client: client, nav: nav) }
+                }
+                Tab(String(localized: "Projects"), systemImage: "folder.fill", value: AppTab.projects) {
+                    stack(.projects) { ProjectsScreen(client: client, nav: nav) }
+                }
+                Tab(value: AppTab.search, role: .search) {
+                    stack(.search) { SearchScreen(client: client, nav: nav) }
                 }
             }
-            .sheet(isPresented: $settings) { SettingsSheet(client: client) }
-            .sheet(item: $compose) { request in
+            .tabBarMinimizeBehavior(.onScrollDown)
+            .tabViewStyle(.sidebarAdaptable)
+            .sheet(isPresented: $nav.settings) { SettingsSheet(client: client) }
+            .sheet(item: $nav.compose) { request in
                 NewChatSheet(client: client, initialProject: request.projectID, initialText: request.text) { id in
-                    compose = nil
-                    selection = .chat(id)
+                    nav.compose = nil
+                    nav.push(.chat(id))
                 }
             }
-            .sheet(isPresented: $addingProject) {
+            .sheet(isPresented: $nav.addingProject) {
                 AddProjectSheet(client: client) { id in
-                    addingProject = false
-                    if let id { selection = .project(id) }
+                    nav.addingProject = false
+                    if let id { nav.tab = .projects; nav.paths[.projects] = [.project(id)] }
                 }
+            }
+            .fullScreenCover(item: $nav.tool) { tool in
+                Group {
+                    switch tool {
+                    case .notes: NotesScreen(client: client)
+                    case .automations: AutomationsScreen(client: client)
+                    case .abilities: AbilitiesScreen(client: client)
+                    case .profile: ProfileScreen(client: client)
+                    case .terminal: NavigationStack { TerminalScreen(client: client, projectID: nil).closable() }
+                    }
+                }
+                .environment(\.close, { nav.tool = nil })
+                .navigationTransition(.zoom(sourceID: tool, in: tools))
             }
             .alert(String(localized: "Your Mac said no"), isPresented: Binding(get: { client.notice != nil }, set: { if !$0 { client.notice = nil } })) {
                 Button(String(localized: "OK")) { client.notice = nil }
             } message: {
                 Text(client.notice ?? "")
             }
+        }
+    }
+
+    private func stack(_ tab: AppTab, @ViewBuilder root: () -> some View) -> some View {
+        NavigationStack(path: nav.path(tab)) {
+            root()
+                .navigationDestination(for: Destination.self) { destination in
+                    switch destination {
+                    case .chat(let id):
+                        ChatScreen(client: client, chatID: id).id(id)
+                            .toolbar(.hidden, for: .tabBar)
+                    case .project(let id):
+                        ProjectScreen(client: client, projectID: id) { project, text in nav.newChat(in: project, text: text) }
+                            .id(id)
+                    case .member(let id):
+                        CrewMemberScreen(client: client, nav: nav, memberID: id)
+                    }
+                }
         }
     }
 }
@@ -162,10 +245,12 @@ struct LinkStatus: View {
         .accessibilityIdentifier("link-status")
     }
 
-    private var mac: String { client.macName ?? String(localized: "your Mac") }
+    private var text: String { Self.text(client) }
+    private var color: Color { Self.color(client) }
 
-    private var text: String {
-        switch client.link {
+    static func text(_ client: RemoteClient) -> String {
+        let mac = client.macName ?? String(localized: "your Mac")
+        return switch client.link {
         case .unpaired: String(localized: "Not paired")
         case .searching: String(localized: "Looking for \(mac)…")
         case .local: String(localized: "\(mac) · same Wi-Fi")
@@ -174,7 +259,7 @@ struct LinkStatus: View {
         }
     }
 
-    private var color: Color {
+    static func color(_ client: RemoteClient) -> Color {
         switch client.link {
         case .local, .cloud: .green
         case .searching: .orange

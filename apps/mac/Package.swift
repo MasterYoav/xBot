@@ -4,7 +4,8 @@ import PackageDescription
 // Dependencies point one way only:
 //
 //   XBotApp ── XBotUI ── XBotCore ── XBotBrain   (Foundation only)
-//                           └────── XBotRemote  (Foundation + Network; also builds for iOS)
+//                           ├────── XBotRemote  (Foundation + Network; also builds for iOS)
+//                           └────── XBotWorld   (SwiftUI pixel art: avatars and worlds; also builds for iOS)
 //
 // XBotBrain never imports SwiftUI. It spawns agent CLIs and parses what they print, and it is tested
 // against recorded output without a window.
@@ -20,6 +21,7 @@ let package = Package(
     products: [
         .executable(name: "XBot", targets: ["XBotApp"]),
         .library(name: "XBotRemote", targets: ["XBotRemote"]),
+        .library(name: "XBotWorld", targets: ["XBotWorld"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
@@ -30,7 +32,9 @@ let package = Package(
         .target(name: "XBotBrain", swiftSettings: strict),
         // The wire between the Mac and the iPhone/iPad app. Foundation and Network only.
         .target(name: "XBotRemote", swiftSettings: strict),
-        .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotRemote", .product(name: "SwiftTerm", package: "SwiftTerm")],
+        // The crew's looks and their pixel worlds: SwiftUI only, shared with the iPhone/iPad app.
+        .target(name: "XBotWorld", swiftSettings: strict),
+        .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotRemote", "XBotWorld", .product(name: "SwiftTerm", package: "SwiftTerm")],
                 swiftSettings: strict),
         .target(
             name: "XBotUI",

@@ -64,6 +64,7 @@ public final class RemoteHost {
         var agents: [RemoteAgent] = []
         var messages: [UUID: [UUID: RemoteMessage]] = [:]
         var live: [UUID: [RemotePart]] = [:]
+        var world: RemoteWorld?
         var dirty = false
         var lastFlush = ContinuousClock.now - .seconds(60)
         init(_ link: any RemoteLink) { self.link = link }
@@ -89,8 +90,10 @@ public final class RemoteHost {
         client.projects = projects
         client.agents = agents
         for chat in chats { client.chats[chat.id] = chat }
+        let world = remoteWorld()
+        client.world = world
         link.send([.hello(version: Wire.version, macName: macName, macID: macID),
-                   .workspace(projects: projects, chats: chats, agents: agents)])
+                   .workspace(projects: projects, chats: chats, agents: agents), .world(world)])
         client.lastFlush = .now
         startWatching()
         refreshAwake()
@@ -138,6 +141,7 @@ public final class RemoteHost {
             _ = workspace.modelOptions
             _ = workspace.availableHarnesses
             _ = workspace.agents
+            _ = workspace.workplace
             _ = workspace.isDiscovering
         } onChange: { [weak self] in
             Task { @MainActor in self?.changed() }
@@ -202,6 +206,11 @@ public final class RemoteHost {
             client.agents = agents
             out.append(.agents(agents))
         }
+        let world = remoteWorld()
+        if world != client.world {
+            client.world = world
+            out.append(.world(world))
+        }
 
         for chatID in client.opened {
             let messages = workspace.messages(in: chatID).map(Self.remote)
@@ -232,6 +241,13 @@ public final class RemoteHost {
         switch message {
         case .hello, .away:
             break
+        case .setWorld(let request, let setting):
+            guard let world = WorkplaceSetting(rawValue: setting) else {
+                answer(client, request, refused: String(localized: "That world isn't on this Mac's xBot."))
+                return
+            }
+            workspace.workplace = world
+            answer(client, request, true)
         case .open(let chatID):
             guard workspace.chat(chatID) != nil else { return }
             workspace.loadTranscript(chatID)
@@ -353,6 +369,19 @@ public final class RemoteHost {
     }
 
     // MARK: Mapping
+
+    private func remoteWorld() -> RemoteWorld {
+        RemoteWorld(setting: workspace.workplace.rawValue, residents: workspace.agents.map { agent in
+            let resident = workspace.resident(agent)
+            let (status, activity): (String, String?) = switch resident.status {
+            case .idle: ("idle", nil)
+            case .working(let activity): ("working", activity)
+            case .done: ("done", nil)
+            }
+            return RemoteResident(id: agent.id, name: agent.name, role: agent.role, avatar: Self.remote(agent.avatar),
+                                  isHeadMaster: agent.isHeadMaster, status: status, activity: activity)
+        })
+    }
 
     private func remoteProjects() -> [RemoteProject] { workspace.projects.map { RemoteProject(id: $0.id, name: $0.name, path: $0.path) } }
 

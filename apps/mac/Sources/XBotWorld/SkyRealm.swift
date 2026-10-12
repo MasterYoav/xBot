@@ -1,5 +1,4 @@
 import SwiftUI
-import XBotCore
 
 /// The Sky Realm: high above a world seen from the clouds, among planets, stars and rainbows.
 /// Everyone rides a golden cloud; a green dragon swims through the cloud sea now and then.

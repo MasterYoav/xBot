@@ -26,6 +26,8 @@ final class RemoteClient {
     private(set) var projects: [RemoteProject] = []
     private(set) var chats: [RemoteChat] = []
     private(set) var agents: [RemoteAgent] = []
+    /// The Agents world on the Mac: which one, and who's in it (pushed as it changes).
+    private(set) var world: RemoteWorld?
     private(set) var transcripts: [UUID: [RemoteMessage]] = [:]
     private(set) var live: [UUID: [RemotePart]] = [:]
     /// Shown once: a refused request's reason.
@@ -330,6 +332,8 @@ final class RemoteClient {
             transcripts[id] = nil
         case .agents(let agents):
             self.agents = agents
+        case .world(let world):
+            self.world = world
         case .transcript(let chatID, let messages):
             transcripts[chatID] = messages
         case .message(let chatID, let message):
@@ -354,6 +358,44 @@ final class RemoteClient {
              .abilities(let requestID, _, _, _):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: true, reason: nil, chatID: nil, payload: message))
         }
+    }
+
+    // MARK: The crew
+
+    /// Everyone on the crew with their details (who they are, what they work on), when asked for.
+    private(set) var crew: [RemoteCrewMember]?
+    private(set) var avatarParts: [RemoteAvatarPart] = []
+    /// Who was just let go, for Undo.
+    var lastLetGo: String?
+
+    func loadCrew(quiet: Bool = true) async {
+        let answer = await call(quiet: quiet) { .listCrew(requestID: $0) }
+        if answer == nil, crew == nil { crew = [] }
+        applyCrew(answer)
+    }
+
+    func applyCrew(_ answer: HostMessage?) {
+        guard case .crew(_, let list, let parts) = answer else { return }
+        crew = list
+        avatarParts = parts
+    }
+
+    func letGo(_ member: RemoteCrewMember) async {
+        let answer = await call { .deleteCrew(requestID: $0, memberID: member.id) }
+        if answer != nil { lastLetGo = member.name }
+        applyCrew(answer)
+    }
+
+    func undoLetGo() async {
+        lastLetGo = nil
+        applyCrew(await call { .undoDeleteCrew(requestID: $0) })
+    }
+
+    /// Moves the crew to another world; the Mac's Agents page follows.
+    func setWorld(_ setting: String) async {
+        let before = world
+        world?.setting = setting
+        if !(await act { .setWorld(requestID: $0, setting: setting) }) { world = before }
     }
 
     func chat(_ id: UUID) -> RemoteChat? { chats.first { $0.id == id } }

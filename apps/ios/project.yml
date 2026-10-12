@@ -29,6 +29,8 @@ targets:
     dependencies:
       - package: XBot
         product: XBotRemote
+      - package: XBot
+        product: XBotWorld
       - package: SwiftTerm
     scheme:
       testTargets: [XBotMobileUITests]

@@ -62,6 +62,7 @@ struct AutomationsScreen: View {
                 }
             }
             .refreshable { await load() }
+            .closable()
             .navigationTitle(String(localized: "Automations"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

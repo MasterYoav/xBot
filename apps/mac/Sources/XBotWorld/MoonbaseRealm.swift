@@ -1,5 +1,4 @@
 import SwiftUI
-import XBotCore
 
 /// A quiet lunar outpost. The supplied clock is the only animation source, so a
 /// frozen date freezes every orbit, meteor and thruster for Reduce Motion.
