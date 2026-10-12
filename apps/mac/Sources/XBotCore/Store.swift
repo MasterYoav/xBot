@@ -95,6 +95,23 @@ public final class Store {
             if !columns.contains("manager_id") { try db.execute("ALTER TABLE agents ADD COLUMN manager_id TEXT") }
             try db.execute("PRAGMA user_version = 6")
         }
+        if version < 7 {
+            // Jev workflows (2026-10-12): the workflows, which chats are their runs, and the
+            // composer's "Let Jev choose".
+            try db.execute("""
+                CREATE TABLE IF NOT EXISTS workflows (
+                  id TEXT PRIMARY KEY, name TEXT NOT NULL, trigger TEXT, steps TEXT NOT NULL,
+                  harness TEXT NOT NULL, model TEXT, effort TEXT, project_id TEXT,
+                  enabled INTEGER NOT NULL DEFAULT 1, last_run_at REAL, created_at REAL NOT NULL,
+                  sort_index INTEGER NOT NULL DEFAULT 0)
+                """)
+            let columns = try db.rows("PRAGMA table_info(chats)").compactMap { $0[1].string }
+            if !columns.contains("workflow_id") { try db.execute("ALTER TABLE chats ADD COLUMN workflow_id TEXT") }
+            if !columns.contains("jev_chooses") {
+                try db.execute("ALTER TABLE chats ADD COLUMN jev_chooses INTEGER NOT NULL DEFAULT 0")
+            }
+            try db.execute("PRAGMA user_version = 7")
+        }
     }
 
     /// `~/Library/Application Support/xBot/xbot.sqlite`.
@@ -255,12 +272,85 @@ public final class Store {
         try db.execute("UPDATE chats SET automation_id = NULL WHERE automation_id = ?", [.text(id.uuidString)])
     }
 
+    // MARK: Workflows
+
+    public func workflows() throws -> [Workflow] {
+        try db.rows("""
+            SELECT id, name, trigger, steps, harness, model, effort, project_id, enabled, last_run_at, created_at,
+              sort_index
+            FROM workflows ORDER BY sort_index, created_at
+            """).compactMap { r in
+            guard let id = r[0].uuid, let name = r[1].string,
+                  let harness = r[4].string.flatMap(HarnessKind.init(rawValue:)) else { return nil }
+            let trigger: Automation.Trigger = r[2].string
+                .flatMap { try? decoder.decode(AutomationSchedule.self, from: Data($0.utf8)) }
+                .map(Automation.Trigger.schedule) ?? .manual
+            // Step by step, so one that can't be read (from a newer xBot) loses only itself.
+            let raw = r[3].string.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) } as? [Any] ?? []
+            let steps = raw.compactMap { item -> WorkflowStep? in
+                guard let data = try? JSONSerialization.data(withJSONObject: item) else { return nil }
+                return try? decoder.decode(WorkflowStep.self, from: data)
+            }
+            return Workflow(
+                id: id, name: name, trigger: trigger, steps: steps, harness: harness, model: r[5].string,
+                effort: r[6].string.flatMap(Effort.init(rawValue:)), projectID: r[7].uuid, isEnabled: r[8].bool,
+                lastRunAt: r[9].isNull ? nil : r[9].date, createdAt: r[10].date, sortIndex: Int(r[11].number)
+            )
+        }
+    }
+
+    /// The last run is left alone: it belongs to `claimWorkflow`.
+    public func save(_ workflow: Workflow) throws {
+        var trigger: String?
+        if case .schedule(let schedule) = workflow.trigger {
+            trigger = String(decoding: try encoder.encode(schedule), as: UTF8.self)
+        }
+        let steps = String(decoding: try encoder.encode(workflow.steps), as: UTF8.self)
+        try db.execute("""
+            INSERT INTO workflows (id, name, trigger, steps, harness, model, effort, project_id, enabled,
+              last_run_at, created_at, sort_index)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name, trigger = excluded.trigger, steps = excluded.steps,
+              harness = excluded.harness, model = excluded.model, effort = excluded.effort,
+              project_id = excluded.project_id, enabled = excluded.enabled, sort_index = excluded.sort_index
+            """, [
+                .text(workflow.id.uuidString), .text(workflow.name), trigger.sql, .text(steps),
+                .text(workflow.harness.rawValue), workflow.model.sql, (workflow.effort?.rawValue).sql,
+                (workflow.projectID?.uuidString).sql, .bool(workflow.isEnabled),
+                workflow.lastRunAt.map(Database.Value.date) ?? .null, .date(workflow.createdAt),
+                .real(Double(workflow.sortIndex)),
+            ])
+    }
+
+    /// Marks a run as started, only if nobody else has since `expected`: the app and the
+    /// background helper both tick, and whichever claims first runs it.
+    public func claimWorkflow(_ id: UUID, expected: Date?, at now: Date) throws -> Bool {
+        let rows = try db.rows("SELECT last_run_at FROM workflows WHERE id = ?", [.text(id.uuidString)])
+        guard let row = rows.first else { return false }
+        let current: Date? = row[0].isNull ? nil : row[0].date
+        guard current?.timeIntervalSinceReferenceDate == expected?.timeIntervalSinceReferenceDate else { return false }
+        if let expected {
+            try db.execute("UPDATE workflows SET last_run_at = ? WHERE id = ? AND last_run_at = ?",
+                           [.date(now), .text(id.uuidString), .date(expected)])
+        } else {
+            try db.execute("UPDATE workflows SET last_run_at = ? WHERE id = ? AND last_run_at IS NULL",
+                           [.date(now), .text(id.uuidString)])
+        }
+        return try db.changes() == 1
+    }
+
+    /// Its runs stay, as plain chats.
+    public func deleteWorkflow(_ id: UUID) throws {
+        try db.execute("DELETE FROM workflows WHERE id = ?", [.text(id.uuidString)])
+        try db.execute("UPDATE chats SET workflow_id = NULL WHERE workflow_id = ?", [.text(id.uuidString)])
+    }
+
     // MARK: Chats
 
     public func chats() throws -> [Chat] {
         try db.rows("""
             SELECT id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan, effort, agent_id, automation_id
+              plan_mode, review_plan, effort, agent_id, automation_id, workflow_id, jev_chooses
             FROM chats ORDER BY updated_at DESC
             """).compactMap { r in
             // A row from a newer xBot with a harness this one does not know is skipped, not fatal.
@@ -271,7 +361,8 @@ public final class Store {
                 id: id, projectID: r[1].uuid, title: title, harness: harness, model: r[4].string,
                 mode: mode, sessionID: r[6].string, planMode: r[9].bool, reviewPlan: r[10].bool,
                 effort: r[11].string.flatMap(Effort.init(rawValue:)), agentID: r[12].uuid,
-                automationID: r[13].uuid, createdAt: r[7].date, updatedAt: r[8].date
+                automationID: r[13].uuid, workflowID: r[14].uuid, jevChooses: r[15].bool,
+                createdAt: r[7].date, updatedAt: r[8].date
             )
         }
     }
@@ -281,19 +372,21 @@ public final class Store {
     public func save(_ chat: Chat) throws {
         try db.execute("""
             INSERT INTO chats (id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan, effort, agent_id, automation_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              plan_mode, review_plan, effort, agent_id, automation_id, workflow_id, jev_chooses)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET project_id = excluded.project_id, title = excluded.title,
               harness = excluded.harness, model = excluded.model, mode = excluded.mode,
               session_id = excluded.session_id, updated_at = excluded.updated_at,
               plan_mode = excluded.plan_mode, review_plan = excluded.review_plan, effort = excluded.effort,
-              agent_id = excluded.agent_id, automation_id = excluded.automation_id
+              agent_id = excluded.agent_id, automation_id = excluded.automation_id,
+              workflow_id = excluded.workflow_id, jev_chooses = excluded.jev_chooses
             """, [
                 .text(chat.id.uuidString), (chat.projectID?.uuidString).sql, .text(chat.title),
                 .text(chat.harness.rawValue), chat.model.sql, .text(chat.mode.rawValue),
                 chat.sessionID.sql, .date(chat.createdAt), .date(chat.updatedAt),
                 .bool(chat.planMode), .bool(chat.reviewPlan), (chat.effort?.rawValue).sql,
                 (chat.agentID?.uuidString).sql, (chat.automationID?.uuidString).sql,
+                (chat.workflowID?.uuidString).sql, .bool(chat.jevChooses),
             ])
     }
 

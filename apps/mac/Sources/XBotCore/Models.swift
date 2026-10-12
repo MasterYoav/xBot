@@ -37,17 +37,23 @@ public struct Chat: Identifiable, Equatable, Sendable {
     public var agentID: UUID?
     /// The automation this chat is a run of. Nil: a chat the person started.
     public var automationID: UUID?
+    /// The workflow this chat is a run of. Nil: not a workflow's run.
+    public var workflowID: UUID?
+    /// "Let Jev choose": each message asks Jev for the CLI, model and effort before it runs.
+    public var jevChooses: Bool
     public var createdAt: Date
     public var updatedAt: Date
 
     public init(
         id: UUID = UUID(), projectID: UUID?, title: String, harness: HarnessKind, model: String? = nil,
         mode: PermissionMode, sessionID: String? = nil, planMode: Bool = false, reviewPlan: Bool = true,
-        effort: Effort? = nil, agentID: UUID? = nil, automationID: UUID? = nil, createdAt: Date = .now,
-        updatedAt: Date = .now
+        effort: Effort? = nil, agentID: UUID? = nil, automationID: UUID? = nil, workflowID: UUID? = nil,
+        jevChooses: Bool = false, createdAt: Date = .now, updatedAt: Date = .now
     ) {
         self.agentID = agentID
         self.automationID = automationID
+        self.workflowID = workflowID
+        self.jevChooses = jevChooses
         self.id = id
         self.projectID = projectID
         self.title = title
