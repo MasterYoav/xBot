@@ -19,7 +19,9 @@
 		8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */; };
 		9150F73FC8D9BEE039D1C682 /* xBot.icon in Resources */ = {isa = PBXBuildFile; fileRef = DE16AE4C9D778783F1CF8C3E /* xBot.icon */; };
 		9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */; };
+		9FBEB32B75F9EF2F1DFD3E29 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 17B84BFA2CB7063ECDB8E94B /* SwiftTerm */; };
 		C370272E29EF48D4D0D0DEA8 /* XBotRemote in Frameworks */ = {isa = PBXBuildFile; productRef = CFBABEF90EEA64CF4E933F25 /* XBotRemote */; };
+		CEA6EC2D9A2F2FE90309947F /* TerminalScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */; };
 		CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */; };
 		D8C7B67994EAA18365C2AF79 /* PairView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B152A45009833C7A36A3E078 /* PairView.swift */; };
 /* End PBXBuildFile section */
@@ -36,6 +38,7 @@
 
 /* Begin PBXFileReference section */
 		0A883A3922A318C099E51A12 /* XBotMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMobileApp.swift; sourceTree = "<group>"; };
+		0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalScreen.swift; sourceTree = "<group>"; };
 		27AAFDD406B0794B6D209FB8 /* XBotMacSigning.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = XBotMacSigning.entitlements; sourceTree = "<group>"; };
 		35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesScreen.swift; sourceTree = "<group>"; };
 		36FEEA105889A9A3FB9EAD00 /* XBotMobileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = XBotMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -62,6 +65,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C370272E29EF48D4D0D0DEA8 /* XBotRemote in Frameworks */,
+				9FBEB32B75F9EF2F1DFD3E29 /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,6 +85,7 @@
 				B152A45009833C7A36A3E078 /* PairView.swift */,
 				AFB116660A0F17CC78A2A1AA /* ProjectScreen.swift */,
 				8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */,
+				0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */,
 				0A883A3922A318C099E51A12 /* XBotMobileApp.swift */,
 			);
 			path = Sources;
@@ -178,6 +183,7 @@
 			name = XBotMobile;
 			packageProductDependencies = (
 				CFBABEF90EEA64CF4E933F25 /* XBotRemote */,
+				17B84BFA2CB7063ECDB8E94B /* SwiftTerm */,
 			);
 			productName = XBotMobile;
 			productReference = 91E24F4731E025708D05F345 /* XBotMobile.app */;
@@ -234,6 +240,7 @@
 			mainGroup = 80967156E8E25CBCC4CEFD84;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				BDCE435789CD3B4FD89A5E18 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 				6796F05CA394AB911FEB7B19 /* XCLocalSwiftPackageReference "../mac" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -290,6 +297,7 @@
 				D8C7B67994EAA18365C2AF79 /* PairView.swift in Sources */,
 				8891F13C347624BA68E89B72 /* ProjectScreen.swift in Sources */,
 				9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */,
+				CEA6EC2D9A2F2FE90309947F /* TerminalScreen.swift in Sources */,
 				3717B2F278EF1BCD207AE7AA /* XBotMobileApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -594,7 +602,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		BDCE435789CD3B4FD89A5E18 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 1.20.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		17B84BFA2CB7063ECDB8E94B /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BDCE435789CD3B4FD89A5E18 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
 		CFBABEF90EEA64CF4E933F25 /* XBotRemote */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = XBotRemote;

@@ -15,6 +15,9 @@ settings:
 packages:
   XBot:
     path: ../mac
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    minorVersion: 1.20.0
 targets:
   XBotMobile:
     type: application
@@ -26,6 +29,7 @@ targets:
     dependencies:
       - package: XBot
         product: XBotRemote
+      - package: SwiftTerm
     scheme:
       testTargets: [XBotMobileUITests]
     entitlements:

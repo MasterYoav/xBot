@@ -194,6 +194,11 @@ public enum HostMessage: Codable, Equatable, Sendable {
     case avatarImage(requestID: UUID, image: Data?)
     /// Every ability (`missing`: agents with no CLI on the Mac), and the marketplace once asked for.
     case abilities(requestID: UUID, items: [RemoteAbility], missing: [String], plugins: [RemotePlugin]?)
+    /// A shell on the Mac started (`openShell`'s answer).
+    case shellOpened(requestID: UUID, shellID: UUID, directory: String)
+    /// What the shell wrote, as bytes for the terminal.
+    case shellOutput(shellID: UUID, data: Data)
+    case shellEnded(shellID: UUID)
 }
 
 /// Phone → Mac.
@@ -264,6 +269,11 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case installPlugin(requestID: UUID, pluginID: String)
     /// A server run by a command (`command` + `arguments`) or reached at `url`, for each agent in `agents`.
     case addMCP(requestID: UUID, name: String, command: String?, arguments: [String], url: String?, agents: [String])
+    // Terminal: a login shell on the Mac, in a project's folder (or home), while this device stays connected.
+    case openShell(requestID: UUID, projectID: UUID?, cols: Int, rows: Int)
+    case shellInput(shellID: UUID, data: Data)
+    case shellResize(shellID: UUID, cols: Int, rows: Int)
+    case closeShell(shellID: UUID)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }

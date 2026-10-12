@@ -59,7 +59,7 @@ import XBotRemote
 
     static func requestID(of message: HostMessage) -> UUID? {
         switch message {
-        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _), .abilities(let r, _, _, _): r
+        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _), .abilities(let r, _, _, _), .shellOpened(let r, _, _): r
         default: nil
         }
     }
@@ -401,5 +401,69 @@ import XBotRemote
         guard case .abilities(_, let gone, _, _) = await tests.answer(link, remove) else { Issue.record("not removed"); return }
         #expect(!gone.contains { $0.id == pdf.id })
         #expect(!FileManager.default.fileExists(atPath: home.appending(path: ".codex/skills/pdf").path))
+    }
+}
+
+/// A terminal from the phone: a real shell on the Mac.
+@MainActor @Suite(.serialized) struct RemoteShellTests {
+    let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+
+    func output(_ link: FakeLink, _ shell: UUID) -> String {
+        String(decoding: link.sent.compactMap { if case .shellOutput(shell, let data) = $0 { data } else { nil } }.reduce(Data(), +), as: UTF8.self)
+    }
+
+    func waitFor(_ seconds: Double = 20, _ done: () -> Bool) async {
+        let end = Date.now.addingTimeInterval(seconds)
+        while !done(), Date.now < end { try? await Task.sleep(for: .milliseconds(20)) }
+    }
+
+    @Test func runACommandResizeAndClose() async throws {
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
+        await w.refreshHarnesses()
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        defer { withExtendedLifetime(host) {} }
+        let folder = FileManager.default.temporaryDirectory.appending(path: "shell-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let project = w.addProject(at: folder)
+        let link = FakeLink()
+        host.attach(link)
+
+        let open = UUID()
+        link.say(.openShell(requestID: open, projectID: project.id, cols: 80, rows: 24))
+        guard case .shellOpened(_, let shell, let directory) = await RemoteProjectsTests().answer(link, open) else { Issue.record("no shell"); return }
+        #expect(directory == project.path)
+
+        link.say(.shellInput(shellID: shell, data: Data("echo hi-$((40+2)); pwd; stty size\r".utf8)))
+        await waitFor { output(link, shell).contains("hi-42") && output(link, shell).contains("24 80") }
+        #expect(output(link, shell).contains("hi-42"))
+        #expect(output(link, shell).contains(folder.lastPathComponent))
+        #expect(output(link, shell).contains("24 80"))
+
+        link.say(.shellResize(shellID: shell, cols: 50, rows: 20))
+        link.say(.shellInput(shellID: shell, data: Data("stty size\r".utf8)))
+        await waitFor { output(link, shell).contains("20 50") }
+        #expect(output(link, shell).contains("20 50"))
+
+        link.say(.closeShell(shellID: shell))
+        await waitFor { link.sent.contains(.shellEnded(shellID: shell)) }
+        #expect(link.sent.contains(.shellEnded(shellID: shell)))
+        #expect(host.shellCount == 0)
+    }
+
+    /// A device that leaves takes its shells with it.
+    @Test func shellsEndWhenTheDeviceLeaves() async throws {
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
+        await w.refreshHarnesses()
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        defer { withExtendedLifetime(host) {} }
+        let link = FakeLink()
+        host.attach(link)
+        let open = UUID()
+        link.say(.openShell(requestID: open, projectID: nil, cols: 80, rows: 24))
+        guard case .shellOpened = await RemoteProjectsTests().answer(link, open) else { Issue.record("no shell"); return }
+        #expect(host.shellCount == 1)
+        link.hangUp()
+        await waitFor { host.shellCount == 0 }
+        #expect(host.shellCount == 0)
     }
 }

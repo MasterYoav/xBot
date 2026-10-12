@@ -73,6 +73,7 @@ enum Destination: Hashable {
     case automations
     case agents
     case abilities
+    case terminal
 }
 
 /// A new chat to start, maybe in a project, maybe with text already in it.
@@ -114,6 +115,8 @@ struct RootView: View {
                     CrewScreen(client: client)
                 case .abilities:
                     AbilitiesScreen(client: client)
+                case .terminal:
+                    NavigationStack { TerminalScreen(client: client, projectID: nil) }
                 default:
                     ContentUnavailableView(String(localized: "Choose a chat"), systemImage: "bubble.left.and.text.bubble.right",
                                            description: Text(String(localized: "Or start a new one with ✎.")))

@@ -372,6 +372,39 @@ final class LiveRemoteUITests: XCTestCase {
         attach(app, "3 marketplace")
     }
 
+    /// Terminal: a shell on the Mac from the sidebar, and one in a project's folder.
+    /// Writes /tmp/xbot-term-42 and /tmp/xbot-term-pwd on the Mac (checked by the runner).
+    func testTerminal() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+
+        app.buttons["Terminal"].firstMatch.tap()
+        if !app.descendants(matching: .any)["terminal"].firstMatch.waitForExistence(timeout: 15) { print("HIERARCHY\n" + app.debugDescription) }
+        sleep(3)
+        app.descendants(matching: .any)["terminal"].firstMatch.tap()
+        app.typeText("echo ok > /tmp/xbot-term-$((6*7)); ls -G /\n")
+        sleep(2)
+        attach(app, "1 home shell")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        // In a project: from its ⋯ menu.
+        let demo = app.buttons["Demo: files and changes"].firstMatch
+        for _ in 0..<5 where !demo.isHittable { app.swipeUp() }
+        demo.tap()
+        app.buttons["Project actions"].tap()
+        app.buttons["Terminal here"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["terminal"].firstMatch.waitForExistence(timeout: 15))
+        sleep(3)
+        app.descendants(matching: .any)["terminal"].firstMatch.tap()
+        app.typeText("pwd > /tmp/xbot-term-pwd; git status\n")
+        sleep(2)
+        attach(app, "2 project shell")
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name
