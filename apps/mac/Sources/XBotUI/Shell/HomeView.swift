@@ -28,18 +28,27 @@ struct HomeView: View {
         VStack(spacing: Space.m) {
             AppMarkView(size: Space.xxl + Space.l)
             Text(String(localized: "xBot works through an agent you already have.")).titleText()
-            Text(String(localized: "Install Claude Code or Codex and sign in, then come back. xBot will find it."))
+            Text(String(localized: "Install Claude Code, Codex, Antigravity or GitHub Copilot and sign in, then come back. xBot will find it."))
                 .bodyText()
                 .foregroundStyle(Palette.textSecondary)
                 .multilineTextAlignment(.center)
-            HStack(spacing: Space.m) {
-                Link(String(localized: "Get Claude Code"), destination: URL(string: "https://claude.com/product/claude-code")!)
-                Link(String(localized: "Get Codex"), destination: URL(string: "https://developers.openai.com/codex")!)
+            // One row when it fits; a column in a narrow window.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.m) { installLinks }
+                VStack(spacing: Space.s) { installLinks }
             }
             .font(Typography.chip)
             .tint(Palette.accent)
             Button(String(localized: "Look again")) { Task { await workspace.refreshHarnesses() } }
                 .buttonStyle(PrimaryButtonStyle())
         }
+    }
+
+    /// Where to get each CLI xBot drives, in `HarnessKind` order.
+    @ViewBuilder private var installLinks: some View {
+        Link(String(localized: "Get Claude Code"), destination: URL(string: "https://claude.com/product/claude-code")!)
+        Link(String(localized: "Get Codex"), destination: URL(string: "https://developers.openai.com/codex")!)
+        Link(String(localized: "Get Antigravity"), destination: URL(string: "https://antigravity.google")!)
+        Link(String(localized: "Get GitHub Copilot"), destination: URL(string: "https://github.com/github/copilot-cli")!)
     }
 }
