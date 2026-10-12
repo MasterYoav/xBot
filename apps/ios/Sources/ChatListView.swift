@@ -22,6 +22,7 @@ struct ChatListView: View {
             if query.isEmpty {
                 Section {
                     NavigationLink(value: Destination.notes) { Label(String(localized: "Notes"), systemImage: "note.text") }
+                    NavigationLink(value: Destination.automations) { Label(String(localized: "Automations"), systemImage: "bolt.horizontal") }
                 }
             }
             let loose = shown.filter { $0.projectID == nil }

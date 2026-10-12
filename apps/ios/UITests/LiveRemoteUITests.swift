@@ -218,6 +218,72 @@ final class LiveRemoteUITests: XCTestCase {
         XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: mine, timeout: 10))
     }
 
+    /// Automations: make one with a Codex step, run it now, see the run answer, delete it.
+    func testAutomations() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+
+        app.buttons["Automations"].firstMatch.tap()
+        XCTAssertTrue(app.switches.firstMatch.waitForExistence(timeout: 15), "No automations page")
+        // Leftovers from an earlier run.
+        for name in ["Phone automation", "New automation"] {
+            let old = app.staticTexts[name].firstMatch
+            while old.waitForExistence(timeout: 2) {
+                old.swipeLeft()
+                app.buttons["Delete"].firstMatch.tap()
+                _ = NSPredicate(format: "exists == false").wait(for: old, timeout: 5)
+            }
+        }
+        attach(app, "1 list")
+        app.navigationBars.buttons["New automation"].firstMatch.tap()
+
+        let name = app.textFields["Name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.tap()
+        let current = (name.value as? String) ?? ""
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + "Phone automation\n")
+
+        app.buttons["Add a step"].tap()
+        let anything = app.buttons["Anything"].firstMatch
+        XCTAssertTrue(anything.waitForExistence(timeout: 5))
+        attach(app, "2 palette")
+        anything.tap()
+        let stepField = app.textFields["What to do"].firstMatch.exists ? app.textFields["What to do"].firstMatch : app.textViews["What to do"].firstMatch
+        XCTAssertTrue(stepField.waitForExistence(timeout: 5))
+        stepField.tap()
+        stepField.typeText("Reply with exactly the word: pong. Don't use any tools.")
+        app.buttons["Done"].firstMatch.tap()
+
+        app.swipeUp()
+        let agent = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Agent'")).firstMatch
+        XCTAssertTrue(agent.waitForExistence(timeout: 5))
+        agent.tap()
+        app.buttons["Codex"].firstMatch.tap()
+        attach(app, "2b editor")
+
+        app.buttons["Run now"].tap()
+        // The agent's reply, not the prompt (which also says "pong").
+        let pong = app.staticTexts.matching(NSPredicate(format: "label MATCHES[c] '\\W*pong\\W*'")).firstMatch
+        XCTAssertTrue(pong.waitForExistence(timeout: 180), "The run didn't answer")
+        attach(app, "3 run")
+
+        // Back to the list: it's there, with its run; then delete it.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        if app.navigationBars.buttons.element(boundBy: 0).exists, !app.staticTexts["Phone automation"].exists {
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        let row = app.staticTexts["Phone automation"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        attach(app, "4 back")
+        row.swipeLeft()
+        app.buttons["Delete"].firstMatch.tap()
+        XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: row, timeout: 10))
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name

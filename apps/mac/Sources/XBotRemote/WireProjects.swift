@@ -178,3 +178,89 @@ public struct RemoteNote: Codable, Equatable, Sendable, Identifiable {
         self.modified = modified
     }
 }
+
+// MARK: Automations
+
+/// When an automation runs by itself; none: only when asked.
+public enum RemoteSchedule: Codable, Equatable, Hashable, Sendable {
+    case hourly(minute: Int)
+    case daily(hour: Int, minute: Int)
+    case weekdays(hour: Int, minute: Int)
+    /// `weekday`: 1 Sunday … 7 Saturday.
+    case weekly(weekday: Int, hour: Int, minute: Int)
+}
+
+public struct RemoteStep: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    /// "mail", "calendar", …, or "connector:<name>".
+    public var app: String
+    public var text: String
+
+    public init(id: UUID = UUID(), app: String, text: String) {
+        self.id = id
+        self.app = app
+        self.text = text
+    }
+}
+
+public struct RemoteRun: Codable, Equatable, Sendable, Identifiable {
+    /// The run's chat.
+    public var id: UUID
+    public var startedAt: Date
+    public var isRunning: Bool
+    public var failed: Bool
+
+    public init(id: UUID, startedAt: Date, isRunning: Bool, failed: Bool) {
+        self.id = id
+        self.startedAt = startedAt
+        self.isRunning = isRunning
+        self.failed = failed
+    }
+}
+
+public struct RemoteAutomation: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var name: String
+    public var schedule: RemoteSchedule?
+    public var steps: [RemoteStep]
+    public var agent: String
+    public var model: String?
+    public var effort: String?
+    public var projectID: UUID?
+    public var isEnabled: Bool
+    // Filled in by the Mac; ignored when saving.
+    public var nextRun: Date?
+    public var lastRunAt: Date?
+    public var runs: [RemoteRun]
+
+    public init(id: UUID = UUID(), name: String, schedule: RemoteSchedule? = nil, steps: [RemoteStep] = [], agent: String,
+                model: String? = nil, effort: String? = nil, projectID: UUID? = nil, isEnabled: Bool = true,
+                nextRun: Date? = nil, lastRunAt: Date? = nil, runs: [RemoteRun] = []) {
+        self.id = id
+        self.name = name
+        self.schedule = schedule
+        self.steps = steps
+        self.agent = agent
+        self.model = model
+        self.effort = effort
+        self.projectID = projectID
+        self.isEnabled = isEnabled
+        self.nextRun = nextRun
+        self.lastRunAt = lastRunAt
+        self.runs = runs
+    }
+}
+
+/// A step's kind, from the Mac's palette: its apps, then connectors.
+public struct RemoteApp: Codable, Equatable, Hashable, Sendable, Identifiable {
+    public var key: String
+    public var title: String
+    public var isConnector: Bool
+    public var id: String { key }
+
+    public init(key: String, title: String, isConnector: Bool = false) {
+        self.key = key
+        self.title = title
+        self.isConnector = isConnector
+    }
+}

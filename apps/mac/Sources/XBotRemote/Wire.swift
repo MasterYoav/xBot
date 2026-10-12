@@ -185,6 +185,9 @@ public enum HostMessage: Codable, Equatable, Sendable {
     case macFolders(requestID: UUID, path: String, folders: [RemoteFolder])
     /// A project's notes, newest first; `saved` is the file a save wrote (it's renamed after its title).
     case notes(requestID: UUID, notes: [RemoteNote], saved: String?)
+    /// Every automation, in order, with the step palette and whether the helper runs them while
+    /// xBot is closed.
+    case automations(requestID: UUID, automations: [RemoteAutomation], apps: [RemoteApp], runsWhileClosed: Bool)
 }
 
 /// Phone → Mac.
@@ -228,6 +231,14 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     /// To the Mac's Trash; `undoDeleteNote` puts the last one deleted from a phone back.
     case deleteNote(requestID: UUID, projectID: UUID, name: String)
     case undoDeleteNote(requestID: UUID, projectID: UUID)
+    // Automations: each answered with `automations`, except `runAutomation` (a `reply` with the run's chat).
+    case listAutomations(requestID: UUID)
+    /// Creates or updates (by id).
+    case saveAutomation(requestID: UUID, automation: RemoteAutomation)
+    case deleteAutomation(requestID: UUID, automationID: UUID)
+    case runAutomation(requestID: UUID, automationID: UUID)
+    /// Installs or removes the background helper that runs automations while xBot is closed.
+    case setAutomationHelper(requestID: UUID, on: Bool)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }
