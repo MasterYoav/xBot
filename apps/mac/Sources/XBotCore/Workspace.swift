@@ -21,6 +21,8 @@ public final class Workspace {
     var workplaceRevision = 0
     /// The crew, in their order. HeadMaster first.
     public internal(set) var agents: [Agent] = []
+    /// xBot on the iPhone and iPad; set by the app at launch (not in tests or the headless tick).
+    public var remote: RemoteService?
     /// Automations, in their order.
     public internal(set) var automations: [Automation] = []
     @ObservationIgnored var automationClock: Task<Void, Never>?
@@ -330,7 +332,7 @@ public final class Workspace {
 
     // MARK: Private
 
-    private func receive(_ event: BrainEvent, in id: UUID, turn token: UUID) {
+    func receive(_ event: BrainEvent, in id: UUID, turn token: UUID) {
         guard turns[id]?.token == token else { return }
         if case .session(let session) = event {
             update(id) { $0.sessionID = session }

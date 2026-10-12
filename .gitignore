@@ -31,3 +31,5 @@ Icon?
 # Sparkle signing key. Never commit it: whoever holds it can sign updates every install accepts.
 sparkle-private.key
 apps/mac/Sources/XBotUI/Resources/AppIcons/
+apps/ios/XBotMobile.xcodeproj/xcuserdata/
+apps/ios/XBotMobile.xcodeproj/project.xcworkspace/xcuserdata/

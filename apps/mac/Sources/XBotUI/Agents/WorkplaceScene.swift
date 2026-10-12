@@ -10,6 +10,7 @@ struct WorkplaceScene: View {
     @State private var hovered: UUID?
     @State private var stillDate = Date.now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.motionPaused) private var motionPaused
 
     static let height: CGFloat = 320
     static let ground: CGFloat = 74
@@ -18,7 +19,7 @@ struct WorkplaceScene: View {
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: false)) { context in
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused)) { context in
                 let agents = workspace.agents
                 let statuses = Dictionary(uniqueKeysWithValues: agents.map { ($0.id, workspace.status(of: $0.id)) })
                 let world = model.advance(to: context.date, width: width, ids: agents.map(\.id),

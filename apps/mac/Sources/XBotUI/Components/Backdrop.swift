@@ -111,6 +111,7 @@ struct AsciiArtView: View {
     /// The wallpaper fills the width and runs off the bottom; a preview shows all of it.
     var wholePicture = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
         GeometryReader { geometry in
@@ -118,7 +119,7 @@ struct AsciiArtView: View {
             let byWidth = geometry.size.width / (CGFloat(max(art.columns, 1)) * 0.6)
             let byHeight = geometry.size.height / (CGFloat(max(art.rows, 1)) * 0.88)
             let size = max(2, wholePicture ? min(byWidth, byHeight) : byWidth)
-            let still = art.frames.count < 2 || reduceMotion
+            let still = art.frames.count < 2 || reduceMotion || motionPaused
             TimelineView(.animation(minimumInterval: 1 / art.fps, paused: still)) { context in
                 let index = still ? 0 : Int(context.date.timeIntervalSinceReferenceDate * art.fps) % art.frames.count
                 Text(verbatim: art.frames[index])

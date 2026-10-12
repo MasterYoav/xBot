@@ -46,8 +46,10 @@ struct LivingAvatar: View {
     /// Keeps neighbours from blinking in step.
     var seed = 0
 
+    @Environment(\.motionPaused) private var motionPaused
+
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1.0 / 12)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 12, paused: motionPaused)) { context in
             AvatarSprite(avatar: avatar, frame: Self.frame(at: context.date, seed: seed, legs: legs,
                                                            talking: talking, headOnly: headOnly), pixel: pixel)
         }
@@ -108,8 +110,9 @@ struct AgentFace: View {
 /// A turning arc: this one is busy.
 private struct WorkingRing: View {
     let size: CGFloat
+    @Environment(\.motionPaused) private var motionPaused
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused)) { context in
             let angle = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4 * 360
             Circle()
                 .trim(from: 0, to: 0.3)

@@ -6,6 +6,7 @@ struct AgentsView: View {
     let workspace: Workspace
     var stageBottomChanged: (CGFloat) -> Void = { _ in }
     @State private var editing: AgentDraft?
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
         ScrollView {
@@ -15,7 +16,7 @@ struct AgentsView: View {
                     .onGeometryChange(for: CGFloat.self) { geometry in
                         geometry.frame(in: .named("workplaceBackdrop")).maxY
                     } action: { stageBottomChanged($0) }
-                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                TimelineView(.animation(minimumInterval: 1, paused: motionPaused)) { _ in
                     cards
                 }
             }

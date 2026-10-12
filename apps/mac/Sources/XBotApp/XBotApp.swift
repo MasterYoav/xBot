@@ -48,6 +48,7 @@ struct XBotApp: App {
     var body: some Scene {
         Window("xBot", id: "main") {
             RootView(workspace: workspace)
+                .motionGate()
                 .frame(minWidth: Metrics.minimumWindow.width, minHeight: Metrics.minimumWindow.height)
                 .followsAppearanceSetting()
                 .windowMovesOnlyFromDragAreas()
@@ -117,6 +118,10 @@ struct XBotApp: App {
         }
         AppDelegate.workspace = workspace
         workspace.startAutomationClock()
+        let remote = RemoteService(workspace: workspace)
+        workspace.remote = remote
+        remote.wantsPushes = { NSApplication.shared.registerForRemoteNotifications() }
+        remote.start()
         return workspace
     }
 }
