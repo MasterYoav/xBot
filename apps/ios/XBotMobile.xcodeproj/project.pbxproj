@@ -13,6 +13,7 @@
 		4501917AFCAE40FA96C89A66 /* XBotMacSigning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5413C960A83C6B9D79335838 /* XBotMacSigning.swift */; };
 		76C27524FB392AAD83103A60 /* Composer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B0EAB5C062853D055579E01 /* Composer.swift */; };
 		8891F13C347624BA68E89B72 /* ProjectScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB116660A0F17CC78A2A1AA /* ProjectScreen.swift */; };
+		898C0B7FAEC7A7C4B84F21B7 /* NotesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */; };
 		8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */; };
 		9150F73FC8D9BEE039D1C682 /* xBot.icon in Resources */ = {isa = PBXBuildFile; fileRef = DE16AE4C9D778783F1CF8C3E /* xBot.icon */; };
 		9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */; };
@@ -33,6 +34,7 @@
 /* Begin PBXFileReference section */
 		0A883A3922A318C099E51A12 /* XBotMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMobileApp.swift; sourceTree = "<group>"; };
 		27AAFDD406B0794B6D209FB8 /* XBotMacSigning.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = XBotMacSigning.entitlements; sourceTree = "<group>"; };
+		35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesScreen.swift; sourceTree = "<group>"; };
 		36FEEA105889A9A3FB9EAD00 /* XBotMobileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = XBotMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B0EAB5C062853D055579E01 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
 		5413C960A83C6B9D79335838 /* XBotMacSigning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMacSigning.swift; sourceTree = "<group>"; };
@@ -66,6 +68,7 @@
 				AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */,
 				78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */,
 				3B0EAB5C062853D055579E01 /* Composer.swift */,
+				35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */,
 				B152A45009833C7A36A3E078 /* PairView.swift */,
 				AFB116660A0F17CC78A2A1AA /* ProjectScreen.swift */,
 				8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */,
@@ -271,6 +274,7 @@
 				8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */,
 				0AA3AC9BCD7CCBEDD0151A78 /* ChatScreen.swift in Sources */,
 				76C27524FB392AAD83103A60 /* Composer.swift in Sources */,
+				898C0B7FAEC7A7C4B84F21B7 /* NotesScreen.swift in Sources */,
 				D8C7B67994EAA18365C2AF79 /* PairView.swift in Sources */,
 				8891F13C347624BA68E89B72 /* ProjectScreen.swift in Sources */,
 				9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */,

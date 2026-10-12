@@ -171,6 +171,53 @@ final class LiveRemoteUITests: XCTestCase {
         attach(app, "6 added")
     }
 
+    /// Notes: read one, write a new one (named after its title on the Mac), delete, undo, delete.
+    func testNotes() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+
+        app.buttons["Notes"].firstMatch.tap()
+        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Project:'")).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 10))
+        picker.tap()
+        app.buttons["Demo"].firstMatch.tap()
+        let existing = app.staticTexts["Next Release"].firstMatch
+        XCTAssertTrue(existing.waitForExistence(timeout: 15), "No notes")
+        attach(app, "1 notes")
+
+        // A new note.
+        app.buttons["New note"].firstMatch.tap()
+        let editor = app.textViews["note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        editor.typeText("# Phone note\nWritten on the phone.")
+        sleep(3)
+        attach(app, "2 writing")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let mine = app.staticTexts["Phone note"].firstMatch
+        XCTAssertTrue(mine.waitForExistence(timeout: 15), "The new note isn't listed")
+
+        // Open it again: the text came back from the Mac.
+        mine.tap()
+        XCTAssertTrue(NSPredicate(format: "value CONTAINS 'Written on the phone.'").wait(for: app.textViews["note-text"], timeout: 15))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        // Delete, undo, delete.
+        XCTAssertTrue(mine.waitForExistence(timeout: 10))
+        mine.swipeLeft()
+        app.buttons["Delete"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 10))
+        attach(app, "3 deleted")
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(mine.waitForExistence(timeout: 10), "Undo didn't bring it back")
+        mine.swipeLeft()
+        app.buttons["Delete"].firstMatch.tap()
+        XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: mine, timeout: 10))
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name

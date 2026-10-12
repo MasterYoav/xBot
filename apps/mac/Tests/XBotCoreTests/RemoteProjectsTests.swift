@@ -59,7 +59,7 @@ import XBotRemote
 
     static func requestID(of message: HostMessage) -> UUID? {
         switch message {
-        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _): r
+        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _): r
         default: nil
         }
     }
@@ -171,5 +171,60 @@ import XBotRemote
         link.say(.removeProject(requestID: remove, projectID: project.id))
         guard case .reply(_, true, _, _) = await answer(link, remove) else { Issue.record("not removed"); return }
         #expect(!w.projects.contains { $0.id == project.id })
+    }
+}
+
+/// Notes from the phone: written as Markdown in the project's notes/ folder, named after the title.
+@MainActor @Suite(.serialized) struct RemoteNotesTests {
+    let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+
+    @Test func writeRenameReadDeleteAndUndo() async throws {
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
+        await w.refreshHarnesses()
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        defer { withExtendedLifetime(host) {} }
+        let folder = FileManager.default.temporaryDirectory.appending(path: "notes-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let project = w.addProject(at: folder)
+        let link = FakeLink()
+        host.attach(link)
+        let tests = RemoteProjectsTests()
+
+        let empty = UUID()
+        link.say(.listNotes(requestID: empty, projectID: project.id))
+        guard case .notes(_, let none, nil) = await tests.answer(link, empty) else { Issue.record("no list"); return }
+        #expect(none.isEmpty)
+
+        // A new note is named after its title.
+        let create = UUID()
+        link.say(.saveNote(requestID: create, projectID: project.id, name: nil, text: "# Trip ideas\nLisbon"))
+        guard case .notes(_, let one, let saved?) = await tests.answer(link, create) else { Issue.record("not saved"); return }
+        #expect(saved == "trip-ideas.md" && one.map(\.title) == ["Trip ideas"])
+        #expect(try String(contentsOf: folder.appending(path: "notes/trip-ideas.md"), encoding: .utf8) == "# Trip ideas\nLisbon")
+
+        // A new title renames the file; the Mac's own notes model sees it.
+        let edit = UUID()
+        link.say(.saveNote(requestID: edit, projectID: project.id, name: "trip-ideas.md", text: "# Summer trip\nLisbon, Porto"))
+        guard case .notes(_, let renamed, let file?) = await tests.answer(link, edit) else { Issue.record("not edited"); return }
+        #expect(file == "summer-trip.md" && renamed.count == 1)
+        #expect(w.notes(for: project).notes.map(\.title) == ["Summer trip"])
+
+        let read = UUID()
+        link.say(.readFile(requestID: read, projectID: project.id, path: "notes/summer-trip.md"))
+        guard case .file(_, let note) = await tests.answer(link, read) else { Issue.record("not read"); return }
+        #expect(note.text == "# Summer trip\nLisbon, Porto")
+
+        // Names can't leave notes/.
+        let sneaky = UUID()
+        link.say(.saveNote(requestID: sneaky, projectID: project.id, name: "../evil.md", text: "x"))
+        guard case .reply(_, false, _, _) = await tests.answer(link, sneaky) else { Issue.record("wrote outside"); return }
+
+        let delete = UUID(), undo = UUID()
+        link.say(.deleteNote(requestID: delete, projectID: project.id, name: "summer-trip.md"))
+        guard case .notes(_, let gone, nil) = await tests.answer(link, delete) else { Issue.record("not deleted"); return }
+        #expect(gone.isEmpty)
+        link.say(.undoDeleteNote(requestID: undo, projectID: project.id))
+        guard case .notes(_, let back, nil) = await tests.answer(link, undo) else { Issue.record("not undone"); return }
+        #expect(back.map(\.name) == ["summer-trip.md"])
     }
 }

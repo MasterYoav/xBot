@@ -69,6 +69,7 @@ enum Theme {
 enum Destination: Hashable {
     case chat(UUID)
     case project(UUID)
+    case notes
 }
 
 /// A new chat to start, maybe in a project, maybe with text already in it.
@@ -102,6 +103,8 @@ struct RootView: View {
                         compose = ComposeRequest(projectID: project, text: text)
                     }
                     .id(id)
+                case .notes:
+                    NotesScreen(client: client)
                 default:
                     ContentUnavailableView(String(localized: "Choose a chat"), systemImage: "bubble.left.and.text.bubble.right",
                                            description: Text(String(localized: "Or start a new one with ✎.")))

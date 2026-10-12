@@ -112,12 +112,69 @@ extension RemoteHost {
             workspace.removeProject(projectID)
             return (request, ok(request))
 
+        case .listNotes(let request, let projectID):
+            guard let project = project(projectID) else { return (request, refuse(request, projectGone)) }
+            return (request, notesAnswer(request, project, saved: nil))
+
+        case .saveNote(let request, let projectID, let name, let text):
+            guard let project = project(projectID) else { return (request, refuse(request, projectGone)) }
+            let folder = workspace.notes(for: project).notesFolder
+            var current: URL?
+            if let name {
+                guard let url = Self.note(name, in: folder) else { return (request, refuse(request, String(localized: "That isn't a note."))) }
+                current = url
+            }
+            do {
+                let url = try ProjectNotes.write(text, to: current, in: folder)
+                workspace.notes(for: project).reload()
+                return (request, notesAnswer(request, project, saved: url.lastPathComponent))
+            } catch {
+                return (request, refuse(request, error.localizedDescription))
+            }
+
+        case .deleteNote(let request, let projectID, let name):
+            guard let project = project(projectID) else { return (request, refuse(request, projectGone)) }
+            guard let url = Self.note(name, in: workspace.notes(for: project).notesFolder),
+                  FileManager.default.fileExists(atPath: url.path) else { return (request, refuse(request, String(localized: "That note isn't there any more."))) }
+            var trashed: NSURL?
+            do { try FileManager.default.trashItem(at: url, resultingItemURL: &trashed) } catch {
+                return (request, refuse(request, error.localizedDescription))
+            }
+            deletedNote = (trashed as URL?).map { (projectID, url, $0) }
+            workspace.notes(for: project).reload()
+            return (request, notesAnswer(request, project, saved: nil))
+
+        case .undoDeleteNote(let request, let projectID):
+            guard let project = project(projectID) else { return (request, refuse(request, projectGone)) }
+            guard let gone = deletedNote, gone.projectID == projectID, !FileManager.default.fileExists(atPath: gone.from.path) else {
+                return (request, refuse(request, String(localized: "That note can't be brought back any more.")))
+            }
+            do { try FileManager.default.moveItem(at: gone.to, to: gone.from) } catch {
+                return (request, refuse(request, error.localizedDescription))
+            }
+            deletedNote = nil
+            workspace.notes(for: project).reload()
+            return (request, notesAnswer(request, project, saved: nil))
+
         default:
             return (nil, nil)
         }
     }
 
     private func project(_ id: UUID) -> Project? { workspace.projects.first { $0.id == id } }
+
+    private func notesAnswer(_ request: UUID, _ project: Project, saved: String?) -> HostMessage {
+        let model = workspace.notes(for: project)
+        model.reload()
+        let notes = model.notes.map { RemoteNote(name: $0.url.lastPathComponent, title: $0.title, modified: $0.modified) }
+        return .notes(requestID: request, notes: notes, saved: saved)
+    }
+
+    /// A note's file by name: a plain ".md" name directly in notes/, nothing else.
+    static func note(_ name: String, in folder: URL) -> URL? {
+        guard name.hasSuffix(".md"), !name.contains("/"), !name.hasPrefix(".") else { return nil }
+        return folder.appending(path: name)
+    }
 
     // MARK: Files
 
