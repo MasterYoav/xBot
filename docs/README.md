@@ -64,6 +64,7 @@ later change replaced part of one, the newer spec says so.
 | [More providers](superpowers/specs/2026-10-11-more-providers-design.md) | Antigravity and GitHub Copilot | Merged (#28) |
 | [Automations](superpowers/specs/2026-10-11-automations-design.md) | Scheduled agent steps, also while xBot is closed | Merged (#29) |
 | [Mobile remote](superpowers/specs/2026-10-11-mobile-remote-design.md) | The iPhone/iPad app, its lanes, protocol and redesign | Open PRs #31–#42 |
+| [Jev workflows](superpowers/specs/2026-10-12-jev-workflows-design.md) | Settings › AI with the TypeSafe Jev key; workflows of agent and Jev steps; Let Jev choose | Built on `jev-ai-settings` and `jev-workflows` (not merged) |
 | [Phase 1 ship readiness](superpowers/specs/2026-09-17-phase-1-ship-readiness-design.md) | 1.x: evidence before a stranger installs | History (1.x) |
 
 The step-by-step plans for the larger sub-projects are in [`superpowers/plans/`](superpowers/plans/).

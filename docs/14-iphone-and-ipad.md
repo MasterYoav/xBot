@@ -55,11 +55,13 @@ fatal.
 
 - **Mac → phone** (`HostMessage`): `hello`, the workspace (projects, chats, agents), a chat that
   changed, a transcript, live parts of a reply as it streams, replies to commands, folders, files,
-  git status and diffs, notes, automations, the crew, abilities, the profile, shell output, and
-  the world (which setting, who lives there and who reports to whom).
+  git status and diffs, notes, automations, Jev workflows (and `workflowsAvailable`, on connecting
+  and whenever the Mac's Jev Workflows toggle changes), the crew, abilities, the profile, shell
+  output, and the world (which setting, who lives there and who reports to whom).
 - **Phone → Mac** (`ClientMessage`): open and close a chat, send, stop, edit, plan answers, chat
   settings, rename, retry, delete and undo; list and act on folders, files and git; add or remove a
-  project (browsing the Mac's folders); notes, automations, crew (hire, edit, let go, undo, talk
+  project (browsing the Mac's folders); notes, automations, Jev workflows (list, run with an
+  optional input), crew (hire, edit, let go, undo, talk
   to, organise, draw an avatar), abilities and plugins, MCP servers; open, type into, resize and
   close a shell; the profile; the world's setting; and `away` for the iCloud lane.
 - Every command carries a request id and is answered, `ok` or refused with a reason, so the phone
@@ -76,12 +78,13 @@ scroll, in Liquid Glass.
 
 | Area | What you can do |
 | --- | --- |
-| **Home** | The Mac's name and lane, a plan board with what each agent has left (one ring per provider up to four, a segmented arc beyond that, each in the provider's colours), what's working now, recent chats, and **Places**: Notes, Automations, Abilities, Terminal, Profile, each opened full screen |
+| **Home** | The Mac's name and lane, a plan board with what each agent has left (one ring per provider up to four, a segmented arc beyond that, each in the provider's colours), what's working now, recent chats, and **Places**: Notes, Automations, Workflows (while the Mac has Jev Workflows on), Abilities, Terminal, Profile, each opened full screen |
 | **Chats** | Every chat, live: streaming replies, tool rows, plans to approve or change. Send, stop, edit and resend, retry, rename, delete with undo; new chats with the agent, model, permission, reasoning and plan chips |
 | **Agents** | The same pixel world as the Mac, in the same setting (change it here or there, the other follows). The crew in tiers by who reports to whom; a member's page, the editor (role, instructions, look, model, **Reports to**), talk to them, let them go. **Suggested agents** to hire with one tap; **Organise like a company** |
 | **Projects** | Files (browse, read, edit and save text; Markdown opens as a formatted document you edit in place and is written back as Markdown, untouched parts byte for byte), git changes and diffs, commit, sync, pull requests and checks, add a project from the Mac's folders. A save is refused if the file changed on the Mac since you opened it |
 | **Notes** | Each project's Markdown notes: read, write, delete with undo |
 | **Automations** | See, edit, run and switch on or off; turn on the Mac's helper that runs them while xBot is closed |
+| **Workflows** | The Mac's Jev workflows, with their schedule and steps; **Run now** and their recent runs. Shown only while the Mac has Jev Workflows on; built and edited on the Mac |
 | **Abilities** | Each agent CLI's connectors, plugins, skills and MCP servers; switch them, install plugins, add an MCP server |
 | **Terminal** | A real login shell on the Mac in a project's folder, drawn on the phone by SwiftTerm |
 | **Profile** | Lifetime and peak tokens, streaks, activity, top projects, tools and skills, plan usage |
@@ -100,7 +103,7 @@ apps/ios/
     Glass.swift, Accent.swift the look: cards, gauges, accent store, provider colours
     HomeScreen, UsageBoard, ChatListView, ChatScreen, Composer, AgentsWorldScreen, CrewScreen,
     SuggestedAgents, ProjectsScreen, ProjectScreen, MarkdownEditor, NotesScreen,
-    AutomationsScreen, AbilitiesScreen, TerminalScreen, ProfileScreen, PairView
+    AutomationsScreen, WorkflowsScreen, AbilitiesScreen, TerminalScreen, ProfileScreen, PairView
   UITests/LiveRemoteUITests.swift
 ```
 
