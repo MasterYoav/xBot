@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Create a release .dmg from a bundled XBot.app (M7 stub).
+# Create a release .dmg from a bundled XBot.app: the app, a link to /Applications, and the
+# uninstaller.
 #
 # Usage:
 #   scripts/generate-app-icon.sh
-#   cd apps/mac && swift build -c release
+#   cd apps/mac && swift build -c release --arch arm64
 #   scripts/bundle-mac-app.sh
 #   scripts/create-dmg.sh
+#   scripts/sign-mac-app.sh     # signs, notarises and staples the app and the DMG
 #
-# Signing and notarization are manual until CI credentials exist — see docs/11-packaging-and-updates.md.
+# The release workflow runs the same steps; see docs/11-packaging-and-updates.md.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -51,4 +53,3 @@ hdiutil create -volname "${VOLUME}" -srcfolder "${STAGE}" -ov -format UDZO "${DM
 rm -rf "${STAGE}"
 
 echo "Created ${DMG}"
-echo "Sign with: codesign --force --deep --options runtime --sign \"Developer ID Application: …\" \"${APP}\""

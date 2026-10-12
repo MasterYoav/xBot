@@ -2,12 +2,14 @@
 # Remove everything xBot stored on this Mac, for somebody who already dragged the app to the Trash.
 #
 # Ships in the DMG. docs/11-packaging-and-updates.md: this is the one place the no-terminal promise
-# yields, because the alternative is gigabytes of orphaned volumes with no way to remove them. The
-# in-app path (Settings → Advanced → Uninstall) does the same, and is what everybody else should use.
+# yields, because the app can't remove what it leaves behind once it is in the Trash, and xBot 1.x
+# left gigabytes of Docker volumes with no other way to remove them.
 #
-# xBot 1.x ran its engine in Docker. Somebody who used it still has that container and its volumes,
-# so they are removed when Docker is available. The runtime itself is left alone — Docker or Colima
-# may be in use for something else. Everything the current app keeps is in one folder, removed last.
+# What the current app keeps: its library (one folder, removed last), its preferences, the
+# background helper's LaunchAgent ("Run when xBot is closed"), and the Keychain items that pair a
+# phone or iPad. xBot 1.x ran its engine in Docker. Somebody who used it still has that container,
+# its volumes and its Keychain items, so they are removed too, the container only when Docker is
+# available. The runtime itself is left alone — Docker or Colima may be in use for something else.
 set -uo pipefail
 
 SUPPORT="${HOME}/Library/Application Support/xBot/runtime"
@@ -15,11 +17,13 @@ SUPPORT="${HOME}/Library/Application Support/xBot/runtime"
 cat <<'EOF'
 This removes everything xBot stored on this Mac:
 
-  - your chats and your list of projects (the project folders themselves stay)
-  - xBot 1.x's engine and agents, if they are still here
-  - the websites your agents are signed in to
+  - your chats, notes, crew and automations, and your list of projects
+    (the project folders themselves stay)
+  - the helper that runs automations while xBot is closed
+  - the pairing with your iPhone or iPad
   - the keys xBot saved in your Keychain
   - xBot's preferences
+  - xBot 1.x's engine and its data, if they are still here
 
 It does not remove Docker or Colima. It cannot be undone.
 EOF
@@ -63,10 +67,20 @@ else
   echo "Start Docker Desktop or Colima, then run this again."
 fi
 
+# "Run when xBot is closed": a LaunchAgent that starts the (now deleted) app every minute. Unloaded
+# first, so launchd stops trying, then removed.
+AGENT="${HOME}/Library/LaunchAgents/dev.xbot.automations.plist"
+launchctl bootout "gui/$(id -u)/dev.xbot.automations" >/dev/null 2>&1
+if [[ -f "${AGENT}" ]]; then
+  rm -f "${AGENT}"
+  echo "Removed the helper that runs automations while xBot is closed."
+fi
+
 # Every service xBot writes, by name — never a wildcard sweep of the login Keychain. One service can
-# hold several accounts (a key per provider), so each is deleted until none is left.
-for service in dev.xbot.provider-key dev.xbot.engine-token dev.xbot.key-encryption-key \
-  dev.xbot.intelligence-key dev.xbot.copilotkit-license; do
+# hold several accounts (a paired device each, a key per provider), so each is deleted until none is
+# left. dev.xbot.remote.pairing is the current app's; the rest are xBot 1.x's.
+for service in dev.xbot.remote.pairing dev.xbot.provider-key dev.xbot.engine-token \
+  dev.xbot.key-encryption-key dev.xbot.intelligence-key dev.xbot.copilotkit-license; do
   while security delete-generic-password -s "${service}" >/dev/null 2>&1; do :; done
 done
 echo "Removed xBot's Keychain items."
