@@ -28,16 +28,7 @@ on:
 permissions:
   contents: write
 
-# Hoisted to the workflow so the optional steps can be gated on them.
-#
-# `if: ${{ secrets.X != '' }}` is not valid — the `secrets` context is not available in a step's
-# `if`, and GitHub rejects the whole file rather than the one expression, so the workflow could
-# never run at all. Only `env` is readable there, so the secrets are lifted here and the conditions
-# below test the environment.
 env:
-  MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-  MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-  SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
   # Sparkle compares CFBundleVersion, so it must rise with every release. The run number does
   # (a re-run keeps its number, and only one run per version ever publishes).
   XBOT_BUILD_NUMBER: ${{ github.run_number }}
@@ -138,7 +129,17 @@ jobs:
     # compile it. On the older image the step ran and reported "actool did not produce Assets.car",
     # and the Swift build then failed on the resources Package.swift declares.
     runs-on: macos-26
+    # The secrets are hoisted to the job so the optional steps can be gated on them (and only this
+    # job, not resolve, ever holds them).
+    #
+    # `if: ${{ secrets.X != '' }}` is not valid — the `secrets` context is not available in a step's
+    # `if`, and GitHub rejects the whole file rather than the one expression, so the workflow could
+    # never run at all. Only `env` is readable there, so the secrets are lifted here and the
+    # conditions below test the environment.
     env:
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+      SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
       XBOT_VERSION: ${{ needs.resolve.outputs.version }}
       PUBLISH: ${{ needs.resolve.outputs.publish }}
       PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
