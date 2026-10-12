@@ -240,6 +240,45 @@ final class RemoteClient {
         if !answer.ok { notice = answer.reason }
     }
 
+    @discardableResult
+    func rename(_ chatID: UUID, to title: String) async -> Bool {
+        let answer = await request { .rename(requestID: $0, chatID: chatID, title: title) }
+        if !answer.ok { notice = answer.reason }
+        return answer.ok
+    }
+
+    func retry(_ chatID: UUID) async {
+        let answer = await request { .retry(requestID: $0, chatID: chatID) }
+        if !answer.ok { notice = answer.reason }
+    }
+
+    /// The chat just deleted, for the Undo banner.
+    private(set) var lastDeleted: RemoteChat?
+
+    func delete(_ chatID: UUID) async {
+        let chat = chats.first { $0.id == chatID }
+        // Gone from the list at once; back if the Mac says no.
+        chats.removeAll { $0.id == chatID }
+        let answer = await request { .delete(requestID: $0, chatID: chatID) }
+        if answer.ok {
+            lastDeleted = chat
+            transcripts[chatID] = nil
+            opened.remove(chatID)
+        } else {
+            if let chat, !chats.contains(where: { $0.id == chat.id }) { chats.append(chat); chats.sort { $0.updatedAt > $1.updatedAt } }
+            notice = answer.reason
+        }
+    }
+
+    func undoDelete() async {
+        guard let chat = lastDeleted else { return }
+        lastDeleted = nil
+        let answer = await request { .undoDelete(requestID: $0, chatID: chat.id) }
+        if !answer.ok { notice = answer.reason }
+    }
+
+    func forgetDeleted() { lastDeleted = nil }
+
     func open(_ chatID: UUID) {
         guard opened.insert(chatID).inserted else { return }
         post([.open(chatID: chatID)])

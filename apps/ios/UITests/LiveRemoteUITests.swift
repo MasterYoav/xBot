@@ -59,6 +59,54 @@ final class LiveRemoteUITests: XCTestCase {
         attach(app, "open chat")
     }
 
+    /// Chat management: rename, delete, undo, ask again.
+    func testManageAChat() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+
+        // Rename from the row's menu.
+        let row = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Reply with'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.press(forDuration: 1)
+        app.buttons["Rename"].firstMatch.tap()
+        let field = app.alerts.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let current = (field.value as? String) ?? ""
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        let name = "Renamed \(Int.random(in: 100...999))"
+        field.typeText(name)
+        app.alerts.buttons["Rename"].tap()
+        let renamed = app.staticTexts[name]
+        XCTAssertTrue(renamed.waitForExistence(timeout: 10), "The rename didn't come back from the Mac")
+        attach(app, "1 renamed")
+
+        // Delete with a swipe, then undo.
+        renamed.swipeLeft()
+        let delete = app.buttons["Delete"].firstMatch
+        if delete.waitForExistence(timeout: 3) { delete.tap() }
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts[name].exists)
+        attach(app, "2 deleted")
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10), "Undo didn't bring it back")
+        attach(app, "3 undone")
+
+        // Ask the last question again from the chat's menu.
+        app.staticTexts[name].tap()
+        // Every one-word answer (pong, ping) in the chat.
+        let pongs = app.staticTexts.matching(NSPredicate(format: "label MATCHES[c] 'p[io]ng\\.?'"))
+        XCTAssertTrue(pongs.firstMatch.waitForExistence(timeout: 15))
+        let before = pongs.count
+        app.buttons["Chat actions"].tap()
+        app.buttons["Ask again"].tap()
+        XCTAssertTrue(NSPredicate(format: "count > %d", before).wait(for: pongs, timeout: 120), "No second answer")
+        attach(app, "4 asked again")
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name
@@ -68,8 +116,8 @@ final class LiveRemoteUITests: XCTestCase {
 }
 
 extension NSPredicate {
-    /// Waits until the element's state matches.
-    func wait(for element: XCUIElement, timeout: TimeInterval) -> Bool {
-        XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: self, object: element)], timeout: timeout) == .completed
+    /// Waits until the element's (or query's) state matches.
+    func wait(for object: Any, timeout: TimeInterval) -> Bool {
+        XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: self, object: object)], timeout: timeout) == .completed
     }
 }

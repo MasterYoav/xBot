@@ -266,4 +266,53 @@ import XBotRemote
         host.refreshAwake()
         #expect(awake.last == false)
     }
+
+    /// Chat management from the phone: rename, retry, delete, and undo the delete.
+    @Test func renameRetryDeleteAndUndoFromThePhone() async throws {
+        let brain = ScriptedBrain([.textDelta("ok"), .done])
+        let (w, host) = await setUp([.claude: brain])
+        let chat = try #require(w.newChat(in: nil))
+        _ = w.send("first", in: chat.id)
+        await until { !w.isRunning(chat.id) && w.messages(in: chat.id).count == 2 }
+        let link = FakeLink()
+        host.attach(link)
+
+        let rename = UUID()
+        link.say(.rename(requestID: rename, chatID: chat.id, title: "  Trip plans "))
+        await until { link.replies().contains { $0.0 == rename } }
+        #expect(w.chat(chat.id)?.title == "Trip plans")
+        #expect(link.replies().first { $0.0 == rename }?.1 == true)
+        await until { link.sent.contains { if case .chat(let c) = $0 { c.title == "Trip plans" } else { false } } }
+
+        let blank = UUID()
+        link.say(.rename(requestID: blank, chatID: chat.id, title: "   "))
+        await until { link.replies().contains { $0.0 == blank } }
+        #expect(link.replies().first { $0.0 == blank }?.1 == false)
+
+        let retry = UUID()
+        link.say(.retry(requestID: retry, chatID: chat.id))
+        await until { !w.isRunning(chat.id) && w.messages(in: chat.id).count == 4 }
+        #expect(link.replies().first { $0.0 == retry }?.1 == true)
+        #expect(brain.requests.withLock { $0.last?.prompt } == "first")
+
+        let delete = UUID()
+        link.say(.delete(requestID: delete, chatID: chat.id))
+        await until { link.sent.contains(.chatRemoved(chat.id)) }
+        #expect(w.chat(chat.id) == nil)
+        #expect(link.replies().first { $0.0 == delete }?.1 == true)
+
+        let undo = UUID()
+        link.say(.undoDelete(requestID: undo, chatID: chat.id))
+        await until { link.replies().contains { $0.0 == undo } }
+        #expect(link.replies().first { $0.0 == undo }?.1 == true)
+        #expect(w.chat(chat.id)?.title == "Trip plans")
+        #expect(w.messages(in: chat.id).count == 4)
+        await until { link.sent.contains { if case .chat(let c) = $0 { c.id == chat.id } else { false } } }
+
+        // Nothing left to undo.
+        let again = UUID()
+        link.say(.undoDelete(requestID: again, chatID: chat.id))
+        await until { link.replies().contains { $0.0 == again } }
+        #expect(link.replies().first { $0.0 == again }?.1 == false)
+    }
 }

@@ -191,6 +191,12 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case runPlan(requestID: UUID, chatID: UUID, messageID: UUID)
     case cancelPlan(requestID: UUID, chatID: UUID, messageID: UUID)
     case setChat(requestID: UUID, chatID: UUID, settings: RemoteChatSettings)
+    case rename(requestID: UUID, chatID: UUID, title: String)
+    /// Ask the last question again.
+    case retry(requestID: UUID, chatID: UUID)
+    /// Deletes the chat; `undoDelete` brings it back (the Mac keeps the last few deleted chats).
+    case delete(requestID: UUID, chatID: UUID)
+    case undoDelete(requestID: UUID, chatID: UUID)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }
