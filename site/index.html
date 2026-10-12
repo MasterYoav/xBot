@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>xBot — your own AI coworkers, on your own Mac</title>
+    <title>xBot — a crew of AI agents on your Mac, run from anywhere</title>
     <meta
       name="description"
-      content="A native Mac app for AI agents that run on your own machine. Each agent gets its own computer and browser. Bring any model."
+      content="A native Mac app around the agent CLIs you already pay for: Claude Code, Codex, Antigravity and GitHub Copilot. A crew organised like a company, and an iPhone and iPad remote."
     />
     <meta property="og:title" content="xBot" />
-    <meta property="og:description" content="Your own AI coworkers, on your own Mac." />
+    <meta property="og:description" content="A crew of AI agents on your Mac, run from anywhere." />
     <meta property="og:image" content="banner.png" />
     <style>
       /* One file, no build step, no dependencies. The app has a design system; this page has a
@@ -20,7 +20,7 @@
         --text: #f4f4f6;
         --muted: #a0a0ad;
         --line: #26262f;
-        --accent: #6f7bff;
+        --accent: #d08ab0;
       }
       @media (prefers-color-scheme: light) {
         :root {
@@ -29,6 +29,7 @@
           --text: #16161a;
           --muted: #5c5c6a;
           --line: #e4e4ec;
+          --accent: #b65e8c;
         }
       }
       * { box-sizing: border-box; }
@@ -61,6 +62,9 @@
       }
       .download:active { transform: scale(0.97); }
       .req { color: var(--muted); font-size: 0.92rem; }
+      header .lede, header .req { max-width: 60ch; margin-left: auto; margin-right: auto; }
+      ul { padding-left: 1.2em; margin: 0 0 16px; }
+      li { margin: 0 0 8px; }
       .card {
         background: var(--surface);
         border: 1px solid var(--line);
@@ -90,68 +94,95 @@
   <body>
     <header>
       <img src="banner.png" alt="xBot" />
-      <h1>Your own AI coworkers, on your own Mac</h1>
+      <h1>A crew of AI agents on your Mac, run from anywhere</h1>
       <p class="lede">
-        Create agents, give them a computer, watch them work, and take the wheel when you want to.
+        Projects, chats, notes and a whole company of agents, built around the agent CLIs you already
+        pay for. Your iPhone and iPad drive it from wherever you are.
       </p>
-      <a class="download" href="https://github.com/MasterYoav/xBot/releases">Download for Mac (preview)</a>
-      <p class="req">Free and open source. macOS 14 Sonoma or later, Apple Silicon or Intel.</p>
+      <a class="download" href="https://github.com/MasterYoav/xBot#run-the-apps-locally">Build it from source</a>
+      <p class="req">
+        Free and open source. macOS 26 on Apple silicon, and at least one of Claude Code, Codex,
+        Antigravity or GitHub Copilot. xBot 2.0 has no signed download yet; the
+        <a href="https://github.com/MasterYoav/xBot/releases">1.0 release</a> is the old Docker app.
+      </p>
     </header>
 
     <main>
       <h2>What it is</h2>
       <p>
-        xBot is a native Mac app. You download it, drag it to Applications, and open it. It walks you
-        through everything else — there is no terminal, no configuration file to edit, and no log to
-        read.
+        xBot is a native Mac app for working with AI agents. Add any folder as a project and talk to
+        an agent about it in chats that sit as tabs in the title bar. Replies stream in as they are
+        written, each tool the agent uses folds into one line, and in Plan mode the agent proposes
+        steps you can edit before it runs them one by one. Beside the chat are the project's git
+        changes, its pull request and checks, and its files. Each chat has its own terminal. Notes
+        are Markdown in the project folder, and Automations run agent steps on a schedule, even
+        while xBot is closed.
       </p>
       <p>
-        Behind the app, a full agent platform runs in containers on your Mac. Each agent gets its own
-        computer with its own browser, its own files, and only the tools you grant it. Every action an
-        agent takes is checked against a policy before it happens, and recorded after.
+        There is no model inside xBot and no server behind it. It runs the CLIs you already have —
+        <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>Antigravity</strong> and
+        <strong>GitHub Copilot</strong> — one turn at a time, on your own subscriptions, with their
+        own sign-in and permissions.
+      </p>
+
+      <h2>A crew, organised like a company</h2>
+      <p>
+        Agents are personas with a name, a role, instructions and a pixel-art look, each working
+        through one of your CLIs. HeadMaster is the CEO and reports to you; a CTO or CFO reports to
+        HeadMaster; engineers report to the CTO, and so on. You decide who reports to whom, and xBot
+        suggests what most companies do. Managers hand work to their team, and finished work reports
+        back up.
       </p>
       <p>
-        Bring any model: OpenAI, Anthropic, Google, xAI, or one running locally through
-        <a href="https://ollama.com">Ollama</a>. xBot supplies no intelligence of its own, so there is
-        nothing to lock you in.
+        On the Agents page the crew lives in a little world — a village, a sky realm, an underwater
+        kingdom, a moonbase or an enchanted forest — where they stroll, sit down at a desk to work,
+        and say what they are doing.
+      </p>
+
+      <h2>Your Mac, in your pocket</h2>
+      <p>
+        The iPhone and iPad app is a remote for your Mac. Pair it with a QR code, and it reaches the
+        Mac directly on the same network or, away from home, through your own iCloud, with every
+        message sealed by the pairing key. Chats, projects and files, notes, automations, the crew and
+        their world, abilities, a real terminal and your usage: all of it, in Liquid Glass.
       </p>
 
       <h2>Where your things live</h2>
-      <p>
-        Your agents, their files, and the websites they are signed in to stay on your Mac. Your model
-        keys are held in the macOS Keychain — never in a file, never in a log. The engine listens on
-        loopback only, so nothing outside your machine can reach it, and a bearer token is required
-        even from inside it.
-      </p>
+      <ul>
+        <li>Projects, chats, the crew and automations are kept in one file on your Mac. Notes live in
+          the project folder.</li>
+        <li>What leaves the Mac is what you send to the agent you picked, on your own account, exactly
+          as if you had typed it into its CLI.</li>
+        <li>xBot reads no passwords or sign-in tokens. Pairing keys are kept in the Keychain on the Mac
+          and the phone, and nowhere else.</li>
+        <li>An agent on <em>Full access</em> can do what you can. xBot passes each CLI its own
+          permission flags and says plainly what each mode allows.</li>
+      </ul>
       <div class="card">
         <p>
-          <strong>Your conversations stay here too.</strong> The engine keeps every conversation in
-          its own database on this Mac, with no CopilotKit account and nothing to sign up for.
-          What leaves the Mac is what you send to the model provider you chose — and nothing at all
-          if that is a model running locally through Ollama.
-          <a href="https://github.com/MasterYoav/xBot/blob/master/docs/decisions/0008-local-thread-runner.md">ADR-0008</a>
-          records how.
+          <strong>Not built yet:</strong> an agent loop for people with an API key or Ollama instead of
+          a CLI, and a computer of its own for an agent — a Linux VM with a browser you can watch and
+          take over. The <a href="https://github.com/MasterYoav/xBot/blob/master/docs/12-roadmap.md">roadmap</a>
+          says what is next.
         </p>
       </div>
 
       <h2>Removing it</h2>
       <p>
-        <strong>Settings → Advanced → Remove all xBot data</strong> deletes the containers, the
-        volumes, the Keychain items and the preferences, then tells you to drag the app to the Trash.
-        It leaves Docker or Colima alone, since you may be using those for something else.
-      </p>
-      <p>
-        If you already moved the app to the Trash and want the rest gone, the disk image contains
-        <code>Uninstall xBot.command</code>. Open the <code>.dmg</code> and double-click it. That is
-        the one place xBot asks you to use a terminal, and it exists so that orphaned data is never
-        unremovable.
+        Drag xBot to the Trash. To remove its library, settings, pairing keys and the automations
+        helper as well, open <code>Uninstall xBot.command</code> from the disk image, or
+        <a href="https://github.com/MasterYoav/xBot/blob/master/scripts/uninstall-xbot.command">from
+        the repository</a>. It also clears anything xBot 1.x left behind.
       </p>
 
-      <h2>Built on OpenBot</h2>
+      <h2>Credits</h2>
       <p>
-        xBot's engine is a fork of <a href="https://github.com/CopilotKit/openbot">OpenBot</a> by
-        <a href="https://copilotkit.ai">CopilotKit</a>, used under the MIT licence. Copyright © 2026
-        CopilotKit.
+        The design follows <a href="https://github.com/hardbeat920/monocode">MonoCode</a>. Updates use
+        <a href="https://sparkle-project.org">Sparkle</a> and the terminals use
+        <a href="https://github.com/migueldeicaza/SwiftTerm">SwiftTerm</a>. xBot 1.x was built on
+        <a href="https://github.com/CopilotKit/openbot">OpenBot</a> by
+        <a href="https://copilotkit.ai">CopilotKit</a>; none of its code ships any more. All MIT.
+        xBot is not affiliated with Anthropic, OpenAI, Google or GitHub.
       </p>
     </main>
 

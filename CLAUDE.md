@@ -9,11 +9,14 @@ Instructions for Claude Code working in this repository. Read this before touchi
 **xBot** is a native macOS app for working with AI agents — for a developer who lives in the
 terminal and for someone who has never opened one.
 
-It drives the agent CLIs a person already has and pays for (Claude Code, Codex; more to come) and
-puts a native experience around them: projects, chats as tabs, and — being built — notes, bots with
-a soul and a memory, a native model loop for people with an API key instead of a CLI, and **a
-computer of its own for any bot that needs one**: a Linux VM on Apple's Containerization, with a
-shell, files and a browser you can watch and take over.
+It drives the agent CLIs a person already has and pays for (Claude Code, Codex, Antigravity, GitHub
+Copilot) and puts a native experience around them: projects, chats as tabs, plan mode, git and
+files, notes, a terminal, automations, and a crew of agents organised like a company (HeadMaster
+the CEO on top, each team under its manager) living in a pixel-art world. An iPhone/iPad app
+(`apps/ios`) is a remote for the Mac, on the local network or through the person's own iCloud.
+Still to build: a native model loop for people with an API key instead of a CLI, and **a computer of
+its own for any agent that needs one**: a Linux VM on Apple's Containerization, with a shell, files
+and a browser you can watch and take over.
 
 The design follows [MonoCode](https://github.com/hardbeat920/monocode). xBot 1.x was built on
 OpenBot in Docker; that was removed in the redesign.
@@ -29,7 +32,9 @@ through the app.
 ### Non-goals
 
 - No hosted/SaaS version. Everything runs on the user's Mac; conversations stay there.
-- No services: no Docker, no background daemon, no database server, no listening port.
+- No services: no Docker, no database server. The only background piece is the opt-in automations
+  LaunchAgent (xBot's own binary, headless, once a minute); the only listening port is the phone's
+  local lane, and only once a device is paired (see invariant 5).
 - No Mac App Store build. See `docs/decisions/0005-distribution-outside-app-store.md`.
 - No Windows or Linux client, and no Intel Macs or macOS before 26.
 - No model of our own. The user brings a CLI subscription, a key, or Ollama.
@@ -44,10 +49,12 @@ through the app.
 | `docs/superpowers/specs/2026-10-06-xbot-redesign-design.md` | The whole design, and the build order |
 | `docs/02-architecture.md` | What runs, how a message becomes a reply |
 | `docs/05-mac-app.md` | Modules and tests |
+| `docs/14-iphone-and-ipad.md` | The remote: lanes, pairing, protocol, tests |
 | `docs/08-design-system.md` | Tokens, motion, materials — non-negotiable |
 | `docs/superpowers/plans/` | The plan for each sub-project, as built |
 
-Docs marked "Describes xBot 1.x" at the top are history until their sub-project rewrites them.
+Every doc in `docs/` describes the app as built (rewritten 2026-10-12). ADRs 0001–0003, 0007 and 0008
+and `docs/plans/` are 1.x history.
 **Read the ADR that covers a task before implementing it.**
 
 ---
@@ -57,8 +64,10 @@ Docs marked "Describes xBot 1.x" at the top are history until their sub-project 
 ### 1. A harness turn is one process, prompt on stdin.
 
 `HarnessBrain` starts the CLI per turn in the chat's folder, writes the prompt to stdin and closes
-it, and resumes the CLI's own session id. **Never put the prompt in argv**: one starting with `-` is
-read as a flag, and argv has a length limit.
+it, and resumes the CLI's own session id. **Never put the prompt in argv as its own argument**: one
+starting with `-` is read as a flag, and argv has a length limit. Antigravity and Copilot can't read
+stdin, so for them alone it goes attached to its flag (`--print=…`, `--prompt=…`), which can't be
+taken for an option; other processes of the same user can see it in `ps`.
 
 ### 2. A turn's stream ends exactly once.
 
@@ -87,9 +96,15 @@ startup files print things), adds the usual install folders, and strips Claude C
 │   ├── Sources/
 │   │   ├── XBotApp/          @main, menus, Sparkle, quit handling
 │   │   ├── XBotUI/           SwiftUI views and the design system
-│   │   ├── XBotCore/         Models, SQLite store, Workspace
-│   │   └── XBotBrain/        Brains: harness CLIs, stream parsers, locator (Foundation only)
+│   │   ├── XBotCore/         Models, SQLite store, Workspace, the crew, automations, RemoteHost
+│   │   ├── XBotBrain/        Brains: harness CLIs, stream parsers, locator (Foundation only)
+│   │   ├── XBotRemote/       The wire to the phone, local (TLS-PSK) and iCloud lanes (also iOS)
+│   │   ├── XBotWorld/        Avatars, the five worlds, OrgChart, WorldStage (also iOS)
+│   │   └── XBotMarkdown/     Markdown documents as blocks (the phone's editor)
 │   └── Tests/
+├── apps/ios/                 The iPhone/iPad remote. XcodeGen (project.yml); run `xcodegen
+│                             generate` after adding files; every xcodebuild needs
+│                             -skipPackagePluginValidation (SwiftTerm's plugin)
 ├── docs/                     Design, ADRs, specs and plans
 ├── scripts/                  Icon, bundling, signing, DMG, appcast, uninstaller
 ├── site/                     The website
@@ -134,7 +149,15 @@ cd apps/mac && swift build --build-tests && swift test
 # After a Claude Code or Codex update, or any change to a stream parser: a real turn and a resumed
 # turn through each installed CLI. Costs a few tokens on your own subscription.
 XBOT_LIVE_HARNESS=1 swift test --filter LiveHarnessTests
+# The phone: build for the simulator; the live XCUITests (apps/ios/UITests) pair with a debug Mac
+# build through TEST_RUNNER_XBOT_PAIR_URL. Point them at a sandboxed library, never a real one.
+cd apps/ios && xcodebuild -project XBotMobile.xcodeproj -scheme XBotMobile \
+  -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build
 ```
+
+**CI's Swift is older than a current Xcode's.** Two rules keep it building: never pass a method
+reference as a `Binding` setter (IRGen crashes), and annotate closure types where inference is long.
+CI runners are slow: give async tests generous waits.
 
 **Never say "done", "fixed", or "passing" without having run the command and read the output.**
 
@@ -191,7 +214,13 @@ Treat these as invariants. A change that breaks one is wrong even if it passes C
 3. **The audit trail is append-only** (when it lands with the tool server). Nothing in the app
    deletes an audit row.
 4. **A secret's value is never echoed.** Record that it was supplied and its length.
-5. **No listening ports.** The tool relay uses a Unix socket (0600), a bot's VM uses vsock.
+5. **No listening ports, with one exception.** The phone's local lane listens on one TCP port,
+   advertised over Bonjour, accepting only TLS with a pairing key, and only while a device is paired
+   (ADR-0009 › Since then). Nothing else listens: the future tool relay uses a Unix socket (0600), a
+   bot's VM uses vsock.
+9. **The phone is a remote.** Agents, files and sign-ins stay on the Mac. Every phone command goes
+   through the same `Workspace` method the Mac's window calls, and is answered ok or refused with a
+   reason. A pairing key is the key to the Mac: it never leaves the two Keychains.
 6. **Destructive actions are confirmed or undoable.** Deleting a bot (its computer and browser
    profile) is confirmed once. Deleting a chat is immediate and undoable from the toast.
 7. **The app degrades honestly.** No CLI installed, a CLI signed out, a folder that moved, a
@@ -214,8 +243,7 @@ Treat these as invariants. A change that breaks one is wrong even if it passes C
 
 ## When you are stuck or the spec is wrong
 
-Say so. The docs in this repository were written before the code existed and will be wrong in
-places. When you find a place where the spec and reality disagree:
+Say so. The docs in this repository describe the code, but drift happens. When you find a place where the spec and reality disagree:
 
 1. Stop.
 2. Say which document, which section, and what reality is.
