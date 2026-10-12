@@ -16,7 +16,9 @@ cd apps/mac && swift build -c release --arch arm64 && cd ../..  # Apple silicon 
 XBOT_VERSION=2.0.0-dev scripts/bundle-mac-app.sh               # → apps/mac/XBot.app (XBOT_BUILD_NUMBER sets CFBundleVersion)
 ```
 
-If the build stops on SwiftTerm's Metal shader: `xcodebuild -downloadComponent MetalToolchain`.
+Without `XBOT_VERSION` the bundle is stamped with the `VERSION` file (the version the next release
+publishes), so pass `2.0.0-dev`-style versions for local installs. If the build stops on SwiftTerm's
+Metal shader: `xcodebuild -downloadComponent MetalToolchain`.
 
 ## Sign: pick one
 
@@ -57,14 +59,23 @@ SPARKLE_EDDSA_PRIVATE_KEY_FILE=sparkle-private.key \
 
 `SPARKLE_EDDSA_PRIVATE_KEY` (the key itself) works instead of the file. Never commit the key.
 
-## In CI
+## In CI: releasing
 
-The same steps run in `.github/workflows/mac-release.yml`:
+**To release, change `VERSION` in a pull request and merge it.** The push to master runs
+`.github/workflows/mac-release.yml`, which runs the same steps with the signing secrets, verifies
+the DMG the way a stranger's Mac will, and publishes `v<VERSION>` with `xBot.dmg`,
+`xBot-<version>.dmg` and `appcast.xml`. A version with a `-` is a pre-release; a version that's
+already released is skipped, not rebuilt. Details in
+[packaging › Releasing](../docs/11-packaging-and-updates.md#releasing).
 
 ```sh
-gh workflow run "Mac release" -R MasterYoav/xBot                    # build only → artifact xbot-release
-gh workflow run "Mac release" -R MasterYoav/xBot -f version=2.0.0   # build, verify, publish v2.0.0
+gh workflow run "Mac release" -R MasterYoav/xBot -f build_only=true   # build only → artifact xbot-release
+gh workflow run "Mac release" -R MasterYoav/xBot                      # publish VERSION if it isn't yet
+git tag v2.0.1 && git push origin v2.0.1                              # publish a tag
 ```
+
+A Developer ID build has no iCloud entitlement, so a downloaded copy reaches the phone on the same
+network only.
 
 ## Before a release candidate
 

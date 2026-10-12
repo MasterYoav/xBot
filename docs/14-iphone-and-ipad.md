@@ -6,8 +6,7 @@ drives it, so you can leave with only a phone, or keep a Mac mini at home, and k
 
 The design and its decisions are in the
 [mobile remote spec](superpowers/specs/2026-10-11-mobile-remote-design.md). This page says what is
-built. The app is in the open pull requests #31–#42, one feature per PR, each stacked on the one
-before it.
+built. It was merged as pull requests #31–#42, one feature per PR.
 
 ## Two lanes
 
@@ -157,7 +156,9 @@ On the installed release build of the Mac app (2026-10-11):
 
 - The iCloud lane needs the Mac app signed with the iCloud entitlement. Builds made with
   `scripts/sign-mac-remote.sh` have it; a Developer ID release needs a Developer ID provisioning
-  profile with iCloud, which isn't set up yet. Without it, the Mac falls back to the local lane.
+  profile with iCloud, which isn't set up yet (`sign-mac-app.sh` signs with no entitlements). So the
+  Mac app downloaded from GitHub Releases reaches the phone **on the same network only**; the Mac
+  falls back to the local lane.
 - Agents never run on the phone. With the Mac off or asleep, the phone shows its cache and nothing
   else.
 - There's no distribution channel for the phone app yet: it's installed from Xcode.

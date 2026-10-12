@@ -9,8 +9,9 @@ for: Claude Code, Codex, Antigravity and GitHub Copilot.
 Everything stays on your Mac. Your iPhone and iPad drive it over your network, or through your own
 iCloud when you're away.
 
-*Not released yet: the redesigned app has no signed download. Build it from source below, and see
-the [launch checklist](docs/13-launch-checklist.md) for what stands between here and a `.dmg`.*
+<a href="https://github.com/MasterYoav/xBot/releases/latest/download/xBot.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-xBot.dmg-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download xBot for Mac"></a>
+
+macOS 26 · Apple silicon · [All releases](https://github.com/MasterYoav/xBot/releases)
 
 [![CI](https://github.com/MasterYoav/xBot/actions/workflows/ci.yml/badge.svg)](https://github.com/MasterYoav/xBot/actions/workflows/ci.yml)
 [![Swift](https://img.shields.io/badge/Swift-F54A2A?logo=swift&logoColor=white)](https://www.swift.org)
@@ -53,6 +54,22 @@ interface.
 
 You never open a terminal to use it. You never edit a configuration file. You never read a log.
 
+## Download
+
+**[Download xBot for Mac](https://github.com/MasterYoav/xBot/releases/latest/download/xBot.dmg)**
+(`xBot.dmg`, always the newest release), or pick a version on the
+[releases page](https://github.com/MasterYoav/xBot/releases). Open the disk image and drag xBot to
+Applications. It's signed with Developer ID and notarized by Apple, so it opens without a warning,
+and it updates itself (it asks first).
+
+You need macOS 26 on Apple silicon and at least one agent CLI installed and signed in: Claude Code,
+Codex, Antigravity or GitHub Copilot.
+
+One limit for now: the downloaded build reaches your iPhone or iPad **on the same network only**. The
+away-from-home lane through iCloud needs an iCloud entitlement that the released build doesn't carry
+yet ([packaging](docs/11-packaging-and-updates.md#a-developer-id-release-with-icloud)). Built from
+source and signed for your own team, it has both.
+
 ## Why it exists
 
 xBot 1.0 ran [**OpenBot**](https://github.com/CopilotKit/openbot)'s agent platform in Docker on
@@ -67,14 +84,16 @@ as a company, a world to watch them in, and a phone that runs it all from anywhe
 
 ## Status
 
-**In development.** The redesigned Mac app is merged up to Automations (PRs #18–#29), and its CI
-passes. The iPhone and iPad app and the company org chart are in a stack of open pull requests
-(#31–#42), each built test-first, verified live against a real Mac, and installed on a real
-iPhone. There are 443 package tests, plus 18 live phone tests that run against a debug Mac.
+**xBot 2.0 is published from CI on every version bump**: changing [`VERSION`](VERSION) on master
+builds, signs, notarizes and releases the `.dmg` ([how](docs/11-packaging-and-updates.md#releasing)).
+The redesigned Mac app, the iPhone and iPad app and the company org chart are all on master, each
+built test-first and verified live against a real Mac and a real iPhone. There are 443 package
+tests, plus 18 live phone tests that run against a debug Mac. The iPhone and iPad app has no
+download yet: it's installed from Xcode.
 
-Not built yet: a native agent loop for API keys and Ollama, a computer of its own for an agent
-(a Linux VM on Apple's Containerization), and a signed 2.0 release. The last published release,
-[1.0.0](https://github.com/MasterYoav/xBot/releases/tag/v1.0.0), is the old Docker app.
+Not built yet: a native agent loop for API keys and Ollama, and a computer of its own for an agent
+(a Linux VM on Apple's Containerization). [1.0.0](https://github.com/MasterYoav/xBot/releases/tag/v1.0.0)
+was the old Docker app.
 
 Start at [`docs/README.md`](docs/README.md). What's done and what's next is in
 [`docs/12-roadmap.md`](docs/12-roadmap.md).

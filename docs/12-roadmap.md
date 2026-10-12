@@ -18,16 +18,17 @@ Docker/OpenBot engine and its milestones M0–M7) is in git and in the [changelo
 | — | Agent-drawn text-art wallpapers | **Merged** (#26) |
 | — | More providers: Antigravity and GitHub Copilot | **Merged** (#28) |
 | — | Automations, also while xBot is closed (replacing the Inbox) | **Merged** (#29) |
-| — | Motion gate: animations pause while xBot isn't in view | **Open** (#30) |
-| — | The iPhone and iPad app | **Open**, a stack of PRs, each based on the one before: #31 pairing, lanes and chats → #32 managing chats → #33 projects → #34 notes → #35 automations → #36 crew → #37 abilities → #38 terminal → #39 profile → #40 Liquid Glass and the shared world → #41 accent, plan board, suggested agents, Markdown documents |
-| — | The crew as a company: who reports to whom | **Open** (#42, on top of the stack) |
+| — | Motion gate: animations pause while xBot isn't in view | **Merged** (with #31; #30 closed) |
+| — | The iPhone and iPad app | **Merged**, as a stack of PRs: #31 pairing, lanes and chats → #32 managing chats → #33 projects → #34 notes → #35 automations → #36 crew → #37 abilities → #38 terminal → #39 profile → #40 Liquid Glass and the shared world → #41 accent, plan board, suggested agents, Markdown documents |
+| — | The crew as a company: who reports to whom | **Merged** (#42) |
+| — | Docs rewritten; fixes they found (pairing security, hand-off permissions, updates) | **Merged** (#43, #44) |
 | 1b | Split panes, checkpoints, worktrees | Not started (the Changes inspector is built) |
 | 3 | Onboarding rewrite | Not started. Today's first run is in [06-onboarding.md](06-onboarding.md) |
 | 4 | Native brain: Anthropic, OpenAI, Google, Ollama tool loop | Not started |
 | 5 | The machine: Containerization driver, image, `xbot-agentd`, shell and file tools | Not started |
 | 6 | Browser and live screen: CDP, screencast inspector, take over | Not started |
 | 7 | Licensing: the Pro licence gate | Not started |
-| — | A signed 2.0 release | Not started: see the [launch checklist](13-launch-checklist.md) |
+| — | A signed 2.0 release | **Automated**: CI publishes `v<VERSION>` when `VERSION` changes on master; 2.0.0 publishes when the release PR merges. What's left: the [launch checklist](13-launch-checklist.md) |
 
 Every merged step passes CI (`swift build --build-tests && swift test` on macOS 26). Each open PR
 was built test-first, run live against a real Mac, and installed on a real iPhone.
@@ -36,11 +37,10 @@ was built test-first, run live against a real Mac, and installed on a real iPhon
 
 In order:
 
-1. **Merge the open PRs**: #30, then #31 → #42 in order. Each PR's base is the branch before it, so
-   merging them in order keeps every diff reviewable.
-2. **Release 2.0** from master: Developer ID signing, notarization, Sparkle, and a Developer ID
-   provisioning profile with iCloud so the phone's away lane works on a downloaded build. The steps
-   that need the account holder are in the [launch checklist](13-launch-checklist.md).
+1. **Release 2.0**: published by CI when `VERSION` (2.0.0) reaches master. Still to come: a Developer
+   ID provisioning profile with iCloud, so the phone's away lane works on a downloaded build. The
+   steps that need the account holder are in the [launch checklist](13-launch-checklist.md).
+2. **Jev**: Settings › AI and Jev workflows ([spec](superpowers/specs/2026-10-12-jev-workflows-design.md)).
 3. **Ship the phone app** through TestFlight.
 4. **Native brain** (step 4), so a person without a CLI can start with an API key or Ollama. This is
    what lets xBot keep its promise to someone who has never opened a terminal.
