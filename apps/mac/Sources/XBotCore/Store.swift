@@ -67,7 +67,7 @@ public final class Store {
                   id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, instructions TEXT NOT NULL,
                   avatar TEXT NOT NULL, harness TEXT NOT NULL, model TEXT, project_id TEXT,
                   head_master INTEGER NOT NULL DEFAULT 0, sort_index INTEGER NOT NULL DEFAULT 0,
-                  created_at REAL NOT NULL)
+                  created_at REAL NOT NULL, manager_id TEXT)
                 """)
             let columns = try db.rows("PRAGMA table_info(chats)").compactMap { $0[1].string }
             if !columns.contains("agent_id") { try db.execute("ALTER TABLE chats ADD COLUMN agent_id TEXT") }
@@ -88,6 +88,12 @@ public final class Store {
             let columns = try db.rows("PRAGMA table_info(chats)").compactMap { $0[1].string }
             if !columns.contains("automation_id") { try db.execute("ALTER TABLE chats ADD COLUMN automation_id TEXT") }
             try db.execute("PRAGMA user_version = 5")
+        }
+        if version < 6 {
+            // Who reports to whom (2026-10-12): nil is HeadMaster.
+            let columns = try db.rows("PRAGMA table_info(agents)").compactMap { $0[1].string }
+            if !columns.contains("manager_id") { try db.execute("ALTER TABLE agents ADD COLUMN manager_id TEXT") }
+            try db.execute("PRAGMA user_version = 6")
         }
     }
 
@@ -129,7 +135,8 @@ public final class Store {
 
     public func agents() throws -> [Agent] {
         try db.rows("""
-            SELECT id, name, role, instructions, avatar, harness, model, project_id, head_master, sort_index, created_at
+            SELECT id, name, role, instructions, avatar, harness, model, project_id, head_master, sort_index, created_at,
+              manager_id
             FROM agents ORDER BY sort_index, created_at
             """).compactMap { r in
             guard let id = r[0].uuid, let name = r[1].string,
@@ -138,7 +145,7 @@ public final class Store {
             return Agent(
                 id: id, name: name, role: r[2].string ?? "", instructions: r[3].string ?? "", avatar: avatar,
                 harness: harness, model: r[6].string, projectID: r[7].uuid, isHeadMaster: r[8].bool,
-                sortIndex: Int(r[9].number), createdAt: r[10].date
+                managerID: r[11].uuid, sortIndex: Int(r[9].number), createdAt: r[10].date
             )
         }
     }
@@ -147,16 +154,17 @@ public final class Store {
         let avatar = String(decoding: try encoder.encode(agent.avatar), as: UTF8.self)
         try db.execute("""
             INSERT INTO agents (id, name, role, instructions, avatar, harness, model, project_id, head_master,
-              sort_index, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              sort_index, created_at, manager_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET name = excluded.name, role = excluded.role,
               instructions = excluded.instructions, avatar = excluded.avatar, harness = excluded.harness,
               model = excluded.model, project_id = excluded.project_id, head_master = excluded.head_master,
-              sort_index = excluded.sort_index
+              sort_index = excluded.sort_index, manager_id = excluded.manager_id
             """, [
                 .text(agent.id.uuidString), .text(agent.name), .text(agent.role), .text(agent.instructions),
                 .text(avatar), .text(agent.harness.rawValue), agent.model.sql, (agent.projectID?.uuidString).sql,
                 .bool(agent.isHeadMaster), .real(Double(agent.sortIndex)), .date(agent.createdAt),
+                (agent.isHeadMaster ? nil : agent.managerID?.uuidString).sql,
             ])
     }
 

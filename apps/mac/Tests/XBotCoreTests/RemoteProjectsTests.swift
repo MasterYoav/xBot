@@ -563,6 +563,26 @@ import XBotRemote
         await waitFor { worlds(link).last?.residents.count == w.agents.count }
         #expect(worlds(link).last?.residents.count == w.agents.count)
 
+        // The org chart: a CTO, then everyone organised; the world carries who reports to whom.
+        var cto = w.hire()
+        cto.name = "Nova"
+        cto.role = "CTO"
+        w.saveAgent(cto)
+        let organise = UUID()
+        link.say(.organiseCrew(requestID: organise))
+        await waitFor { worlds(link).last?.residents.first { $0.name == "Forge" }?.managerID == cto.id }
+        #expect(worlds(link).last?.residents.first { $0.name == "Forge" }?.managerID == cto.id)
+        #expect(link.sent.contains { if case .crew(organise, let members, _) = $0 { members.first { $0.name == "Hawk" }?.managerID == cto.id } else { false } })
+        // From the phone: Quill under Nova.
+        let quill = try #require(w.agents.first { $0.name == "Quill" })
+        var remote = RemoteCrewMember(id: quill.id, name: quill.name, role: quill.role, instructions: quill.instructions,
+                                      avatar: RemoteAvatar(parts: [:]), agent: quill.harness.rawValue, managerID: cto.id)
+        remote.projectID = nil
+        let move = UUID()
+        link.say(.saveCrew(requestID: move, member: remote))
+        await waitFor { w.agent(quill.id)?.managerID == cto.id }
+        #expect(w.agent(quill.id)?.managerID == cto.id)
+
         let bad = UUID()
         link.say(.setWorld(requestID: bad, setting: "mars"))
         await waitFor { link.replies().contains { $0.0 == bad } }

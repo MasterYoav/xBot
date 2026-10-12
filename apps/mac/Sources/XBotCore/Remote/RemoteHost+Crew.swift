@@ -26,6 +26,7 @@ extension RemoteHost {
             agent.harness = harness
             agent.model = remote.model
             agent.projectID = remote.projectID
+            agent.managerID = remote.managerID.flatMap { workspace.agent($0)?.id }
             workspace.saveAgent(agent)
             return (request, crewAnswer(request))
 
@@ -55,6 +56,10 @@ extension RemoteHost {
             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { _ = workspace.send(text, in: chat.id) }
             return (request, .reply(requestID: request, ok: true, reason: nil, chatID: chat.id))
 
+        case .organiseCrew(let request):
+            workspace.organiseLikeACompany()
+            return (request, crewAnswer(request))
+
         case .drawAvatar(let request, let remote):
             return (request, .avatarImage(requestID: request, image: drawAvatar?(Self.avatar(remote, over: AgentAvatar()))))
 
@@ -78,7 +83,8 @@ extension RemoteHost {
             return RemoteCrewMember(
                 id: agent.id, name: agent.name, role: agent.role, instructions: agent.instructions,
                 avatar: Self.remote(agent.avatar), agent: agent.harness.rawValue, model: agent.model, projectID: agent.projectID,
-                isHeadMaster: agent.isHeadMaster, status: word, activity: activity, image: drawAvatar?(agent.avatar))
+                isHeadMaster: agent.isHeadMaster, status: word, activity: activity, image: drawAvatar?(agent.avatar),
+                managerID: agent.managerID)
         }
         let parts = AgentAvatar.Part.allCases.map { RemoteAvatarPart(key: $0.rawValue, title: $0.title, count: $0.count) }
         return .crew(requestID: request, members: members, parts: parts)

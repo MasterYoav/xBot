@@ -68,6 +68,7 @@ let package = Package(
         .testTarget(
             name: "XBotCoreTests", dependencies: ["XBotCore"], resources: [.copy("Fixtures")], swiftSettings: strict
         ),
+        .testTarget(name: "XBotWorldTests", dependencies: ["XBotWorld"], swiftSettings: strict),
         .testTarget(name: "XBotMarkdownTests", dependencies: ["XBotMarkdown"], swiftSettings: strict),
         .testTarget(name: "XBotRemoteTests", dependencies: ["XBotRemote"], swiftSettings: strict),
         .testTarget(name: "XBotUITests", dependencies: ["XBotUI"], swiftSettings: strict),

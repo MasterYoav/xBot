@@ -263,6 +263,8 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case undoDeleteCrew(requestID: UUID)
     /// A new chat with the member (in its home project), starting with `text`.
     case talkTo(requestID: UUID, memberID: UUID, text: String)
+    /// Everyone reports where their role suggests, the way most companies do. Answered with `crew`.
+    case organiseCrew(requestID: UUID)
     case drawAvatar(requestID: UUID, avatar: RemoteAvatar)
     // Abilities: each answered with `abilities`.
     case listAbilities(requestID: UUID, refresh: Bool)

@@ -39,7 +39,7 @@ struct AgentsView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text(String(localized: "Agents")).heroText().foregroundStyle(Palette.textPrimary)
-                Text(String(localized: "Your crew, at work. Click someone to open their chat."))
+                Text(String(localized: "Your crew, as a company: HeadMaster on top, each team under its manager. Click someone to open their chat."))
                     .bodyText().foregroundStyle(Palette.textSecondary)
             }
             Spacer()
@@ -55,6 +55,13 @@ struct AgentsView: View {
             .accessibilityLabel(String(localized: "World"))
             .fixedSize()
             .help(String(localized: "Where your crew lives"))
+            Button {
+                withAnimation(Motion.standard) { workspace.organiseLikeACompany() }
+            } label: {
+                Label(String(localized: "Organise"), systemImage: "point.3.filled.connected.trianglepath.dotted")
+            }
+            .buttonStyle(OutlineButtonStyle())
+            .help(String(localized: "Everyone reports where their role suggests, the way most companies do"))
             Button {
                 editing = AgentDraft(workspace.hire(), isNew: true)
             } label: {
@@ -316,8 +323,25 @@ struct AgentEditor: View {
                 .labelsHidden()
             }
             if agent.isHeadMaster {
-                Text(String(localized: "HeadMaster founded this place: it can hand work to the crew, and it can't be let go."))
+                Text(String(localized: "HeadMaster founded this place and runs it for you: it reports to you, hands work to the crew, and can't be let go."))
                     .captionText().foregroundStyle(Palette.textTertiary)
+            } else {
+                field(String(localized: "Reports to")) {
+                    let suggested = workspace.suggestedManager(role: agent.role, for: agent.id)
+                    Picker(String(localized: "Reports to"), selection: Binding(
+                        get: { agent.managerID ?? workspace.headMaster?.id },
+                        set: { agent.managerID = $0 }
+                    )) {
+                        ForEach(workspace.agents.filter { $0.id != agent.id && !workspace.team(of: agent.id).contains($0) }) { boss in
+                            Text(boss.id == suggested ? String(localized: "\(boss.name) (suggested)") : boss.name).tag(UUID?.some(boss.id))
+                        }
+                    }
+                    .labelsHidden()
+                    .onChange(of: agent.role) {
+                        // New hires follow the suggestion as their role is typed.
+                        if isNew { agent.managerID = workspace.suggestedManager(role: agent.role, for: agent.id) }
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

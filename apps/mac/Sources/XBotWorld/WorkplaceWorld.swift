@@ -20,6 +20,13 @@ public struct WorkplaceWorld: Sendable {
     public let margin: Double = 44
     public private(set) var walkers: [UUID: Walker] = [:]
     public private(set) var order: [UUID] = []
+    /// Where each one lives in the org chart: their desk, and how far they stroll from it.
+    public struct Slot: Equatable, Sendable {
+        public var home: Double
+        public var range: Double
+        public init(home: Double, range: Double) { self.home = home; self.range = range }
+    }
+    public private(set) var slots: [UUID: Slot] = [:]
     private var rng: Generator
 
     public init(width: Double, seed: UInt64 = 1) {
@@ -32,6 +39,11 @@ public struct WorkplaceWorld: Sendable {
         order = ids
         // Each newcomer starts near its own desk, so the crew starts spread out, not in a huddle.
         for id in ids where walkers[id] == nil {
+            if let slot = slots[id] {
+                walkers[id] = Walker(x: slot.home + Double.random(in: -slot.range...slot.range, using: &rng),
+                                     facing: Bool.random(using: &rng) ? 1 : -1, rest: Double.random(in: 0.2...2.5, using: &rng))
+                continue
+            }
             let x = min(max(desk(of: id) + Double.random(in: -50...50, using: &rng), margin), width - margin)
             walkers[id] = Walker(x: x, facing: Bool.random(using: &rng) ? 1 : -1,
                                  rest: Double.random(in: 0.2...2.5, using: &rng))
@@ -42,6 +54,8 @@ public struct WorkplaceWorld: Sendable {
     public mutating func resize(_ newWidth: Double) {
         let newWidth = max(newWidth, 200)
         guard newWidth != width else { return }
+        // In slots, everyone keeps to their own: nothing to stretch.
+        if !slots.isEmpty { width = newWidth; return }
         let scale = (newWidth - 2 * margin) / (width - 2 * margin)
         width = newWidth
         for id in walkers.keys {
@@ -50,8 +64,23 @@ public struct WorkplaceWorld: Sendable {
         }
     }
 
-    /// Each agent's desk: spread evenly along the floor, in crew order.
+    /// Places everyone in their slot; someone whose slot moved walks over to it.
+    public mutating func arrange(_ new: [UUID: Slot]) {
+        guard new != slots else { return }
+        slots = new
+        for (id, slot) in new {
+            guard var walker = walkers[id] else { continue }
+            if abs(walker.x - slot.home) > slot.range + 0.5 {
+                walker.target = slot.home
+                walker.rest = 0
+            }
+            walkers[id] = walker
+        }
+    }
+
+    /// Each agent's desk: their slot's centre, else spread evenly along the floor, in crew order.
     public func desk(of id: UUID) -> Double {
+        if let slot = slots[id] { return slot.home }
         let index = Double(order.firstIndex(of: id) ?? 0)
         let span = (width - 2 * margin) / Double(max(order.count, 1))
         return margin + span * (index + 0.5)
@@ -87,6 +116,9 @@ public struct WorkplaceWorld: Sendable {
                         // Sometimes look the other way while standing about.
                         if Double.random(in: 0...1, using: &rng) < 0.3 { walker.facing *= -1 }
                     }
+                } else if let slot = slots[id] {
+                    // A stroll near their own desk.
+                    walker.target = slot.home + Double.random(in: -slot.range...slot.range, using: &rng)
                 } else {
                     // Somewhere new, not where someone else is standing or heading.
                     let others = order.filter { $0 != id }.compactMap { walkers[$0] }.map { $0.target ?? $0.x }

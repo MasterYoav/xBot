@@ -25,8 +25,15 @@ extension Workspace {
     public func saveAgent(_ agent: Agent) {
         var agent = agent
         agent.name = agent.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if agent.isHeadMaster == false, agents.first(where: { $0.id == agent.id })?.isHeadMaster == true {
+        let before = agents.first { $0.id == agent.id }
+        if agent.isHeadMaster == false, before?.isHeadMaster == true {
             agent.isHeadMaster = true
+        }
+        if agent.isHeadMaster { agent.managerID = nil }
+        // Nobody can end up their own manager: keep what they had.
+        let others = agents.filter { $0.id != agent.id }.map(\.orgMember) + [agent.orgMember]
+        if OrgChart.wouldLoop(agent.id, under: agent.managerID, in: others) || agent.managerID == agent.id {
+            agent.managerID = before?.managerID
         }
         attempt { try store.save(agent) }
         if let index = agents.firstIndex(where: { $0.id == agent.id }) {
@@ -42,12 +49,21 @@ extension Workspace {
     public func deleteAgent(_ id: UUID) -> (@MainActor () -> Void)? {
         guard let agent = agent(id), !agent.isHeadMaster else { return nil }
         let theirs = chats.filter { $0.agentID == id }.map(\.id)
+        // Their team now reports to their manager.
+        let team = agents.filter { $0.managerID == id }
+        for var member in team {
+            member.managerID = agent.managerID
+            saveAgent(member)
+        }
         attempt { try store.deleteAgent(id) }
         agents.removeAll { $0.id == id }
         for chatID in theirs { update(chatID) { $0.agentID = nil } }
         return { [weak self] in
             guard let self else { return }
             self.saveAgent(agent)
+            for member in team {
+                if var now = self.agent(member.id) { now.managerID = id; self.saveAgent(now) }
+            }
             self.agents.sort { ($0.sortIndex, $0.createdAt) < ($1.sortIndex, $1.createdAt) }
             for chatID in theirs { self.update(chatID) { $0.agentID = id } }
         }
@@ -88,6 +104,32 @@ extension Workspace {
 
     // MARK: Who they are, every turn
 
+    // MARK: The org chart
+
+    /// The crew as an org chart (HeadMaster at the top).
+    public var orgChart: OrgChart.Tree { OrgChart.tree(agents.map(\.orgMember)) }
+
+    /// Who they report to: their manager on the crew, or nil for the person (HeadMaster).
+    public func manager(of id: UUID) -> Agent? { agent(orgChart.manager(of: id)) }
+
+    /// Everyone below them, at any depth: who they can hand work to.
+    public func team(of id: UUID) -> [Agent] { orgChart.below(id).compactMap { agent($0) } }
+
+    /// Where most companies would put someone with this role on this crew.
+    public func suggestedManager(role: String, for id: UUID?) -> UUID? {
+        OrgChart.suggestedManager(role: role, id: id, among: agents.map(\.orgMember))
+    }
+
+    /// Everyone reports where their role suggests: executives to HeadMaster, teams to theirs.
+    public func organiseLikeACompany() {
+        // Executives and leads first, so their teams find them.
+        let ordered = agents.sorted { OrgChart.position(of: $0.role).rank < OrgChart.position(of: $1.role).rank }
+        for var member in ordered where !member.isHeadMaster {
+            member.managerID = suggestedManager(role: member.role, for: member.id)
+            saveAgent(member)
+        }
+    }
+
     /// Who the chat's agent is, the crew it works with, and its role instructions. Nil for a
     /// chat that isn't with an agent.
     func instructions(for chat: Chat) -> String? {
@@ -95,17 +137,25 @@ extension Workspace {
         var text = "You are \(agent.name)"
         if !agent.role.isEmpty { text += ", \(agent.role.prefix(1).lowercased() + agent.role.dropFirst())" }
         text += ". You are one of the crew in xBot, a workplace of AI agents on this Mac.\n\n"
+        if agent.isHeadMaster {
+            text += "You report to the person using xBot: you run the company for them.\n\n"
+        } else if let boss = manager(of: agent.id) {
+            text += "You report to \(boss.name)\(boss.role.isEmpty ? "" : " (\(boss.role))"). When you finish work they gave you, xBot tells them.\n\n"
+        }
         let others = agents.filter { $0.id != agent.id }
         if !others.isEmpty {
             text += "The crew:\n"
             for other in others {
-                text += "- \(other.name)\(other.isHeadMaster ? " (the founder, who orchestrates)" : ""): \(other.role)\n"
+                let boss = manager(of: other.id).map { ", reports to \($0.name)" } ?? ""
+                text += "- \(other.name)\(other.isHeadMaster ? " (the founder and CEO, who orchestrates)" : ""): \(other.role)\(boss)\n"
             }
             text += "\n"
         }
-        if agent.isHeadMaster, !others.isEmpty {
+        let team = team(of: agent.id)
+        if !team.isEmpty {
+            text += "Your team (you can hand work to them): \(team.map(\.name).joined(separator: ", ")).\n\n"
             text += """
-                To hand a task to a crew member, end your reply with one block per task, exactly like this:
+                To hand a task to someone on your team, end your reply with one block per task, exactly like this:
 
                 ```handoff
                 to: <their name>
@@ -125,12 +175,18 @@ extension Workspace {
 
     /// Acts on HeadMaster's hand-offs once its turn ends; returns a notice per hand-off for its reply.
     func handOff(from chatID: UUID, reply parts: [Part]) -> [Part] {
-        guard let chat = chat(chatID), let head = agent(chat.agentID), head.isHeadMaster else { return [] }
+        guard let chat = chat(chatID), let head = agent(chat.agentID) else { return [] }
+        let team = team(of: head.id)
+        guard !team.isEmpty else { return [] }
         let text = parts.compactMap { part -> String? in if case .text(let t) = part { t } else { nil } }.joined()
         return Handoff.all(in: text).map { handoff in
-            guard let member = agents.first(where: {
-                !$0.isHeadMaster && $0.name.compare(handoff.to, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
-            }) else {
+            func named(_ agent: Agent) -> Bool {
+                agent.name.compare(handoff.to, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            }
+            guard let member = team.first(where: named) else {
+                if agents.contains(where: named) {
+                    return .notice(String(localized: "\(handoff.to) isn't on \(head.name)'s team, so that task wasn't handed off."))
+                }
                 return .notice(String(localized: "There's no \(handoff.to) in the crew, so that task wasn't handed off."))
             }
             guard let started = startChat(with: member, in: chat.projectID, select: false),

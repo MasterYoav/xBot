@@ -24,6 +24,13 @@ extension Workspace {
         case .idle: .idle
         }
         return WorldResident(id: agent.id, name: agent.name, role: agent.role, avatar: agent.avatar,
-                             isHeadMaster: agent.isHeadMaster, status: status)
+                             isHeadMaster: agent.isHeadMaster, status: status, managerID: agent.managerID)
+    }
+}
+
+extension Agent {
+    /// The agent as the org chart sees it.
+    public var orgMember: OrgChart.Member {
+        OrgChart.Member(id: id, name: name, role: role, isHeadMaster: isHeadMaster, managerID: managerID)
     }
 }

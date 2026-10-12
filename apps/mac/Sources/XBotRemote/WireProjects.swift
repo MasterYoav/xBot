@@ -304,10 +304,13 @@ public struct RemoteCrewMember: Codable, Equatable, Sendable, Identifiable {
     public var activity: String?
     /// The pixel sprite, drawn by the Mac (PNG).
     public var image: Data?
+    /// Who they report to. Nil: HeadMaster (for HeadMaster, the person).
+    public var managerID: UUID?
 
     public init(id: UUID = UUID(), name: String, role: String = "", instructions: String = "", avatar: RemoteAvatar, agent: String,
                 model: String? = nil, projectID: UUID? = nil, isHeadMaster: Bool = false, status: String = "idle",
-                activity: String? = nil, image: Data? = nil) {
+                activity: String? = nil, image: Data? = nil, managerID: UUID? = nil) {
+        self.managerID = managerID
         self.id = id
         self.name = name
         self.role = role
@@ -475,8 +478,12 @@ public struct RemoteResident: Codable, Equatable, Sendable, Identifiable {
     /// "idle", "working" or "done".
     public var status: String
     public var activity: String?
+    /// Who they report to (nil: HeadMaster); the world draws the org chart from it.
+    public var managerID: UUID?
 
-    public init(id: UUID, name: String, role: String, avatar: RemoteAvatar, isHeadMaster: Bool, status: String, activity: String?) {
+    public init(id: UUID, name: String, role: String, avatar: RemoteAvatar, isHeadMaster: Bool, status: String, activity: String?,
+                managerID: UUID? = nil) {
+        self.managerID = managerID
         self.id = id
         self.name = name
         self.role = role

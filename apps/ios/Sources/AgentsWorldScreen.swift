@@ -17,7 +17,8 @@ extension RemoteResident {
         case "done": .done
         default: .idle
         }
-        return WorldResident(id: id, name: name, role: role, avatar: avatar.look, isHeadMaster: isHeadMaster, status: state)
+        return WorldResident(id: id, name: name, role: role, avatar: avatar.look, isHeadMaster: isHeadMaster, status: state,
+                             managerID: managerID)
     }
 }
 
@@ -27,7 +28,6 @@ extension RemoteResident {
 struct AgentsWorldScreen: View {
     let client: RemoteClient
     let nav: Navigator
-    @State private var stageBottom: CGFloat = 400
     @State private var editing: RemoteCrewMember?
     @State private var talking: RemoteCrewMember?
     @State private var hiring: String?
@@ -36,14 +36,13 @@ struct AgentsWorldScreen: View {
     private var residents: [RemoteResident] { client.world?.residents ?? [] }
 
     var body: some View {
-        VStack(spacing: 0) {
-            WorldStage(setting: setting, residents: residents.map(\.resident),
-                       open: { nav.push(.member($0)) },
-                       newChat: { id in talking = member(id) },
-                       edit: { id in editing = member(id) })
-                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { stageBottom = $0 }
-                .accessibilityIdentifier("world-stage")
-            ScrollView {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                WorldStage(setting: setting, residents: residents.map(\.resident), metrics: .compact,
+                           open: { nav.push(.member($0)) },
+                           newChat: { id in talking = member(id) },
+                           edit: { id in editing = member(id) })
+                    .accessibilityIdentifier("world-stage")
                 VStack(alignment: .leading, spacing: 18) {
                     crewCards
                     if !suggestions.isEmpty {
@@ -57,12 +56,15 @@ struct AgentsWorldScreen: View {
                 .padding(.top, 6)
                 .padding(.bottom, 40)
             }
-            .scrollIndicators(.hidden)
         }
+        .scrollIndicators(.hidden)
         .background {
-            WorkplaceBackdrop(setting: setting, stageBottom: stageBottom)
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.5), value: setting)
+            // The world fills the whole page, top to bottom.
+            GeometryReader { geometry in
+                WorkplaceBackdrop(setting: setting, stageBottom: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom)
+            }
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.5), value: setting)
         }
         .navigationBarTitleDisplayMode(.inline)
         // The worlds are drawn for night and day alike; glass over them reads best dark.
@@ -70,9 +72,16 @@ struct AgentsWorldScreen: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { worldMenu }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { editing = newMember() } label: { Image(systemName: "person.badge.plus") }
-                    .accessibilityLabel(String(localized: "Hire"))
-                    .disabled(client.avatarParts.isEmpty || client.agents.isEmpty)
+                Menu {
+                    Button { editing = newMember() } label: { Label(String(localized: "Hire someone"), systemImage: "person.badge.plus") }
+                        .disabled(client.avatarParts.isEmpty || client.agents.isEmpty)
+                    Button {
+                        Task { client.applyCrew(await client.call { .organiseCrew(requestID: $0) }) }
+                    } label: {
+                        Label(String(localized: "Organise like a company"), systemImage: "point.3.filled.connected.trianglepath.dotted")
+                    }
+                } label: { Image(systemName: "person.badge.plus") }
+                .accessibilityLabel(String(localized: "Crew actions"))
             }
         }
         .overlay(alignment: .bottom) {
@@ -106,7 +115,8 @@ struct AgentsWorldScreen: View {
     private func newMember() -> RemoteCrewMember {
         var look: [String: Int] = [:]
         for part in client.avatarParts { look[part.key] = Int.random(in: 0..<max(part.count, 1)) }
-        return RemoteCrewMember(name: "", avatar: RemoteAvatar(parts: look), agent: client.agents.first?.id ?? "claude")
+        return RemoteCrewMember(name: "", avatar: RemoteAvatar(parts: look), agent: client.agents.first?.id ?? "claude",
+                                managerID: client.crew?.first(where: \.isHeadMaster)?.id)
     }
 
     // MARK: Pieces
@@ -169,7 +179,11 @@ struct AgentsWorldScreen: View {
                 SuggestionCard(suggestion: suggestion, hiring: hiring == suggestion.id) {
                     Task { await hire(suggestion) }
                 }
-                .onTapGesture { editing = suggestion.member(agent: defaultAgent, parts: client.avatarParts) }
+                .onTapGesture {
+                    var member = suggestion.member(agent: defaultAgent, parts: client.avatarParts)
+                    member.managerID = OrgChart.suggestedManager(role: member.role, id: member.id, among: (client.crew ?? []).map(\.orgMember))
+                    editing = member
+                }
                 .disabled(client.agents.isEmpty)
             }
         }
@@ -182,7 +196,10 @@ struct AgentsWorldScreen: View {
     private func hire(_ suggestion: SuggestedAgent) async {
         hiring = suggestion.id
         defer { hiring = nil }
-        client.applyCrew(await client.call { .saveCrew(requestID: $0, member: suggestion.member(agent: defaultAgent, parts: client.avatarParts)) })
+        var member = suggestion.member(agent: defaultAgent, parts: client.avatarParts)
+        member.managerID = OrgChart.suggestedManager(role: member.role, id: member.id, among: (client.crew ?? []).map(\.orgMember))
+        let hire = member
+        client.applyCrew(await client.call { .saveCrew(requestID: $0, member: hire) })
     }
 }
 
