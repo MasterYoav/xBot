@@ -9,6 +9,8 @@ struct ChangesPanel: View {
     let git: ProjectGit
     @State private var message = ""
     @State private var discarding: GitFile?
+    /// ⌘↩ commits only while the message is being written: the plan card's "Run plan" has ⌘↩ too.
+    @FocusState private var writingMessage: Bool
 
     var body: some View {
         ScrollView {
@@ -190,12 +192,15 @@ struct ChangesPanel: View {
                 .lineLimit(1...5)
                 .padding(Space.s)
                 .background(Palette.inset, in: RoundedRectangle(cornerRadius: Radius.small, style: .continuous))
+                .focused($writingMessage)
+                // Tells the plan card to give up ⌘↩ while this field has it.
+                .focusedValue(\.writingCommitMessage, writingMessage)
             HStack(spacing: Space.s) {
                 Button(String(localized: "Commit")) {
                     Task { if await git.commit(message) { message = "" } }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .keyboardShortcut(.return, modifiers: .command)
+                .keyboardShortcut(writingMessage ? KeyboardShortcut(.return, modifiers: .command) : nil)
                 .disabled(!canCommit || git.isBusy)
                 Button {
                     Task { await git.sync() }
@@ -282,4 +287,9 @@ struct ChangesPanel: View {
             .help(file.originalPath.map { String(localized: "Renamed from \($0)") } ?? file.path)
         }
     }
+}
+
+extension FocusedValues {
+    /// The Changes panel's commit message has focus, so ⌘↩ means Commit there, not Run plan.
+    @Entry var writingCommitMessage: Bool?
 }

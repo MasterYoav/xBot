@@ -72,6 +72,49 @@ final class FakeMailbox: CloudMailbox {
         #expect(try await phone.poll().isEmpty)
     }
 
+    /// The sender, recipient and sequence number are sealed with the batch: the same ciphertext
+    /// under a higher number is refused, even though it's newer than anything delivered.
+    @Test func aRenumberedBatchIsRefused() async throws {
+        let box = FakeMailbox()
+        let mac = CloudChannel<HostMessage, ClientMessage>(me: "mac", peer: "phone", secret: secret, mailbox: box)
+        let phone = CloudChannel<ClientMessage, HostMessage>(me: "phone", peer: "mac", secret: secret, mailbox: box)
+        try await mac.send([.chatRemoved(UUID())])
+        let old = try #require(box.records.withLock { $0.values.first })
+        #expect(try await phone.poll().count == 1)
+        try await box.post(CloudBatch(from: "mac", to: "phone", seq: old.seq + 1_000, sealed: old.sealed))
+        #expect(try await phone.poll().isEmpty)
+    }
+
+    /// A phone's own batch posted back to it as if from the Mac is refused.
+    @Test func aReflectedBatchIsRefused() async throws {
+        let box = FakeMailbox()
+        let phone = CloudChannel<ClientMessage, ClientMessage>(me: "phone", peer: "mac", secret: secret, mailbox: box)
+        try await phone.send([.away])
+        let mine = try #require(box.records.withLock { $0.values.first })
+        box.records.withLock { $0 = [:] }
+        try await box.post(CloudBatch(from: "mac", to: "phone", seq: mine.seq, sealed: mine.sealed))
+        #expect(try await phone.poll().isEmpty)
+    }
+
+    /// The replay mark outlives the channel: a channel started where the last one left off (a
+    /// relaunch) refuses a batch the last one already read.
+    @Test func aReplayAfterARestartIsRefused() async throws {
+        let box = FakeMailbox()
+        let mac = CloudChannel<HostMessage, ClientMessage>(me: "mac", peer: "phone", secret: secret, mailbox: box)
+        let before = CloudChannel<ClientMessage, HostMessage>(me: "phone", peer: "mac", secret: secret, mailbox: box)
+        try await mac.send([.chatRemoved(UUID())])
+        let old = try #require(box.records.withLock { $0.values.first })
+        #expect(try await before.poll().count == 1)
+        let mark = await before.delivered
+        #expect(mark == old.seq)
+
+        let after = CloudChannel<ClientMessage, HostMessage>(me: "phone", peer: "mac", secret: secret, mailbox: box, after: mark)
+        try await box.post(CloudBatch(from: "mac", to: "phone", seq: old.seq, sealed: old.sealed))
+        #expect(try await after.poll().isEmpty)
+        try await mac.send([.chatRemoved(UUID())])
+        #expect(try await after.poll().count == 1)
+    }
+
     /// The Mac fetches once per push and every phone's channel takes its own batches from it.
     @Test func oneFetchServesEveryChannel() async throws {
         let box = FakeMailbox()

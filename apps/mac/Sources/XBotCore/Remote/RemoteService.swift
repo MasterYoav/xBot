@@ -10,6 +10,9 @@ public struct PairedDevice: Codable, Equatable, Sendable, Identifiable {
     public var name: String
     public var pairedAt: Date
     public var lastSeen: Date?
+    /// The installation of the app that paired with the key: no other may use it. (A device
+    /// paired before this was recorded claims it with its next hello.)
+    public var installID: String?
 }
 
 /// Where pairing secrets are kept: the Keychain in the app, a dictionary in tests.
@@ -104,8 +107,9 @@ public final class RemoteService {
     public init(workspace: Workspace, secrets: any PairingSecrets = KeychainPairingSecrets(),
                 defaults: UserDefaults = .standard, macName: String = Host.current().localizedName ?? "Mac",
                 mailbox: (any CloudMailbox)? = nil, advertise: Bool = true, cloudTimeout: Duration = .seconds(150),
-                cloudChecks: CloudChecks = .init()) {
+                cloudChecks: CloudChecks = .init(), inviteLifetime: Duration = .seconds(600)) {
         self.secrets = secrets
+        self.inviteLifetime = inviteLifetime
         self.cloudChecks = cloudChecks
         self.defaults = defaults
         self.advertise = advertise
@@ -122,6 +126,11 @@ public final class RemoteService {
         if let data = defaults.data(forKey: "remote.devices"), let saved = try? JSONDecoder().decode([PairedDevice].self, from: data) {
             devices = saved.filter { secrets.secret(for: $0.id) != nil }
         }
+        // Invites still outstanding when xBot last quit were never used: take their keys back.
+        for id in defaults.stringArray(forKey: "remote.pending") ?? [] where !devices.contains(where: { $0.id == id }) {
+            secrets.remove(id)
+        }
+        defaults.removeObject(forKey: "remote.pending")
         host.keepAwake = { [weak self] in self?.setAwake($0) }
         listener.onReady = { [weak self] in self?.port = $0 }
         listener.onConnection = { [weak self] in self?.accept($0) }
@@ -136,51 +145,113 @@ public final class RemoteService {
 
     // MARK: Pairing
 
-    /// A new device's invite, for the QR code. The device is listed once it first connects.
+    /// A new device's invite, for the QR code. The device is listed once it first connects. The
+    /// invite works once, until the sheet is closed (`withdraw`) or `inviteLifetime` passes,
+    /// whichever comes first; xBot quitting withdraws it too (see `init`).
     public func invite(host address: String? = nil) -> PairingInvite {
         let key = PairingKey.generate()
         secrets.save(key.secret, for: key.identity)
-        pending.insert(key.identity)
+        invites[key.identity] = Date.now.addingTimeInterval(Self.seconds(inviteLifetime))
+        savePending()
+        let lifetime = inviteLifetime
+        expiries[key.identity] = Task { [weak self] in
+            try? await Task.sleep(for: lifetime)
+            guard !Task.isCancelled else { return }
+            self?.withdraw(key.identity)
+        }
         restartListener(including: key)
         Task { await startCloud() }
         return PairingInvite(macID: macID, macName: macName, key: key, host: address, port: port)
     }
 
-    @ObservationIgnored private var pending: Set<String> = []
+    /// Invites shown and not yet used, and when each stops working.
+    public private(set) var invites: [String: Date] = [:]
+    @ObservationIgnored private var expiries: [String: Task<Void, Never>] = [:]
+    /// How long a pairing code works if nobody uses it.
+    @ObservationIgnored public let inviteLifetime: Duration
+
+    /// Whether this invite's code can still pair a device.
+    public func isLive(_ invite: PairingInvite) -> Bool { isLiveInvite(invite.key.identity) }
+
+    private func isLiveInvite(_ id: String) -> Bool { invites[id].map { $0 > .now } ?? false }
+
+    /// A key the Mac answers to: a paired device's, or a live invite's. Anything else in the
+    /// Keychain (an invite from an older build, say) opens nothing.
+    private func accepts(_ id: String) -> Bool { devices.contains { $0.id == id } || isLiveInvite(id) }
+
+    /// The sheet closed: an invite nobody used stops working, on both lanes, and its key leaves
+    /// the Keychain. Once a device has paired with it, this does nothing.
+    public func withdraw(_ invite: PairingInvite) { withdraw(invite.key.identity) }
+
+    func withdraw(_ id: String) {
+        expiries.removeValue(forKey: id)?.cancel()
+        guard invites.removeValue(forKey: id) != nil else { return }
+        savePending()
+        guard !devices.contains(where: { $0.id == id }) else { return }
+        secrets.remove(id)
+        channels[id] = nil
+        for link in localLinks.values where link.deviceID == id { link.close() }
+        restartListener()
+    }
 
     public func remove(_ id: String) {
         devices.removeAll { $0.id == id }
         secrets.remove(id)
         save()
+        cloudMarks[id] = nil
         cloudLinks[id]?.close()
         for link in localLinks.values where link.deviceID == id { link.close() }
         channels[id] = nil
         restartListener()
-        if devices.isEmpty && pending.isEmpty { listener.stop(); port = nil; stopCloudClock() }
     }
 
     private func keys(including extra: PairingKey? = nil) -> [PairingKey] {
-        var keys = (devices.map(\.id) + pending).compactMap { id in secrets.secret(for: id).map { PairingKey(identity: id, secret: $0) } }
+        var keys = (devices.map(\.id) + invites.keys.filter(isLiveInvite)).compactMap { id in
+            secrets.secret(for: id).map { PairingKey(identity: id, secret: $0) }
+        }
         if let extra, !keys.contains(extra) { keys.append(extra) }
         return keys
     }
 
+    /// Listens with exactly the keys the Mac accepts now; with none, stops (and stops reading iCloud).
     private func restartListener(including extra: PairingKey? = nil) {
         let keys = keys(including: extra)
-        guard !keys.isEmpty else { return }
+        guard !keys.isEmpty else {
+            listener.stop()
+            port = nil
+            stopCloudClock()
+            return
+        }
         try? listener.start(keys: keys, macID: macID, macName: macName, advertise: advertise, port: port)
     }
 
-    /// A device spoke: list it if it's new, and note when it was seen.
-    func seen(_ id: String, name: String) {
-        pending.remove(id)
+    /// A device said hello with a key the Mac accepts: list it if it's new, and note when it was
+    /// seen. An invite pairs one installation: the first to say hello with its key is the device,
+    /// and the key is refused from any other. False (and nothing changes) when refused.
+    @discardableResult
+    func admit(_ id: String, installID: String?, name: String) -> Bool {
+        guard let installID, !installID.isEmpty, accepts(id), secrets.secret(for: id) != nil else { return false }
         if let index = devices.firstIndex(where: { $0.id == id }) {
+            if let claimed = devices[index].installID, claimed != installID { return false }
+            devices[index].installID = installID
             devices[index].lastSeen = .now
             if devices[index].name != name { devices[index].name = name }
-        } else if secrets.secret(for: id) != nil {
-            devices.append(PairedDevice(id: id, name: name, pairedAt: .now, lastSeen: .now))
+        } else {
+            expiries.removeValue(forKey: id)?.cancel()
+            invites[id] = nil
+            savePending()
+            devices.append(PairedDevice(id: id, name: name, pairedAt: .now, lastSeen: .now, installID: installID))
         }
         save()
+        return true
+    }
+
+    /// Invites outstanding, by identity, so a relaunch can take back the ones never used.
+    private func savePending() { defaults.set(Array(invites.keys), forKey: "remote.pending") }
+
+    static func seconds(_ duration: Duration) -> TimeInterval {
+        let (seconds, attoseconds) = duration.components
+        return TimeInterval(seconds) + TimeInterval(attoseconds) / 1e18
     }
 
     private func save() {
@@ -213,16 +284,19 @@ public final class RemoteService {
         connection.start()
     }
 
-    fileprivate func localHello(_ link: LocalLink, deviceID: String, name: String) {
-        guard secrets.secret(for: deviceID) != nil else { return link.close() }
-        seen(deviceID, name: name)
+    /// A phone nearby said who it is. False if it's refused (the caller closes it).
+    fileprivate func localHello(_ link: LocalLink, deviceID: String, name: String, installID: String?) -> Bool {
+        guard admit(deviceID, installID: installID, name: name) else { return false }
+        link.deviceID = deviceID
         attached[deviceID] = .local
         host.attach(link)
+        return true
     }
 
     // MARK: iCloud lane
 
     private func startCloud() async {
+        guard !devices.isEmpty || !invites.isEmpty else { return }
         if mailbox == nil {
             guard Self.hasCloudEntitlement else {
                 cloudProblem = String(localized: "This copy of xBot isn't signed for iCloud, so phones can reach it on the same network only.")
@@ -241,6 +315,12 @@ public final class RemoteService {
         }
         startCloudClock()
         await cloudPushed()
+    }
+
+    /// Per device, the sequence number of the last iCloud batch read from it.
+    private var cloudMarks: [String: Int64] {
+        get { (defaults.dictionary(forKey: "remote.cloud.marks") as? [String: Int64]) ?? [:] }
+        set { defaults.set(newValue, forKey: "remote.cloud.marks") }
     }
 
     private func startCloudClock() {
@@ -278,22 +358,39 @@ public final class RemoteService {
     private func readCloud() async {
         guard let mailbox, let fetched = try? await mailbox.fetchNew(), !fetched.isEmpty else { return }
         for id in Set(fetched.filter { $0.to == "mac" }.map(\.from)) where channels[id] == nil {
-            guard let secret = secrets.secret(for: id) else { continue }
-            channels[id] = CloudChannel(me: "mac", peer: id, secret: secret, mailbox: mailbox)
+            guard accepts(id), let secret = secrets.secret(for: id) else { continue }
+            channels[id] = CloudChannel(me: "mac", peer: id, secret: secret, mailbox: mailbox, after: cloudMarks[id] ?? -1)
         }
+        // Mail for the Mac from a key it doesn't accept (a withdrawn invite, a removed device) is
+        // never read; don't leave it in iCloud.
+        let unread = fetched.filter { $0.to == "mac" && channels[$0.from] == nil }.map(\.id)
+        if !unread.isEmpty { try? await mailbox.delete(unread) }
         for (id, channel) in channels {
-            let messages = await channel.receive(fetched)
+            guard accepts(id) else {
+                // An invite that expired or was withdrawn since its channel was opened.
+                channels[id] = nil
+                continue
+            }
+            // Every batch from a phone starts with its hello, so each one is checked against the
+            // installation that paired: one that isn't that device's is dropped whole.
+            var messages: [ClientMessage] = []
+            for batch in await channel.open(fetched) {
+                guard case .hello(_, let deviceID, let name, let installID)? = batch.messages.first(where: { if case .hello = $0 { true } else { false } }),
+                      deviceID == id, admit(id, installID: installID, name: name) else { continue }
+                await channel.accept(batch.seq)
+                messages += batch.messages
+            }
+            // The replay mark outlives the app: a batch read before a relaunch isn't read again.
+            let mark = await channel.delivered
+            if mark > (cloudMarks[id] ?? -1) { cloudMarks[id] = mark }
             guard !messages.isEmpty else { continue }
-            let link = cloudLinks[id] ?? attachCloud(id, channel: channel, messages: messages)
+            let link = cloudLinks[id] ?? attachCloud(id, channel: channel)
             link.heard()
             for message in messages { link.onReceive?(message) }
         }
     }
 
-    private func attachCloud(_ id: String, channel: CloudChannel<HostMessage, ClientMessage>, messages: [ClientMessage]) -> CloudLink {
-        let name = messages.lazy.compactMap { if case .hello(_, _, let n) = $0 { n } else { nil } }.first
-            ?? devices.first { $0.id == id }?.name ?? String(localized: "iPhone")
-        seen(id, name: name)
+    private func attachCloud(_ id: String, channel: CloudChannel<HostMessage, ClientMessage>) -> CloudLink {
         let link = CloudLink(deviceID: id, channel: channel, timeout: cloudTimeout)
         link.onGone = { [weak self] in
             self?.cloudLinks[id] = nil
@@ -331,7 +428,7 @@ public final class RemoteService {
     let lane = RemoteLane.local
     var onReceive: ((ClientMessage) -> Void)?
     var onClose: (() -> Void)?
-    private(set) var deviceID: String?
+    fileprivate(set) var deviceID: String?
     private let connection: FramedConnection<ClientMessage>
     private var closed = false
 
@@ -340,11 +437,14 @@ public final class RemoteService {
     func send(_ messages: [HostMessage]) { connection.send(messages) }
 
     func deliver(_ message: ClientMessage, service: RemoteService) {
+        guard !closed else { return }
         if deviceID == nil {
-            // The TLS handshake proved the key; the hello names the device it belongs to.
-            guard case .hello(_, let identity, let name) = message else { return }
-            deviceID = identity
-            service.localHello(self, deviceID: identity, name: name)
+            // The TLS handshake proved a key; the hello must name the device that key belongs
+            // to (the identity the handshake used, not just any the Mac knows). Anything else
+            // first, or a hello the Mac refuses, ends the connection.
+            guard case .hello(_, let identity, let name, let installID) = message,
+                  let used = connection.pskIdentity, identity == used,
+                  service.localHello(self, deviceID: identity, name: name, installID: installID) else { return close() }
             return
         }
         onReceive?(message)

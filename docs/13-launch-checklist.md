@@ -120,17 +120,9 @@ website ("same Wi-Fi for now").
 
 Work in the repository, before anything is published:
 
-- **The uninstaller.** `scripts/uninstall-xbot.command` ships in the DMG and still describes 1.x.
-  It doesn't remove the automations LaunchAgent (`~/Library/LaunchAgents/dev.xbot.automations.plist`)
-  or the pairing keys (Keychain service `dev.xbot.remote.pairing`), and its text mentions an in-app
-  "Settings → Advanced → Uninstall" that no longer exists. Keep the 1.x Docker clean-up: 1.0.0
-  installs exist.
 - **The website.** `site/index.html` still describes the Docker engine, OpenBot and the 1.x
   uninstaller. Rewrite it for 2.0 (what xBot does now, that it needs an agent CLI, that it isn't
   sandboxed and why, the phone app's status, uninstall). Pushing to master republishes it.
-- **The committed `Info.plist`** (`apps/mac/Resources/Info.plist`) says version `1.0.0` and
-  "Engine © 2026 CopilotKit, MIT" in its copyright line. The version is overwritten at release time;
-  the copyright line isn't.
 
 ---
 
@@ -161,8 +153,8 @@ The one test that can't be faked from the development Mac. Apple silicon, macOS 
 Homebrew, no xBot data, no agent CLI yet.
 
 1. Install from the step 6 DMG. It opens with no Gatekeeper warning.
-2. Home says "xBot works through an agent you already have". Follow its link, install Claude Code
-   (or Codex) and sign in. xBot finds it without a restart or a terminal hint (Settings › Agents).
+2. Home says "xBot works through an agent you already have". Follow one of its links, install Claude
+   Code (or Codex, Antigravity or GitHub Copilot) and sign in. xBot finds it without a restart or a terminal hint (Settings › Agents).
 3. Add a project folder, start a chat, get a streamed reply with tool rows; stop one mid-reply (⌘.);
    run a plan; open the terminal; edit a note.
 4. Turn on **Run when xBot is closed** for an automation, quit xBot, and see it run. Turn it off and
@@ -193,7 +185,8 @@ because the only release, 1.0.0, is a pre-release.
 
 Publishing 2.0.0 as a full release also means **every 1.0.0 install on macOS 26 will be offered
 2.0**: same bundle id, same key, and its feed starts answering. Decide whether that's wanted. Those
-people's Docker container and volumes stay behind; the uninstaller (step 5) is how they remove them.
+people's Docker container and volumes stay behind; `Uninstall xBot.command` in the DMG is how they
+remove them.
 
 Afterwards:
 
@@ -208,7 +201,8 @@ ends in `200`, and **xBot › Check for Updates…** in the installed 2.0.0 says
 ## 9. Prove an update — **after the next release**
 
 An update channel isn't verified until an update has gone through it. Publish 2.0.1 the same way
-and check that 2.0.0 offers it, asks before installing, installs and relaunches as 2.0.1.
+and check that 2.0.0 offers it, asks before installing, installs and relaunches as 2.0.1. Do it once
+with a long turn running too: the relaunch should wait until the turn ends.
 
 ---
 
@@ -237,6 +231,3 @@ Without option B in step 4, a TestFlight phone only works on the same network as
   permission mode.
 - **The name.** [ADR-0006](decisions/0006-naming-and-trademark.md) is still unresolved, and it's
   cheaper to answer before a public launch than after.
-- **Hold updates during a turn.** Sparkle can prompt while an agent is mid-reply; the hook for it
-  exists in `SparkleAppUpdateController` but isn't connected (see
-  [packaging](11-packaging-and-updates.md#updates)).

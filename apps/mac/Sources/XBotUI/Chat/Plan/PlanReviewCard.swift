@@ -10,6 +10,8 @@ struct PlanReviewCard: View {
     @State private var steps: [PlanStep]
     @State private var hovered: UUID?
     @FocusState private var focused: UUID?
+    /// ⌘↩ is Commit while the Changes panel's message has focus; Run plan has it otherwise.
+    @FocusedValue(\.writingCommitMessage) private var writingCommitMessage
 
     init(workspace: Workspace, chatID: UUID, messageID: UUID, plan: Plan) {
         self.workspace = workspace
@@ -58,7 +60,7 @@ struct PlanReviewCard: View {
                         }
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .keyboardShortcut(.return, modifiers: .command)
+                    .keyboardShortcut(writingCommitMessage == true ? nil : KeyboardShortcut(.return, modifiers: .command))
                     .disabled(runnable.isEmpty || workspace.isRunning(chatID))
                 }
             }

@@ -13,8 +13,8 @@ before it.
 
 | Lane | When | How |
 | --- | --- | --- |
-| **Local** | The phone and the Mac are on the same network | Bonjour (`_xbot._tcp`) finds the Mac; the pairing code also carries its address and port. TLS with the pairing key as a pre-shared key (TLS-PSK). Frames are a 4-byte length plus JSON, at most 16 MB. |
-| **iCloud** | Not found nearby within 4 seconds | CloudKit's private database in your own iCloud account (container `iCloud.dev.xbot`). Each record is a batch of messages sealed with the pairing key, opened in order, once, then deleted. No server of ours. |
+| **Local** | The phone and the Mac are on the same network | Bonjour (`_xbot._tcp`) finds the Mac; the pairing code also carries its address and port. TLS with the pairing key as a pre-shared key (TLS-PSK); the phone's hello must name the key its handshake used. Frames are a 4-byte length plus JSON, at most 16 MB. |
+| **iCloud** | Not found nearby within 4 seconds | CloudKit's private database in your own iCloud account (container `iCloud.dev.xbot`). Each record is a batch of messages sealed with the pairing key, its sender, recipient and sequence number authenticated with it; opened in order, once, then deleted, and never read again after a relaunch. Every batch from the phone starts with its hello. No server of ours. |
 
 The phone switches by itself; the status under the Mac's name says "same Wi-Fi" or "through
 iCloud". Through iCloud, pushes make things quicker when they arrive, but they're best-effort, so
@@ -33,10 +33,16 @@ its cache.
 
 1. On the Mac: **Settings › Devices › Pair an iPhone or iPad**. It shows a QR code holding an
    `xbot://pair?…` link: a random 256-bit key, the Mac's id, name, address and port.
-2. On the phone: scan it with the app (or open the `xbot://pair` link on the phone). Each side keeps
-   the key in its Keychain.
+2. On the phone: scan it with the app, paste the link (**Paste a pairing link**, or type it in the
+   field below), or open the `xbot://pair` link on the phone. Each side keeps the key in its
+   Keychain. The phone also makes an id for this installation and sends it with every hello.
 3. Settings › Devices on the Mac lists paired devices and removes them; removing one ends its
    access on both lanes.
+
+A code pairs one device. The first installation to say hello with it is the device, and the Mac
+refuses its key from any other. A code nobody used stops working when the sheet closes, after
+10 minutes if the sheet is left open (the sheet then offers a new one), and when xBot quits. Opening
+a pairing link on a phone that's already paired asks first: "Replace the pairing with …?"
 
 Until the first pairing the feature is off: no listener, no CloudKit.
 
@@ -122,8 +128,10 @@ launch. There's no TestFlight or App Store build yet.
 ## Tests
 
 - **Package tests** (`swift test` in `apps/mac`): every message round-trips; the local transport
-  over loopback with the key (and a wrong key refused); the cloud channel against a fake mailbox
-  (order, dedupe, cleanup); `RemoteHost` for each feature with a scripted brain; remote shells;
+  over loopback with the key (a wrong key refused, and the listener knowing which key a phone
+  used); the cloud channel against a fake mailbox (order, dedupe, cleanup, renumbered, reflected
+  and replayed batches refused); pairing in `RemoteService` (codes withdrawn on close, expired,
+  removed at relaunch, used once, a hello that names another key refused); `RemoteHost` for each feature with a scripted brain; remote shells;
   path checks; the world and the org chart.
 - **Live phone tests** (`UITests/LiveRemoteUITests.swift`, 18 of them): the simulator pairs with a
   debug build of the Mac app (pairing link in `TEST_RUNNER_XBOT_PAIR_URL`) and goes through each

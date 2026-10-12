@@ -31,11 +31,10 @@ cp "${RES}/xBot.icns" "${APP}/Contents/Resources/xBot.icns"
 cp "${MAC}/Resources/Info.plist" "${APP}/Contents/Info.plist"
 "${ROOT}/scripts/inject-sparkle-plist.sh" "${APP}/Contents/Info.plist"
 
-# The release workflow stamps the version it is publishing. Sparkle compares CFBundleVersion, so it
-# has to rise with every release, and the committed plist's "1" never would.
-if [[ -n "${XBOT_VERSION:-}" ]]; then
-  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${XBOT_VERSION}" "${APP}/Contents/Info.plist"
-fi
+# The version always comes from here, never from the committed plist: the release workflow stamps
+# the one it is publishing, and anything else is a development build. Sparkle compares
+# CFBundleVersion, so that has to rise with every release, and the committed plist's "1" never would.
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${XBOT_VERSION:-2.0.0-dev}" "${APP}/Contents/Info.plist"
 if [[ -n "${XBOT_BUILD_NUMBER:-}" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${XBOT_BUILD_NUMBER}" "${APP}/Contents/Info.plist"
 fi

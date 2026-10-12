@@ -47,15 +47,15 @@ Home says, in full (`HomeView`):
 
 > **xBot works through an agent you already have.**
 >
-> Install Claude Code or Codex and sign in, then come back. xBot will find it.
+> Install Claude Code, Codex, Antigravity or GitHub Copilot and sign in, then come back. xBot will
+> find it.
 >
-> Get Claude Code · Get Codex
+> Get Claude Code · Get Codex · Get Antigravity · Get GitHub Copilot
 >
 > [ Look again ]
 
-The two links open `claude.com/product/claude-code` and `developers.openai.com/codex`. The copy
-names only Claude Code and Codex, although Antigravity and GitHub Copilot are found the same way
-if they're installed. xBot looks again when you press **Look again**, press **Look Again** in
+The four links open `claude.com/product/claude-code`, `developers.openai.com/codex`,
+`antigravity.google` and `github.com/github/copilot-cli`. xBot looks again when you press **Look again**, press **Look Again** in
 Settings › Agents, or relaunch; it doesn't notice an install on its own.
 
 ### Settings › Agents
@@ -89,10 +89,12 @@ Until it's paired the app shows one screen (`PairView`), not the tab bar:
 > 3. Scan the code it shows.
 >
 > [ Scan the code ]
+> [ Paste a pairing link ]   Or type it: xbot://pair?…
 
-**Scan the code** opens the camera (iOS asks for it once). A code that isn't an xBot link gets
-"That isn't an xBot pairing code." Opening an `xbot://pair?…` link on the phone pairs it the same
-way. There's no field to paste the link into.
+**Scan the code** opens the camera (iOS asks for it once). **Paste a pairing link** reads the link
+from the clipboard, or type it in the field. A code that isn't an xBot link gets "That isn't an xBot
+pairing code." Opening an `xbot://pair?…` link on the phone pairs it the same way; if the phone is
+already paired, it first asks "Replace the pairing with <Mac>?".
 
 ### On the Mac
 

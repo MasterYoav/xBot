@@ -16,13 +16,7 @@ struct DevicesSettings: View {
                 Text(String(localized: "Keep working from your iPhone or iPad: your chats live, and the agents still run here. On the same Wi-Fi it connects directly; away, through your iCloud."))
                     .captionText().foregroundStyle(Palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button(String(localized: "Pair an iPhone or iPad…")) {
-                    invite = remote?.invite(host: LocalAddress.ipv4)
-                    #if DEBUG
-                    // For the simulator, which has no camera: `xcrun simctl openurl booted <this>`.
-                    if let invite { print("XBOT_PAIRING_URL \(invite.url.absoluteString)") }
-                    #endif
-                }
+                Button(String(localized: "Pair an iPhone or iPad…")) { newInvite() }
                     .disabled(remote == nil)
             }
             if let remote {
@@ -55,9 +49,28 @@ struct DevicesSettings: View {
             }
         }
         .formStyle(.grouped)
-        .sheet(item: Binding(get: { invite.map(InviteBox.init) }, set: { if $0 == nil { invite = nil } })) { box in
-            PairingSheet(invite: box.invite, remote: remote) { invite = nil }
+        // One sheet for the whole visit: a new code replaces the old one in place.
+        .sheet(isPresented: Binding(get: { invite != nil }, set: { (shown: Bool) in if !shown { closeInvite() } })) {
+            if let invite {
+                PairingSheet(invite: invite, remote: remote, renew: { newInvite() }, done: { closeInvite() })
+            }
         }
+    }
+
+    /// A fresh code; the one on screen before it (if any) stops working.
+    private func newInvite() {
+        if let invite { remote?.withdraw(invite) }
+        invite = remote?.invite(host: LocalAddress.ipv4)
+        #if DEBUG
+        // For the simulator, which has no camera: `xcrun simctl openurl booted <this>`.
+        if let invite { print("XBOT_PAIRING_URL \(invite.url.absoluteString)") }
+        #endif
+    }
+
+    /// The sheet closed, however it closed: a code nobody used stops working at once.
+    private func closeInvite() {
+        if let invite { remote?.withdraw(invite) }
+        invite = nil
     }
 
     private func status(of device: PairedDevice, in remote: RemoteService) -> String {
@@ -71,18 +84,16 @@ struct DevicesSettings: View {
     }
 }
 
-private struct InviteBox: Identifiable {
-    let invite: PairingInvite
-    var id: String { invite.key.identity }
-}
-
-/// The QR code, until the device connects.
+/// The QR code, until the device connects or the code runs out.
 private struct PairingSheet: View {
     let invite: PairingInvite
     let remote: RemoteService?
+    let renew: () -> Void
     let done: () -> Void
 
     private var paired: Bool { remote?.devices.contains { $0.id == invite.key.identity } == true }
+    private var expired: Bool { !paired && remote?.isLive(invite) != true }
+    private var minutes: Int { max(1, Int((remote?.inviteLifetime ?? .seconds(600)).components.seconds / 60)) }
 
     var body: some View {
         VStack(spacing: Space.l) {
@@ -101,10 +112,17 @@ private struct PairingSheet: View {
             if paired {
                 Label(String(localized: "Paired. You can close this."), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(Palette.success).frame(height: 220)
+            } else if expired {
+                VStack(spacing: Space.m) {
+                    Label(String(localized: "This code has expired."), systemImage: "clock.badge.xmark")
+                        .foregroundStyle(Palette.textSecondary)
+                    Button(String(localized: "Show a new code"), action: renew)
+                }
+                .frame(height: 220)
             } else if let image = QRCode.image(invite.url.absoluteString) {
                 Image(nsImage: image).interpolation(.none).resizable().frame(width: 220, height: 220)
                     .accessibilityLabel(String(localized: "Pairing code"))
-                Text(String(localized: "The code pairs one device. Keep it to yourself: it's the key to this Mac."))
+                Text(String(localized: "The code pairs one device and works for \(minutes) minutes, until you close this. Keep it to yourself: it's the key to this Mac."))
                     .captionText().foregroundStyle(Palette.textTertiary).multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -116,6 +134,8 @@ private struct PairingSheet: View {
         }
         .padding(Space.xl)
         .frame(width: 380)
+        // However the sheet goes (Settings closed with it open, say), an unused code stops working.
+        .onDisappear { remote?.withdraw(invite) }
     }
 }
 

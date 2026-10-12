@@ -4,6 +4,8 @@ import XBotCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static var workspace: Workspace?
+    /// Set by the app before launch finishes; bound to the turns and scheduled below.
+    static var appUpdates: (any AppUpdateControlling)?
 
     /// A bare executable (`swift run`) has no Info.plist and can be handed the prohibited
     /// activation policy: the window draws but never takes keystrokes. The bundled app never
@@ -14,11 +16,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        startUpdates()
+        #if DEBUG
+        snapshotIfAsked()
+        #endif
+    }
+
+    /// No update is installed while a turn runs, and the daily check is set going.
+    private func startUpdates() {
+        guard let updates = Self.appUpdates else { return }
+        updates.bindUpdateBlockingActivity { Self.workspace?.isRunningAnyTurn ?? false }
+        updates.scheduleAutomaticCheckIfDue()
+    }
+
     #if DEBUG
     /// `XBOT_WINDOW_SNAPSHOT=/path.png swift run XBot`: a picture of the real window — title bar,
     /// traffic lights and all — a few seconds after launch, then quit. How the chrome is checked
     /// where screen recording is not allowed; never in a release build.
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    private func snapshotIfAsked() {
         guard let path = ProcessInfo.processInfo.environment["XBOT_WINDOW_SNAPSHOT"] else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(5))

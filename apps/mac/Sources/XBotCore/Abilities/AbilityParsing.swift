@@ -236,11 +236,12 @@ public enum AbilityParsing {
             .joined(separator: " ")
     }
 
+    /// Masked: it's shown on the Abilities page and sent to a paired phone (see `SecretRedaction`).
     static func target(_ entry: [String: Any]) -> String? {
-        if let url = entry["url"] as? String { return url }
+        if let url = entry["url"] as? String { return SecretRedaction.redact(url) }
         guard let command = entry["command"] as? String else { return nil }
         let args = entry["args"] as? [String] ?? []
-        return ([command] + args).joined(separator: " ")
+        return SecretRedaction.redact(([command] + args).joined(separator: " "))
     }
 
     static func host(_ url: String) -> String { URL(string: url)?.host() ?? url }

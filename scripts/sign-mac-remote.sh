@@ -11,7 +11,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="${1:-${ROOT}/apps/mac/XBot.app}"
-DD="${XBOT_SIGN_DERIVED_DATA:-${HOME}/.hermes/cache/scratch/dd-sign}"
+# Repo-local and ignored by git (.gitignore: DerivedData/), so it works on any Mac and is reused.
+DD="${XBOT_SIGN_DERIVED_DATA:-${ROOT}/apps/ios/DerivedData/sign}"
 
 [[ -d "${APP}" ]] || { echo "Bundle the app first: scripts/bundle-mac-app.sh" >&2; exit 1; }
 

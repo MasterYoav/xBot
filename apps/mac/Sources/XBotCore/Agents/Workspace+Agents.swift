@@ -87,13 +87,16 @@ extension Workspace {
         }
     }
 
-    func startChat(with agent: Agent, in projectID: UUID?, select: Bool) -> Chat? {
+    /// `handedFrom`: the permission of the manager's chat when this one is a hand-off, which caps
+    /// this chat's (see `Handoff.mode`).
+    func startChat(with agent: Agent, in projectID: UUID?, select: Bool, handedFrom: PermissionMode? = nil) -> Chat? {
         let harness = brains[agent.harness] == nil ? availableHarnesses.first : agent.harness
         guard let harness else { return nil }
         let projectID = projectID.flatMap { id in projects.contains { $0.id == id } ? id : nil }
+        let mode = handedFrom.map { Handoff.mode(handedFrom: $0, to: harness) } ?? .editFiles
         let chat = Chat(
             projectID: projectID, title: String(localized: "New chat"), harness: harness,
-            model: harness == agent.harness ? agent.model : nil, mode: .editFiles, agentID: agent.id
+            model: harness == agent.harness ? agent.model : nil, mode: mode, agentID: agent.id
         )
         attempt { try store.save(chat) }
         chats.insert(chat, at: 0)
@@ -179,22 +182,27 @@ extension Workspace {
         let team = team(of: head.id)
         guard !team.isEmpty else { return [] }
         let text = parts.compactMap { part -> String? in if case .text(let t) = part { t } else { nil } }.joined()
-        return Handoff.all(in: text).map { handoff in
+        return Handoff.all(in: text).flatMap { handoff -> [Part] in
             func named(_ agent: Agent) -> Bool {
                 agent.name.compare(handoff.to, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
             }
             guard let member = team.first(where: named) else {
                 if agents.contains(where: named) {
-                    return .notice(String(localized: "\(handoff.to) isn't on \(head.name)'s team, so that task wasn't handed off."))
+                    return [.notice(String(localized: "\(handoff.to) isn't on \(head.name)'s team, so that task wasn't handed off."))]
                 }
-                return .notice(String(localized: "There's no \(handoff.to) in the crew, so that task wasn't handed off."))
+                return [.notice(String(localized: "There's no \(handoff.to) in the crew, so that task wasn't handed off."))]
             }
-            guard let started = startChat(with: member, in: chat.projectID, select: false),
+            guard let started = startChat(with: member, in: chat.projectID, select: false, handedFrom: chat.mode),
                   send(String(localized: "From \(head.name): \(handoff.task)"), in: started.id) else {
-                return .notice(String(localized: "Couldn't hand that to \(member.name)."))
+                return [.notice(String(localized: "Couldn't hand that to \(member.name)."))]
             }
             handoffOrigins[started.id] = chatID
-            return .notice(Handoff.handedPrefix(member.name) + Self.title(from: handoff.task))
+            var notices: [Part] = [.notice(Handoff.handedPrefix(member.name) + Self.title(from: handoff.task))]
+            // Said, not silent: the person may expect the member to edit, as others on the crew do.
+            if chat.mode == .editFiles, started.harness.editingNeedsFullAccess {
+                notices.append(.notice(String(localized: "\(started.harness.displayName) can only edit with full access, so \(member.name) works read-only on this. Give this chat full access to let them edit.")))
+            }
+            return notices
         }
     }
 
