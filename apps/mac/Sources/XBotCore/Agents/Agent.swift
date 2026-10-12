@@ -91,6 +91,18 @@ public struct Handoff: Equatable, Sendable {
     public static func handedPrefix(_ name: String) -> String { String(localized: "Handed to \(name): ") }
     public static func finishedPrefix(_ name: String) -> String { String(localized: "\(name) finished: ") }
 
+    /// The permission a handed-off chat starts with: Can edit, as a chat with an agent does, but
+    /// never more than the manager's chat has, so a read-only chat can't get work done with edits
+    /// by handing it on. A CLI that can only edit with full access (Antigravity) stays read-only
+    /// unless the manager's chat has full access: its "Can edit" would be an escalation.
+    public static func mode(handedFrom manager: PermissionMode, to harness: HarnessKind) -> PermissionMode {
+        switch manager {
+        case .readOnly: .readOnly
+        case .editFiles: harness.editingNeedsFullAccess ? .readOnly : .editFiles
+        case .fullAccess: .editFiles
+        }
+    }
+
     public static func all(in text: String) -> [Handoff] {
         var found: [Handoff] = []
         var inside = false

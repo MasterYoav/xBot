@@ -61,6 +61,22 @@ import XBotBrain
         #expect(Handoff.stripping(reply) == "Splitting it.\n\nBack soon.\n```swift\nlet x = 1\n```")
     }
 
+    /// A hand-off never gives the member more than the manager's chat has.
+    @Test func aHandedOffChatGetsTheManagersPermissionAtMost() {
+        #expect(Handoff.mode(handedFrom: .readOnly, to: .claude) == .readOnly)
+        #expect(Handoff.mode(handedFrom: .editFiles, to: .claude) == .editFiles)
+        #expect(Handoff.mode(handedFrom: .fullAccess, to: .claude) == .editFiles)
+        #expect(Handoff.mode(handedFrom: .readOnly, to: .codex) == .readOnly)
+        #expect(Handoff.mode(handedFrom: .editFiles, to: .copilot) == .editFiles)
+    }
+
+    /// Antigravity's "Can edit" is full access, so it only gets it from a manager with full access.
+    @Test func antigravityStaysReadOnlyUnlessTheManagerHasFullAccess() {
+        #expect(Handoff.mode(handedFrom: .readOnly, to: .antigravity) == .readOnly)
+        #expect(Handoff.mode(handedFrom: .editFiles, to: .antigravity) == .readOnly)
+        #expect(Handoff.mode(handedFrom: .fullAccess, to: .antigravity) == .editFiles)
+    }
+
     @Test func ignoresOtherCodeAndEmptyTasks() {
         let reply = "```swift\nto: Forge\ntask: no\n```\n```handoff\nto: Forge\ntask:\n```"
         #expect(Handoff.all(in: reply).isEmpty)
@@ -188,6 +204,45 @@ import XBotBrain
         }
         #expect(notices.contains { $0.contains("Forge") })
         #expect(notices.contains { $0.contains("Nobody") })
+    }
+
+    /// A read-only manager chat hands off read-only work: the member can't edit either.
+    @Test func aReadOnlyManagerHandsOffReadOnly() async throws {
+        let brain = ScriptedBrain([.textDelta("```handoff\nto: Forge\ntask: Build it.\n```"), .done])
+        let w = await workspace(brain)
+        let head = try #require(w.headMaster)
+        let chat = try #require(w.talk(to: head.id))
+        w.setMode(.readOnly, for: chat.id)
+        _ = w.send("Ship it", in: chat.id)
+        await settle(w)
+        let forge = try #require(w.agents.first { $0.name == "Forge" })
+        let forgeChat = try #require(w.chats.first { $0.agentID == forge.id })
+        #expect(forgeChat.mode == .readOnly)
+        for _ in 0..<400 where brain.requests.withLock({ $0.count }) < 2 { await Task.yield() }
+        #expect(brain.requests.withLock { $0.last?.mode } == .readOnly)
+    }
+
+    /// Antigravity can only edit with full access: from a Can-edit chat it stays read-only, and
+    /// HeadMaster's chat says why.
+    @Test func aHandOffToAntigravityDoesNotEscalate() async throws {
+        let brain = ScriptedBrain([.textDelta("```handoff\nto: Forge\ntask: Build it.\n```"), .done])
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: brain, .antigravity: brain] })
+        await w.refreshHarnesses()
+        var forge = try #require(w.agents.first { $0.name == "Forge" })
+        forge.harness = .antigravity
+        w.saveAgent(forge)
+        let head = try #require(w.headMaster)
+        let chat = try #require(w.talk(to: head.id))
+        #expect(w.chat(chat.id)?.mode == .editFiles)
+        _ = w.send("Ship it", in: chat.id)
+        await settle(w)
+        let forgeChat = try #require(w.chats.first { $0.agentID == forge.id })
+        #expect(forgeChat.harness == .antigravity)
+        #expect(forgeChat.mode == .readOnly)
+        let notices = w.messages(in: chat.id).flatMap(\.parts).compactMap { part -> String? in
+            if case .notice(let text) = part { text } else { nil }
+        }
+        #expect(notices.contains { $0.contains("full access") && $0.contains("Forge") })
     }
 
     /// When a member finishes what HeadMaster gave them, HeadMaster's chat hears about it.
