@@ -161,6 +161,12 @@ CI runners are slow: give async tests generous waits.
 
 **Never say "done", "fixed", or "passing" without having run the command and read the output.**
 
+**Releasing = bumping `VERSION`.** A PR that changes the `VERSION` file, once merged to master,
+makes "Mac release" build, sign, notarize and publish `v<VERSION>` (`xBot.dmg` at
+`releases/latest/download/`). Don't change `VERSION` in an unrelated PR; prefer a bump to a manual
+run.
+See `docs/11-packaging-and-updates.md` › Releasing.
+
 **Local green is not CI green.** Both are worth checking — `gh run list -R MasterYoav/xBot`. Every
 CI failure so far has been something that only exists on a fresh checkout: a generated file that
 was never committed, a runner image without the right Xcode, a value spliced into a script that

@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased — the redesign
+## 2.0.0 — the redesign
 
 xBot is now a native app that drives the agent CLIs you already have. See
 [ADR-0009](docs/decisions/0009-native-harness-redesign.md).
+
+Download: [`xBot.dmg`](https://github.com/MasterYoav/xBot/releases/latest/download/xBot.dmg), signed
+and notarized, published by CI from the `VERSION` file. The downloaded build reaches the iPhone and
+iPad app on the same network only; the iCloud lane needs a build signed with the iCloud entitlement.
 
 ### Added
 - Projects: add any folder; chats in it work in that folder.
