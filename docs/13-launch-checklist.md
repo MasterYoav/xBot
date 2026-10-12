@@ -154,7 +154,7 @@ Homebrew, no xBot data, no agent CLI yet.
 
 1. Install from the step 6 DMG. It opens with no Gatekeeper warning.
 2. Home says "xBot works through an agent you already have". Follow one of its links, install Claude
-   Code (or Codex, Antigravity or GitHub Copilot) and sign in. xBot finds it without a restart or a terminal hint (Settings › Agents).
+   Code (or Codex, Antigravity or GitHub Copilot) and sign in. xBot finds it without a restart or a terminal hint (Settings › AI).
 3. Add a project folder, start a chat, get a streamed reply with tool rows; stop one mid-reply (⌘.);
    run a plan; open the terminal; edit a note.
 4. Turn on **Run when xBot is closed** for an automation, quit xBot, and see it run. Turn it off and

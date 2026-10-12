@@ -1,7 +1,8 @@
 import SwiftUI
 import XBotCore
 
-/// The Settings window (⌘,): how new chats start, how xBot looks, the agents found, and about xBot.
+/// The Settings window (⌘,): how new chats start, how xBot looks, AI (the Jev key and the agents
+/// found), and about xBot.
 public struct SettingsView: View {
     let workspace: Workspace
 
@@ -13,8 +14,8 @@ public struct SettingsView: View {
                 .tabItem { Label(String(localized: "General"), systemImage: "gearshape") }
             AppearanceSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Appearance"), systemImage: "paintpalette") }
-            AgentSettings(workspace: workspace)
-                .tabItem { Label(String(localized: "Agents"), systemImage: "cpu") }
+            AISettings(workspace: workspace)
+                .tabItem { Label(String(localized: "AI"), systemImage: "cpu") }
             DevicesSettings(workspace: workspace)
                 .tabItem { Label(String(localized: "Devices"), systemImage: "iphone") }
             AboutSettings()
@@ -57,11 +58,13 @@ private struct GeneralSettings: View {
     }
 }
 
-private struct AgentSettings: View {
+/// TypeSafe Jev above the agent CLIs found on this Mac.
+private struct AISettings: View {
     let workspace: Workspace
 
     var body: some View {
         Form {
+            JevSettingsSection(jev: workspace.jev)
             ForEach(HarnessKind.allCases, id: \.self) { kind in
                 Section(kind.displayName) {
                     LabeledContent(String(localized: "Found at")) {

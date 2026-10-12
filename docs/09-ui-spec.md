@@ -419,7 +419,7 @@ A separate Settings window (⌘,), with five tabs.
 | --- | --- |
 | **General** | **Default agent** (*Most recent* or a CLI), **Default reasoning** (*The agent's default* or a level), **Default permission** |
 | **Appearance** | Appearance (Dark / Light / Match System); Wallpaper; App icon; Font |
-| **Agents** | For each CLI: **Found at** (path, *Looking…* or *Not installed*), **Signed in**, **Plan**, and 5-hour and weekly usage left where known; **Look Again** |
+| **AI** | **TypeSafe Jev** (the API key, the model, the **Jev Workflows** toggle; below), then for each CLI: **Found at** (path, *Looking…* or *Not installed*), **Signed in**, **Plan**, and 5-hour and weekly usage left where known; **Look Again** |
 | **Devices** | Pair an iPhone or iPad, the paired devices, and the stay-awake note |
 | **About** | Icon, version and build, credits |
 
@@ -431,6 +431,16 @@ xBot wrote"* to read.
 
 **App icon**: Ink, Rose, Sunset, Plum. **Font**: *System (SF Pro)* or any installed family; code
 and file names stay in SF Mono.
+
+**TypeSafe Jev** (the AI tab, formerly Agents; same icon): with no key, a secure **API key** field
+and **Save**. Saved, the key is never shown again: *"Saved · 48 characters"*, **Check** (one tiny
+yes/no question; *"Jev answered in 120 ms."* in green, or the error in a sentence in red: *"Jev didn't
+accept the key. Check it at console.typesafe.ai."*, *"Jev is rate limiting this key. Try again in a
+minute."*, *"Jev can't be reached. Check this Mac's internet connection."*) and **Remove**. Saving
+a key checks it straight away. **Model**: blank for `jev-latest`, or a pinned version.
+**Jev Workflows** toggle (off by default): *"Workflows that mix your agents with Jev's quick
+decisions, and “Let Jev choose” in chats."* Footer: *"The key is kept in your Keychain."* and the
+link *Get a key at console.typesafe.ai*.
 
 **Signed in** reads *Yes*/*No* for Claude Code, *Yes*/*Not seen yet* for Codex, and *Checked on
 the first turn* for Antigravity and Copilot.

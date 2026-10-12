@@ -56,11 +56,13 @@ Home says, in full (`HomeView`):
 
 The four links open `claude.com/product/claude-code`, `developers.openai.com/codex`,
 `antigravity.google` and `github.com/github/copilot-cli`. xBot looks again when you press **Look again**, press **Look Again** in
-Settings › Agents, or relaunch; it doesn't notice an install on its own.
+Settings › AI, or relaunch; it doesn't notice an install on its own.
 
-### Settings › Agents
+### Settings › AI
 
-One section per CLI, all four always listed:
+The tab was called Agents until the TypeSafe Jev section was added above the CLIs (the key, the
+model, and the Jev Workflows toggle; see [the UI spec](09-ui-spec.md#settings)). Below it, one
+section per CLI, all four always listed:
 
 | Row | Shows |
 | --- | --- |
