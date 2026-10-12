@@ -47,15 +47,15 @@ Home says, in full (`HomeView`):
 
 > **xBot works through an agent you already have.**
 >
-> Install Claude Code or Codex and sign in, then come back. xBot will find it.
+> Install Claude Code, Codex, Antigravity or GitHub Copilot and sign in, then come back. xBot will
+> find it.
 >
-> Get Claude Code · Get Codex
+> Get Claude Code · Get Codex · Get Antigravity · Get GitHub Copilot
 >
 > [ Look again ]
 
-The two links open `claude.com/product/claude-code` and `developers.openai.com/codex`. The copy
-names only Claude Code and Codex, although Antigravity and GitHub Copilot are found the same way
-if they're installed. xBot looks again when you press **Look again**, press **Look Again** in
+The four links open `claude.com/product/claude-code`, `developers.openai.com/codex`,
+`antigravity.google` and `github.com/github/copilot-cli`. xBot looks again when you press **Look again**, press **Look Again** in
 Settings › Agents, or relaunch; it doesn't notice an install on its own.
 
 ### Settings › Agents

@@ -121,9 +121,10 @@ suggestion cards; they were taken out.
 With no agent CLI found, Home says instead:
 
 > **xBot works through an agent you already have.**
-> Install Claude Code or Codex and sign in, then come back. xBot will find it.
+> Install Claude Code, Codex, Antigravity or GitHub Copilot and sign in, then come back. xBot will find it.
 
-with links **Get Claude Code** and **Get Codex**, and **Look again**.
+with links **Get Claude Code**, **Get Codex**, **Get Antigravity** and **Get GitHub Copilot** (in a
+row, or a column when the window is too narrow), and **Look again**.
 
 ## The composer
 
@@ -238,7 +239,7 @@ opens Apple's own installer.
   (*Passing*, *Failing*, *Running*). Click opens it.
 - **Problems** from git, in red monospace, dismissable.
 - **Commit box** — *Message (⌘↩ to commit)*, **Commit**, and **Sync Changes ↓n ↑n** (or **Publish
-  Branch** with no upstream).
+  Branch** with no upstream). ⌘↩ commits only while the message field has focus.
 - **Merge needed** — *"Your branch and the remote both have new commits. They need merging before
   you can push."* with **Ask the agent to merge**, which sends a merge request to the open chat or
   puts it in Home's composer. Conflicts are explained here, never resolved here.
@@ -469,7 +470,7 @@ Motion stills the worlds, text-art wallpapers and Galaxy.
 | ⌘. | Stop the running turn |
 | ⌃` | Show or hide this chat's terminal |
 | ← → | Move the effort slider (when it has focus) |
-| ⌘↩ | Run plan (on a plan in review); commit (in the commit box) |
+| ⌘↩ | Commit, while the commit box's message has focus; otherwise Run plan (on a plan in review). Never both: Run plan gives the shortcut up while the message has focus |
 | ⌥↑ ⌥↓ | Move a plan step |
 | ⏎ / ⌫ | Next plan step / remove an empty step |
 | Escape | Cancel an edit; close a diff; close the explorer's filter |
