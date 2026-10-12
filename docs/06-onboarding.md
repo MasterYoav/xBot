@@ -89,10 +89,12 @@ Until it's paired the app shows one screen (`PairView`), not the tab bar:
 > 3. Scan the code it shows.
 >
 > [ Scan the code ]
+> [ Paste a pairing link ]   Or type it: xbot://pair?…
 
-**Scan the code** opens the camera (iOS asks for it once). A code that isn't an xBot link gets
-"That isn't an xBot pairing code." Opening an `xbot://pair?…` link on the phone pairs it the same
-way. There's no field to paste the link into.
+**Scan the code** opens the camera (iOS asks for it once). **Paste a pairing link** reads the link
+from the clipboard, or type it in the field. A code that isn't an xBot link gets "That isn't an xBot
+pairing code." Opening an `xbot://pair?…` link on the phone pairs it the same way; if the phone is
+already paired, it first asks "Replace the pairing with <Mac>?".
 
 ### On the Mac
 
