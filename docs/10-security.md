@@ -115,17 +115,29 @@ code the agent will run as you; xBot doesn't vet it.
 | `…/xBot/profile.png` | The account picture, if you set one |
 | `<project>/notes/*.md` | Notes, in the project |
 | User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names and installation ids, the identities of outstanding invites, iCloud change tokens and replay marks |
-| Keychain | Pairing keys, nothing else (below) |
+| Keychain | Pairing keys and the TypeSafe Jev API key, nothing else (below) |
 | `~/Library/LaunchAgents/dev.xbot.automations.plist` | Only while **Run when xBot is closed** is on |
 
-xBot itself makes no web requests: no telemetry, no crash reporting, no account. The network
-traffic it causes is the CLIs' own, `git` and `gh` when you use the Changes inspector, CloudKit for
-the remote's iCloud lane, and Sparkle once updates are configured.
+xBot itself makes no web requests of its own accord: no telemetry, no crash reporting, no account.
+The network traffic it causes is the CLIs' own, `git` and `gh` when you use the Changes inspector,
+CloudKit for the remote's iCloud lane, Sparkle once updates are configured, and — only with a Jev
+key saved — `POST https://api.typesafe.ai/v1/systemone` (TypeSafe's Jev), when you press **Check**
+in Settings › AI or, with **Jev Workflows** on, when a workflow's Jev step or a "Jev picks" choice
+runs. What goes to Jev is the question and its state: a workflow's input and its steps' replies so
+far (trimmed), or the message a chat sends with **Let Jev choose**. Nothing is sent to Jev with the
+toggle off, except Check.
 
 ## The Keychain
 
-The only secrets xBot holds are pairing keys. There are no API keys: the native brain that would
-take them isn't built.
+The secrets xBot holds are pairing keys and, if you add one, the TypeSafe Jev API key. There are no
+model API keys: the native brain that would take them isn't built.
+
+- **The Jev key:** one generic password, service `dev.xbot.jev`, account `api-key`, accessible
+  `AfterFirstUnlockThisDeviceOnly` (`KeychainJevKeyStore`). Settings › AI shows only that it is
+  saved and its length; the field is cleared when it's saved. It leaves the Keychain only as the
+  `Authorization: Bearer` header of a call to `api.typesafe.ai`, over HTTPS through an ephemeral
+  session (nothing cached on disk). Jev's errors are shown as sentences that never contain it.
+  **Remove** deletes the item.
 
 - **On the Mac:** a generic password per device, service `dev.xbot.remote.pairing`, account the
   key's identity (a UUID), value the 256-bit key in base64, accessible
@@ -278,7 +290,8 @@ don't exist yet. Don't read this page as describing them.
   gate is the CLI's permission mode.
 - **An append-only audit trail.** A record of every tool call, written before its result returns.
   Today the record is the chat's transcript, which can be edited and deleted like any chat.
-- **API keys.** The native brain (API keys, Ollama) is planned, with keys in the Keychain only.
+- **Model API keys.** The native brain (API keys, Ollama) is planned, with keys in the Keychain only
+  (as the Jev key already is).
 
 ## Threat model
 
@@ -293,6 +306,7 @@ don't exist yet. Don't read this page as describing them.
 | Another process running as you on the Mac | Read `xbot.sqlite` and transcripts, the CLIs' own logs and credentials, Antigravity and Copilot prompts in process arguments | Nothing of xBot's. Your macOS account is the boundary, as for every app you run |
 | An MCP server or plugin you add | Run code as you when an agent uses it | You choosing it. xBot installs only what you ask, through the CLI |
 | A tampered update | Run code as you | EdDSA signatures, HTTPS-only feed, key only from the signed bundle in release. Inert until configured |
+| TypeSafe (Jev's operator), or anyone who gets your Jev key | See the states xBot sends (a workflow's input and its steps' replies, a message sent with Let Jev choose); spend your Jev credit | Nothing goes to Jev unless you saved a key and turned Jev Workflows on (Check aside). The key is in the Keychain only; Remove it in Settings › AI and revoke it at console.typesafe.ai |
 | An automation running unattended | Anything you can, on a schedule, while the app is closed if the helper is on | Off by default; each run is a chat in its history; the helper is removed when the toggle is turned off |
 
 ## Known weaknesses

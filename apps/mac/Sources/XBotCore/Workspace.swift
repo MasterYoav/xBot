@@ -81,6 +81,8 @@ public final class Workspace {
     public internal(set) var usage: [HarnessKind: AgentUsage] = [:]
     /// The models each agent offers, read when the agents are found.
     public private(set) var modelOptions: [HarnessKind: [ModelOption]] = [:]
+    /// Settings › AI › TypeSafe Jev: the key (Keychain), the model, the Jev Workflows toggle.
+    public let jev: JevSettings
 
     public init(
         store: Store,
@@ -90,8 +92,10 @@ public final class Workspace {
         codexUsage: @escaping @Sendable () -> RateLimits? = { CodexUsage.latest() },
         defaults: UserDefaults = .standard,
         gitTool: GitTool? = GitTool.find(),
-        indexer: HistoryIndexer? = nil
+        indexer: HistoryIndexer? = nil,
+        jev: JevSettings? = nil
     ) {
+        self.jev = jev ?? JevSettings(defaults: defaults)
         self.gitTool = gitTool
         self.indexer = indexer
         self.store = store

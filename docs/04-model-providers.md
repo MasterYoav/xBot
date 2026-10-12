@@ -51,7 +51,7 @@ because startup files may print anything) and appends the usual folders: `~/.loc
 system bins. The first executable named after the CLI on that path wins. Every CLI is started with
 that `PATH`; variables beginning `CLAUDECODE` or `CLAUDE_CODE_` are removed from its environment.
 
-Settings › Agents lists, per agent, where it was found (or "Not installed"), whether it is signed
+Settings › AI lists, per agent, where it was found (or "Not installed"), whether it is signed
 in, its plan and its usage left, with a **Look Again** button. "Signed in" is read from
 `~/.claude.json` for Claude Code; Codex counts as signed in once it has reported a plan; Antigravity
 and Copilot are "Checked on the first turn".
@@ -223,7 +223,7 @@ themselves report.
   `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` that has a `rate_limits` line — trying up to five
   files, and only the last 512 KB of each — taking `primary` as the five-hour window, `secondary` as
   the weekly one and `plan_type` as the plan (ChatGPT Plus, Pro, Team, Business, Enterprise).
-  `Workspace.refreshCodexUsage()` runs when the account menu or Settings › Agents opens, and every
+  `Workspace.refreshCodexUsage()` runs when the account menu or Settings › AI opens, and every
   minute while the menu is open.
 - **Antigravity and Copilot** do not report limits, so they are not shown.
 
