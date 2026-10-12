@@ -1,460 +1,678 @@
 # UI specification
 
-> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
-> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
-> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
-> Until then, where it disagrees with the code, the code and the spec win.
+Every screen of the Mac app and of the iPhone and iPad app, as they are built today. The Mac app's
+views live in `apps/mac/Sources/XBotUI`; the phone's in `apps/ios/Sources`. **The code is the source
+of truth.** Where this document and the code disagree, the code wins, and this document is wrong.
 
-Screen by screen. The interaction model is taken from the Grok Bot reference screenshots; see
-[ADR-0006](decisions/0006-naming-and-trademark.md) on where the line sits between borrowing an
-interaction model and copying trade dress.
+Nothing here is a plan. Features the redesign still owes — a bot's own computer, the native brain,
+checkpoints, worktrees, split panes, the Quick Composer, onboarding — are in the
+[redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md) and the
+[roadmap](12-roadmap.md), not here.
 
-**This document is the product.** Since [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md)
-the engine is wrapped rather than rebuilt, which makes everything below the actual work rather than
-the reward at the end of it. OpenBot already does what the agents do; nobody outside a terminal can
-use it. This is that gap, written down.
+Two rules run through every screen:
 
-## What exists today
-
-The app drives a `RuntimeController` and `HTTPEngineClient` in production, and still has
-`StubEngineClient` for tests and for UI work without Docker.
-
-| Surface | State |
-| --- | --- |
-| The rail | Built — selection on pointer-down, ⌘1–⌘9. Working ring, which follows the agent that is answering rather than the one selected. **All three badges wired**: unread when a reply lands out of sight, attention when an agent calls `ask_person` and stops |
-| Conversation, header, status pill | Built — streaming, scroll-pinning that releases on scroll-up. Empty states distinguish engine-down, runtime-missing, failed-start, and no-agents |
-| Message bubbles | Built — markdown, code blocks with highlighting and a copy button, compact tool-call rows. Images **not yet**. Handover and secret cards: see the note under *Content types* — the engine has no in-band request for either |
-| The composer | Built — grow to five lines, ⏎/⇧⏎, disabled-with-reason (Start / Try again / Give it back), optimistic send |
-| The right panel | Built — Screen, Activity, Routines, Agent settings (model picker, **What it can reach**, Connection, Handoff grants) |
-| Command palette | Built — search, open, create. **`Tab` adds an agent to the current channel** (creates a multi-agent channel). Footer shows both verbs |
-| Engine connection | Built — SSE parser, AG-UI decoder, HTTP client, runtime state machine, container adoption. A stopped-but-installed runtime is now **started** rather than reported as missing. Image published to ghcr; the app fetches `manifests/engine-stable.json` for a pinned digest before each pull |
-| Design system | Built — tokens, aurora field, frosted glass, Reduce Motion and Reduce Transparency inside tokens |
-| Onboarding | **Built (M6 in progress)** — five steps, Colima install-for-me, engine adoption, provider keys, handoff to main window. VM clean-machine validation still open |
-| Settings | **In the main window, not a separate scene** — the gear at the foot of the rail, ⌘, and Escape. General, Models, **Agents** (defaults), **Computer** (policy presets + boundaries admin), **Usage** (placeholder), Updates, Advanced |
-| Plugins & admin | **Partial** — native grant toggles in agent settings; Plugins admin window (`WKWebView` at `/admin/plugins` with bearer injection). **The audit trail is native** (Settings → Audit), which is ADR-0004's one exception to the webview rule. Credentials, playground and the rest reached from **Engine admin…** in the same window |
-
-## The main window
-
-Three regions. Familiar, because a chat app should be.
-
-```
-┌────┬──────────────────────────────────────┬──────────────────────┐
-│    │  Agent name          ⟨ Reconnecting ⟩│   ‹  Panel      ⚙ ›› │
-│ R  ├──────────────────────────────────────┼──────────────────────┤
-│ A  │                                      │                      │
-│ I  │            conversation              │  Screen              │
-│ L  │                                      │  Activity            │
-│    │                                      │  Routines            │
-│ 68 │                                      │  Agent settings      │
-│ pt │                                      │                      │
-│    ├──────────────────────────────────────┤   320–420 pt         │
-│    │  ⊕  Message <agent>              🎤  │   resizable          │
-└────┴──────────────────────────────────────┴──────────────────────┘
-```
-
-**Minimum window 900 × 600.** Below ~1100 the panel collapses to an overlay rather than a column.
+- **Every empty state is a sentence and, where there is one, an action.** Never "No items".
+- **A control revealed on hover is faded, not absent**, so VoiceOver and the keyboard can still
+  reach it. Copy buttons on code blocks, the × on tabs and the actions under messages all work this
+  way.
 
 ---
 
-## The rail
+# The Mac app
 
-Fixed 68 pt. `Material.bar`. Vertical, top-aligned.
+## The window
 
-```
-   ┌────┐
-   │ 🎭 │   selected agent — filled background, radius 12
-   ├────┤
-   ────────  divider
-   │ ✉️ │   agent
-   │ ⚫ │   agent · unread dot
-   │ 🟢 │   agent · attention badge (needs you)
-   │    │
-   │ +  │   new agent
-   │    │
-   │ 👤 │   you — bottom-anchored, opens the account menu
-   └────┘
-```
-
-### Behaviour
-
-- **Selection is instant.** The fill appears on pointer-down. The conversation may take a frame to
-  load; the selection does not wait for it.
-- **Reorder by drag**, 1:1 with the cursor, respecting the grab offset. Others displace with
-  `Motion.reposition`. Release hands off velocity. Momentum projection picks the landing slot.
-- **`⌘1`–`⌘9`** select. Visible in the command palette, as in the reference.
-- **Hover** shows name and label in a popover anchored to the item, scaling from the item — not from
-  its own centre.
-- **Right-click** → Rename, Duplicate, Reset computer, Hide, Delete.
-
-### The three badges
-
-| Badge | Meaning |
-| --- | --- |
-| Dot (accent) | Unread messages |
-| Ring (amber, pulsing slowly) | Working — a turn is in flight |
-| Filled badge (attention) | **Blocked on you.** Needs a handover, a secret, or a decision |
-
-The third is the important one and gets the strongest treatment, plus a dock badge and a
-notification. An agent waiting for a human that nobody notices is the failure mode that makes the
-whole product feel unreliable.
-
-**All three are wired.** The ring follows `workingAgentID`, the dot follows `unreadAgents` — a turn
-keeps running when the selection moves, so a reply can finish where nobody is looking — and the
-attention badge follows `questionsForYou`.
-
-**What lights the attention badge** is the engine's own escalation tool,
-`server/src/agents/escalation.ts`. A Bot that needs judgement can guess, hand sideways to another
-Bot, or ask the person; `ask_person` is the third, and calling it *ends the Bot's turn*. So an
-outstanding call is exactly "blocked on you". The question comes from the call's arguments rather
-than its result — the result is a sentence written for the model ("Ask it in your own words now"),
-while the arguments carry what was actually asked. Answering in the composer clears it.
-
-Blocked outranks working in the rail. An agent that has stopped to ask something is the state a
-person most needs to see, so a working ring never covers it.
-
-The tool's *name* is the contract, and upstream's renderer matches on it too
-(`app/src/lib/copilot/escalation-tool.tsx`) — a rename there is a rename here.
-
-**On the cards this document used to promise here:** `ask_person` reads as a compact tool row plus
-the agent's own prose, and that is the whole of it — the engine has one escalation tool and it takes
-a question, not a credential. See *Content types* below for why the secret card is not coming.
-
----
-
-## The conversation
-
-### Header
-
-Agent avatar, name, and — centred, floating over the content — the **status pill**.
+One window (`Window("xBot", id: "main")`), default 1280 × 820, minimum 900 × 600. The title bar
+is hidden: content runs to the top edge, the traffic lights float over the sidebar, and the strip
+of chat tabs is the title bar row. The window moves only from its drag areas — the empty parts of
+the sidebar's title row, the tab strip and the inspector's header.
 
 ```
-       ⟨  ◌  Reconnecting  ⟩
+┌──────────────┬───────────────────────────────────────────────┬────────────────┐
+│ ● ● ●   ◧  ✎ │  × ☺ Fix login ⌘1 │ ☺ Notes ⌘2 │ +          ◨ │ Explorer +12 −3 │
+│ 🔍 Search ⌘K ├───────────────────────────────────────────────┤                │
+│ Abilities    │                                               │  Changes       │
+│ Notes        │            Home, a chat, or a page            │  or            │
+│ Automations  │                                               │  Explorer      │
+│ ░ Agents ░░░ │                                               │                │
+│ Projects  +  │                                               │  260–420 pt    │
+│ Recent       │  ┌─ composer ───────────────────────────┐     │  drag to       │
+│ ─────────────│  └──────────────────────────────────────┘     │  resize        │
+│ ◉ Your name ⇕│                                               │                │
+└──────────────┴───────────────────────────────────────────────┴────────────────┘
+  220–340 pt
 ```
 
-`Material.ultraThin`, capsule, a shadow that separates it from text beneath. It **materialises**:
-blur radius and scale animate together on enter, so it reads as a surface arriving rather than an
-opacity ramp. It is not part of the layout — content scrolls under it.
+Behind Home and chats sits the wallpaper chosen in Settings › Appearance: full strength on Home,
+softer behind a conversation. The Agents page draws its own world instead.
 
-States: `Starting up` · `Updating` · `Model not connected`, and one per `DegradedReason` —
-`Reconnecting`, `The agent's computer is restarting`, `The engine is slow to respond`. Those three
-are not interchangeable: an agent whose browser has crashed is not reconnecting, and why its screen
-went blank is the one thing the pill can usefully say. **When everything is
-fine there is no pill.** Do not confirm good news.
+If the library on disk cannot be opened, xBot runs on one in memory and a red strip across the top
+of the content says so: *"xBot couldn't open its library, so this session won't be saved."*
 
-### Messages
+### Pages
 
-From the reference: incoming bubbles are light neutral fill, left-aligned, `Radius.large`. Outgoing
-are near-black with white text, right-aligned, same radius. Both cap at ~70% of the conversation
-width.
+The content area shows one of these at a time.
 
-Content types:
+| Page | Reached from | Tab strip shown |
+| --- | --- | --- |
+| Home (a new chat before its first message) | ⌘N, ✎ in the sidebar, + in the tab strip | yes |
+| A chat | a tab, the sidebar, ⌘1…⌘9 | yes |
+| A file's diff | a changed file in the inspector | yes |
+| Profile | the account menu | yes |
+| Abilities, Notes, Automations | the sidebar | no |
+| Agents | the sidebar's miniature world | no |
 
-| Type | Rendering |
+Notes and Automations run to the top of the window; the inspector button floats over their
+top-right corner.
+
+### The tab strip
+
+Open chats are tabs, in the title bar row.
+
+- Each tab shows the chat's agent face (or a coloured dot for the CLI; a spinner while it works),
+  its title, and `⌘1`…`⌘9` for the first nine.
+- The selected tab is a soft translucent segment, and only while that chat is what the window
+  shows — not under Abilities or Notes.
+- **×** appears on hover at the tab's leading edge. It is laid over the tab rather than inside it,
+  so closing never also reopens the chat.
+- **Drag a tab** along the strip to reorder it. Neighbours slide aside as its middle passes theirs;
+  a few points of travel are needed first, so a click still just selects.
+- A new chat waiting for its first message is a tab of its own, **New chat**.
+- **+** starts a new chat in the current chat's project.
+- At the right end, **◨** toggles the inspector (⌥⌘0). With no project in view it is disabled and
+  says *"Choose a project to see its files and changes."*
+- With the sidebar hidden, the traffic lights sit at the strip's left with a button to show the
+  sidebar again (⌃⌘S).
+
+## The sidebar
+
+Top to bottom:
+
+1. **Title row** — hide sidebar (⌃⌘S) and new chat (⌘N).
+2. **Search** (⌘K). Filters chats by title, hiding projects with no match; Escape clears it.
+3. **Abilities**, **Notes**, **Automations**. Automations shows a spinner while one is running.
+4. **Agents** — a miniature of the crew's world (hidden while searching). See below.
+5. **Projects**, with **+** to add a folder. With none, an **Add a folder** row. Each project is a
+   folder row with a dot while any of its chats is working; click to fold it. Long lists end in
+   **Show all N**. Right-click: **New Chat**, **Show in Finder**, **Remove from xBot**.
+6. **Recent** — chats outside any project, with **Show all N** / **Show less**.
+7. **Account button** — your picture and name, bottom-anchored.
+
+An automation's runs are not listed here; they are on its page. A chat row shows the agent's face
+(animated while working). Right-click: **Rename** (in place; Return saves, Escape cancels) and
+**Delete Chat**, which deletes at once and shows a toast with **Undo** rather than asking first.
+
+### The agents miniature
+
+The same scenery as the Agents page, scaled to a strip and dimmed, with the crew's faces in one row
+over it.
+
+- The header reads **Agents**, plus **N working** when anyone is.
+- A face opens that member's latest chat. Its tooltip is the member's name and what they are doing,
+  *"Done — tap to read"*, or their role.
+- **+** opens the hiring sheet on the Agents page.
+- Anywhere else on the strip opens the Agents page.
+
+## Home
+
+A new chat before its first message is the composer on its own, centred. There are no greeting or
+suggestion cards; they were taken out.
+
+With no agent CLI found, Home says instead:
+
+> **xBot works through an agent you already have.**
+> Install Claude Code or Codex and sign in, then come back. xBot will find it.
+
+with links **Get Claude Code** and **Get Codex**, and **Look again**.
+
+## The composer
+
+One composer, used on Home (where it writes the draft) and docked under a chat.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 📁 xbot ⌄   ⑂ main                                  ● ● ●     │  context strip
+├──────────────────────────────────────────────────────────────┤
+│ Describe a task, a bug to fix, an idea to try…               │
+│                                                              │
+│ ● Claude Code · Opus ⌄  🧠 Medium ⌄  ✎ Can edit ⌄  ▤ Plan   ⬆ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- **Context strip** — the project menu (*No project*, each project, *Add a folder…*), the branch,
+  and a coloured dot for each installed CLI. The project can be changed only before anything has
+  been said in the chat.
+- **Text** grows to ten lines. ⏎ sends. A refused send keeps what was typed.
+- **Agent chip** — CLI and model, grouped by CLI, each with *Default model*. Locked while a turn
+  runs.
+- **Effort chip** — opens a card: *Effort · Medium*, a slider from *Faster* to *Smarter* with six
+  stops (Low, Medium, High, Extra, Max, Galaxy), the agent's recommended stop marked
+  *Recommended*. ← and → move it. At **Galaxy** the track fills with shimmering pixels and the knob
+  radiates (still under Reduce Motion). The help reads: *"Galaxy is the most the agent can do:
+  Claude Code at max on Opus, Codex at its ultra level."*
+- **Permission chip** — **Read only** (eye), **Can edit** (pencil), **Full access** (bolt). For
+  Antigravity the menu adds that it can only edit with full access, so "Can edit" runs with full
+  access.
+- **Plan chip** — click to turn plan mode on or off; its menu holds **Review plan first**. With
+  review off the chip reads *Plan · runs at once*. For CLIs that cannot make plans in xBot
+  (Antigravity, Copilot) the chip is dimmed with that reason.
+- **Send** is ⬆ in the accent; while a turn runs it becomes ■ (⌘.).
+- A reason, when sending is blocked, sits beside Send: *"No agent found"*,
+  *"Looking for Codex…"*, *"Codex isn't installed on this Mac any more."*
+
+The placeholder changes with the mode: *"Describe a task, a bug to fix, an idea to try…"*;
+*"Ask Forge…"* in a crew member's chat; *"Describe the change. You'll review the plan first."* or
+*"…The plan runs straight away."* in plan mode.
+
+A file dropped on the composer, or mentioned from the explorer, is added as `@path`.
+
+## A chat
+
+The transcript is centred at reading width, anchored to the bottom, with the composer under it.
+
+**An empty chat with a crew member** shows them standing there with their name and role, and
+*"Tell Forge what you need."* — for HeadMaster, *"Big things get planned and shared out to the
+crew."*
+
+**Your messages** are right-aligned on a raised fill, selectable. On hover: the time, **Copy
+message**, and **Edit and send again**, which opens the bubble in place (Escape cancels). Editing
+replaces that turn and everything after it, and a toast offers **Undo**. Not offered while the chat
+is busy.
+
+**Replies** are under a header — the member's face or the CLI's dot, then *"Forge is working…"*
+live or *"Forge worked for 41s"* when done. The body is:
+
+| Part | Rendering |
 | --- | --- |
 | Text | Markdown. Code blocks with syntax highlighting and a copy button |
-| Image | Inline, tappable to a full-size window. Both directions — the reference shows the user attaching an image and the agent returning one |
-| Tool call | A compact inline row: what it did, its target, its result. Expandable |
-| Handover request | Upstream's `computer_request_help` client tool: the Bot asks, the person takes control and hands back. Shown above the composer (`PersonAskView`) |
-| Secret request | Upstream's `computer_request_secret` client tool: a masked box whose value is typed straight into the page and never reaches the model. Shown above the composer (`PersonAskView`) |
-| Generated UI | Sandboxed `WKWebView`, no same-origin access. Fixed height, expandable |
-| Error | Inline, with a retry action |
+| Shell code block | The same, plus **Run**, which sends it to this chat's terminal (*"Sent to terminal"*) |
+| Tools | One folded line — *"Read 3 files, ran a command"* — that opens to every tool with its target, size and time. While live, the running tool shows under the fold |
+| Hand-off | A card with the member's face: *"Handed to Forge"* or *"Forge finished"*, a line of the task, and **Open** |
+| Notice | A quiet caption line |
+| Failure | A red callout with the reason and, on the last reply only, **Retry** |
 
-**Correction: the secret and handover requests exist, and the Mac app does not implement them.**
-An earlier version of this section said "the engine has no tool with which a Bot asks for" a secret,
-and argued the takeover made one unnecessary. That was wrong, from reading only the server. Upstream
-defines the whole computer — `computer_navigate`, `computer_snapshot`, `computer_click`,
-`computer_type`, the file tools, `computer_run_command`, and also `computer_request_secret` and
-`computer_request_help` — as **client-side tools** registered by its web app
-(`app/src/lib/copilot/computer-tools.tsx`). The client offers them on every run, executes each call
-against `/api/computers/:botId/…`, and continues the run with the result.
+On hover under a reply: **Copy reply** and the time. **Stop** (⌘.) keeps whatever had arrived.
 
-The Mac app is the client in xBot. It used to send `tools: []`, so no xBot agent was offered a computer.
-It now offers all fourteen and runs them (`XBotEngine/ComputerTools.swift`), and the two requests appear
-above the composer while the turn waits on them. See
-`docs/plans/computer-client-tools.md`.
+### Plan mode
 
-**Streaming.** Tokens append without re-laying-out the message. The scroll pins to the bottom while
-the user is at the bottom, and **releases the moment they scroll up** — with a "jump to latest"
-affordance. Yanking someone back to the bottom mid-read is the single most-hated behaviour in chat
-UIs.
+With plan mode on, the agent first plans read-only, then each step runs as its own turn.
 
-**Hover actions.** Forward and react are **not built and are not coming in v1**. There is nobody to
-forward a message to — one person, their own agents — and nothing anywhere stores a reaction, so both
-would be controls that exist to do nothing. The reference is a group-chat app; this is not one.
+1. **Planning…** (*Read-only*) — what it is reading, live, or *"Looking around the project"*.
+2. **Review the plan** — *"Here's my plan. Change anything you like, then run it."* Each step is an
+   editable line. ⌥↑/⌥↓ move a step, Return goes to the next (or adds one), Delete on an empty step
+   removes it, × on hover removes it, **Add step** appends. The meta line counts steps or says
+   *"Add a step to run."* Footer: **Cancel** and **Run plan** (⌘↩). With review off this card is
+   skipped.
+3. **Tasks** — *"On it. I'll keep this list updated as I go."* A progress bar (red if anything
+   failed), *"3 of 7 done · 1 failed"*, the agent's latest note, and the steps. Pending steps are
+   dashed circles (the next one solid), the running step shows its live tools and active wording,
+   done steps are struck through, failed steps show their note. Steps the agent added mid-run sit
+   on a soft panel with an **Added** pill while the plan runs. Three or more finished steps above
+   the running one fold into *"N completed"*. Each finished step opens to its tools. The footer
+   shows *Running*, *Finished · 2 added* or *Stopped*, the elapsed time, and hide/show steps.
+4. **The closing sentence** — the agent's summary, under the card.
 
-What a person actually needs from a reply is its text, and that already works two ways: the whole
-bubble is selectable, and every fenced code block carries its own copy button, which is the case
-that matters because it is the one somebody would otherwise retype.
+Under the latest plan, above the composer, a status pill reads *Finished*, *Finished · 1 failed*
+or *Stopped*; a stopped plan has **Resume**. A planning turn that produced no steps shows **No
+plan** with the reason and **Try again**. A cancelled plan leaves *"Plan cancelled"*. When a plan
+finishes, a toast says *"Plan finished · N steps"*.
 
-A control revealed only on hover must still be in the view tree when it is not hovered — faded, not
-absent. There is no pointer to put over it with a keyboard or VoiceOver, so a control that only
-exists on hover cannot be reached at all. `CodeBlockView` and the routine rows both do it this way.
+## The inspector: files and changes
 
-### The composer
+A column on the right for the project in view (the open chat's, or the draft's). ⌥⌘0 or ◨ toggles
+it; drag its left hairline to resize between 260 and 420 pt. Its header has two segments,
+**Explorer** and the change totals themselves, **+372 −33**, which is the Changes tab.
 
-```
-  ┌──────────────────────────────────────────────────┐
-  │  Message Orchestrator                            │
-  └──────────────────────────────────────────────────┘
-```
+If git is missing: *"Git isn't installed on this Mac."* with **Install Command Line Tools**, which
+opens Apple's own installer.
 
-- **Grows to five lines**, then scrolls. `Radius.xlarge`.
-- **No `⊕` and no `🎤`.** Both were drawn and both did nothing, which the seventh invariant in
-  CLAUDE.md forbids — a dead control is worse than an absent one, because absent is honest.
-  - **Attach** needs the engine to gain attachments first; `agents/message-text.ts` says upstream
-    has none ("the day attachments ship"). Building the request here is re-engineering upstream
-    rather than surfacing it. It comes back when upstream does.
-  - **Dictation** needs nothing from us. macOS dictation works in any standard text field, this one
-    included — the system recogniser this spec asked for, reached the way the person already knows.
-    Our own button would be a second, worse door to the same room with a permission prompt in front
-    of it.
-- **`⏎` sends. `⇧⏎` newline.** Not configurable. Every chat app on this machine works this way.
-- **Disabled with a reason, inline.** "Connect a model to start" with a Settings link. Never a toast,
-  never a silent no-op.
-- **Sending is optimistic.** The bubble appears immediately with a sending state. Failure turns it
-  into a retryable state — the text is never lost.
+### Changes
 
----
+- **Header** — *Changes*, the branch, ↓behind ↑ahead, a spinner while busy, and a ⋯ menu with
+  **Fetch Now** and **Open on GitHub**. A quiet fetch also runs every five minutes while the column
+  is open.
+- **State** — one pill and one sentence: *Up to date* ("Nothing to commit. In step with
+  origin/main."), *Changes*, *To push*, *To pull*, *Diverged* ("Pull before you push…"),
+  *Conflict*, or *Local* ("This branch isn't on a remote yet.") with **Publish Branch**.
+- **Pull request** (through `gh`) — *PR #42 · open*, its review state, and a checks pill
+  (*Passing*, *Failing*, *Running*). Click opens it.
+- **Problems** from git, in red monospace, dismissable.
+- **Commit box** — *Message (⌘↩ to commit)*, **Commit**, and **Sync Changes ↓n ↑n** (or **Publish
+  Branch** with no upstream).
+- **Merge needed** — *"Your branch and the remote both have new commits. They need merging before
+  you can push."* with **Ask the agent to merge**, which sends a merge request to the open chat or
+  puts it in Home's composer. Conflicts are explained here, never resolved here.
+- **Changed files** — icon, name, folder, and the git letter (M/R amber, A/U green, D/C red;
+  deleted names struck through). On hover: **Stage**/**Unstage** and **Discard Changes**, which asks
+  first (*"This can't be undone."*). Click opens the diff.
 
-## The right panel
+**The diff** replaces the content area: the path and letter on top, a unified diff with both
+sides' line numbers, additions and removals tinted, hunks on an inset band. *"No changes to show."*
+when empty. × or Escape closes it.
 
-Parallel and non-blocking: translucent, offset, **no scrim**. It sits beside the conversation rather
-than over it, which is why the reference shows both at once. Collapses with `»`; enters and exits to
-the right, always.
+### Explorer
 
-### Screen
+The project's files as a tree that loads folders as they open. Names are coloured by their git
+letter; ignored files are dimmed and italic; deleted files stay listed, struck through.
 
-The live view of the agent's browser. A polled screenshot endpoint — cadence adapts: fast while a
-turn runs, slow when idle, **stopped when the panel is not visible**.
+- Header buttons: **New File**, **New Folder** (created beside the selection with a free name, then
+  renamed in place), **Collapse All**, **Filter** (by name, among folders already read; Escape
+  closes).
+- Click a file to preview it with Quick Look; double-click opens it in its app. Files can be
+  dragged out, or onto the composer.
+- Right-click: **Mention in Chat**, **Reveal in Finder**, **Copy Path**, **Rename**, **Move to
+  Trash** (with a toast).
 
-- **Aspect-preserving, letterboxed.** Never stretched.
-- **Take control** overlays the frame. While a human holds it, agent actions are *refused, not
-  queued* — upstream's behaviour, and correct. The panel says so.
-- **Empty state:** a monitor glyph and "*Agent*'s screen", as in the reference. Not "No data."
-- **Detach to its own window** for real work. `WindowGroup`, one per agent.
+## The terminal
 
-### Activity
+Each chat has its own terminal window, floating over the chat's right side. The **terminal button**
+at the chat's bottom-right shows or hides it (⌃`) and counts its tabs. **Run** on a shell code
+block sends the command there.
 
-What the agent did away from the browser: every command with its output and exit code, every file
-read, write, and listing. Newest first. Monospaced.
+- The window has a tab strip like the main one: a tab per shell, titled with the end of the shell's
+  path (or *Terminal N*), × on hover (*"Close tab (ends its shell)"*), drag to reorder, **+** for
+  another shell, **–** to hide.
+- The empty part of the strip moves the window; the left, right and bottom edges and bottom corners
+  resize it (minimum 340 × 200). It is kept where its strip can still be grabbed.
+- A shell that exits on its own closes its tab.
+- Shells are real login shells, drawn by SwiftTerm.
 
-**Say what this is.** Upstream is precise and we should be too: Activity is held in the client for
-the open conversation and is gone on reload. It is a window, not a record. **The record is the audit
-trail** — server-side, survives restarts, and is what an investigation reads. A footer links to it.
+## Abilities
 
-A saved file contributes its path and size, never its contents. An agent may be saving something it
-was told in confidence.
+*"Connectors, plugins, skills and MCP servers your agents can use."* Everything here is read from,
+and changed through, Claude Code's and Codex's own CLIs.
 
-**What is built.** Entries come from the turn's own stream — every `TOOL_CALL_START` becomes one —
-rather than from a fetch, which is what "held for the open conversation" means in practice. So a
-call carries the tool's name and, for now, an `ActivityEntry.Kind.tool` rather than a command's exit
-code or a page's URL: `TOOL_CALL_ARGS` arrives separately, keyed by tool-call id rather than by
-message, and inventing `command(exitCode: 0)` to fill the richer shape would claim a call succeeded
-when nothing said so. Pairing the arguments back to their call is what turns these into the command,
-file and page rows described above.
+- **Tabs**: Connectors, Plugins, Skills, MCPs, each with a count (a spinner while loading), and a
+  search field for the current tab.
+- **Rows**: icon, title, source, summary, and the agent that uses it. At the end, a switch where
+  the CLI allows turning it on and off; otherwise a status pill (*Connected*, *Sign in*, *Failed*,
+  *Pending*), *On*/*Off*, or a lock with the reason. A ⋯ menu on hover offers **Show in Finder**
+  and **Remove…**, which says what removal means (a skill's folder goes to the Trash; a plugin is
+  uninstalled by its CLI; a server is forgotten).
+- **Browse** opens the plugin marketplaces: filter by agent (All, Claude Code, Codex), search, and
+  **Install**. Over 300 results asks you to search.
+- **Add** ▾ — **MCP Server…** (name; connects by Command or URL; which agents to add it to),
+  **Skill Folder…** for a chosen agent, **Plugin from a Marketplace…**.
+- Connectors are claude.ai's; the tab links to **Manage connectors on claude.ai**.
+- If one of the two CLIs is missing: *"Codex isn't installed, so its abilities aren't shown."*
 
-### Routines
+Empty tabs: *"No claude.ai connectors yet…"* with **Open claude.ai**; *"No plugins installed."*
+with **Browse plugins**; *"No skills yet."*; *"No MCP servers yet."* with **Add an MCP server**.
 
-Recurring scheduled tasks. Each routine: its instruction, the schedule in plain language
-("Weekdays at 09:00"), when it next fires, an enable toggle, and delete on hover.
+## Notes
 
-**There is no Create Routine button, and the reference's one was wrong.** The engine has
-deliberately no create and no edit endpoint — `server/src/routines/routes.ts` says so at length:
-making a routine and changing one are conversational, because the hard part of both is turning a
-sentence into a cron expression and a channel, which is what a conversation is for. A Bot creates
-one mid-chat through its own tools. This panel answers the narrower question a person actually
-brings to it: what is standing, and does it stay standing.
+A project's ideas and release notes, as Markdown files in `<project>/notes/`.
 
-So the empty state is an invitation to ask rather than a button: *"Nothing standing. Ask this agent
-for something on a schedule — 'check the inbox every weekday at nine' — and it will set one up."*
-A button that opened a form with a cron field in it would be the terminal this product does not
-have, wearing a different hat.
+- **Left**: a project menu, **New note**, the notes newest first with their age, and the footer
+  *"In xbot/notes — part of the project, so agents can read them."* Right-click a note: **Show in
+  Finder**, **Delete**.
+- **Right**: **Edit** / **Preview** (rendered Markdown), *Editing…* or *Saved*, and delete. A note
+  saves 0.7 s after typing stops and on leaving. Deleting shows a toast with **Undo**.
+- The folder is re-read every three seconds, so a note an agent writes appears.
 
-**The schedule is display text and is never parsed.** The engine renders it, computes `nextRunAt`
-from the expression itself, and says in its own comment that a consumer must show it and never
-compute a time from it. A second cron reader in the client is a second answer to when something
-happens.
+With no project: *"Notes belong to a project."* and **Add a project**. With no note selected:
+*"Ideas, plans, the next release notes — in whatever shape they're in."* and **New note**.
 
-**A routine whose channel is gone still runs**, and the row says so — it has nowhere to speak, and
-silence about that is the confusing version.
+## Automations
 
-### Agent settings
+A trigger, then steps in plain words, carried out by an agent with full access.
 
-Editing is **in place**, saved on blur. No Save button, no dialog.
+- **Left**: the list (a clock for scheduled ones, a spinner while running, *off* when switched off),
+  **+**, and at the foot **Run when xBot is closed**. Off (the default), *"Scheduled automations run
+  while xBot is open."* On installs a background helper: *"A small background helper checks every
+  minute and runs what's due."*
+- **Editor**:
+  - The name, an on/off switch, ⋯ › **Delete…** (*"Its past runs stay as chats."*) and **Run now**.
+  - The agent/model chip, the project chip, a warning label **Full access**, and *Next: …* when
+    scheduled.
+  - **WHEN** — *When I press Run now*, *Every hour* at a minute (five-minute steps), *Every day*,
+    *Every weekday* or *Every week* (a weekday) at a time.
+  - **STEPS** — numbered cards, each an app's icon and a field with a hint for that app (*"e.g. Find
+    unread mail from today and summarise it"*). Drag to reorder; × on hover removes. A dashed drop
+    zone at the end: *"Drag an app or connector here for the first step"*.
+  - **RUNS** — the last twenty, each a chat: running, *Failed*, or *Open*.
+- **Right**: the palette — **APPS** (Mail, Calendar, Reminders, Notes, Messages, Contacts, Finder,
+  Safari, Music, Photos, Maps, Shortcuts, Terminal, Web, Anything) and **CONNECTORS** (the enabled
+  connectors and MCP servers from Abilities; *"None yet. Add them in Abilities."*). Drag a tile
+  into the steps, or click to add it at the end.
 
-```
-              ┌─────────┐
-              │  avatar │      ← click opens the picker
-              └─────────┘
+Empty: *"Automate anything you do on your Mac"* and **New automation**.
 
-   Name         [ Orchestrator                    ]
-   Label        [ Orchestrate and use the other…  ]
-   Description  [                                 ]
-                [ What this Bot is for            ]
+## Agents
 
-   Model        [ Claude Sonnet 4.5             ⌄ ]
-                Anthropic · vision · tools
+The crew, as a company, in a living pixel world.
 
-   Notifications                              ( ●  )
-   Get notified when this Bot finishes or needs input
+**Header**: *"Your crew, as a company: HeadMaster on top, each team under its manager. Click
+someone to open their chat."* Then a **World** menu (Village, Sky Realm, Underwater Kingdom,
+Moonbase, Enchanted Forest), **Organise**, and **Hire**.
 
-   What it can reach                          ⌄
-   Connection                                 ⌄
-   Handoff grants                             ⌄
+**The world** draws the org chart as tiers by rank, with no lines: HeadMaster on top, each
+manager's team on the tier below, centred under them, each person with a slot of their own. In the
+Village everyone has a grassy ledge with a desk, strolls on it and sits at the desk to work; in the
+other worlds each rides a mount over their slot (a golden cloud, a sea turtle…) with a floating
+screen when working. Speech bubbles say what someone is doing, *"Done! ✓"*, or now and then
+something idle. Click someone to open their latest chat; right-click for **New chat with …** and
+**Edit …**.
 
-   Duplicate · Reset computer · Delete
-```
+**Organise** puts everyone where their role suggests: executives (CTO, CFO, CMO, CPO, COO, VP,
+Head of, Director) under HeadMaster; leads under their department's executive; everyone else under
+their department's lead or executive; product falls back to engineering; anyone unmatched under
+HeadMaster.
 
-The **Model** row is the xBot addition and the reason the router exists. It shows the current model,
-its provider, and its capabilities. Choosing takes effect on the next message.
+**Below the world**: **Working now** (who, what, for how long; *"Nobody's working right now."*),
+**Just finished** (*"Finished — open to read"*; *"Nothing new for you."*), **Activity** (replies
+from the crew over 14 days, as bars), and **Crew** (face, name, *Founder* for HeadMaster, role,
+CLI, ✎ and **Talk**).
 
-### The avatar picker
+**The editor** (a sheet, for hiring and editing):
 
-From the reference: a popover with four tabs and a two-part grid.
+- Left, a character creator: the avatar on a little stage (click to make them walk), a ‹ › stepper
+  for each of seven parts — Skin, Hair, Hair colour, Eyes, Outfit, Outfit colour, Accessory — and
+  **Randomize**.
+- Right: **Name**, **Role** (*"One line: what they do"*), **Role instructions** (sent on every
+  turn), **Brain** (the CLI) and **Model**, **Home project** (*"The one in view"* or a project), and
+  **Reports to**, which lists everyone except the member and their own team, marking the
+  suggestion *(suggested)*. A new hire's manager follows the suggestion as the role is typed.
+- For HeadMaster, instead of Reports to: *"HeadMaster founded this place and runs it for you: it
+  reports to you, hands work to the crew, and can't be let go."*
+- Footer: **Let go…** (not for HeadMaster), **Cancel**, **Hire** / **Save**. Letting someone go
+  moves their team up to their manager, keeps their chats, and shows a toast with **Undo**.
 
-```
-  ┌──────────────────────────────────────────┐
-  │  Bot    Generate    Upload        Reset  │
-  ├──────────────────────────────────────────┤
-  │   ⬤   ⬬   ▢   ▭                          │
-  │   ▲   ⬢   ☁   ◗                          │   shapes
-  │                                          │
-  │   ●  ●  ●  ●  ●  ●                       │   colours
-  │   ●  ●  ●  ●  ●                          │
-  └──────────────────────────────────────────┘
-```
+The founding crew is HeadMaster, Forge (builder), Hawk (reviewer) and Quill (scribe).
 
-- **Bot** — the shape + colour grid. Generated locally as an SVG. No network.
-- **Generate** — an image from the connected model, if it supports images. **Greyed with a reason if
-  not**, rather than failing on click.
-- **Upload** — a file, cropped to a square.
-- **Reset** — back to the generated default.
+## Profile
 
-Scales from the avatar it was opened from, not from its own centre.
+Opened from the account menu. Your picture, name and `@username`, with **Edit** at the top right
+(a sheet: **Choose Picture…**, Name). The Mac account's name and picture are the defaults.
 
----
+Built from the agents' own history on this Mac, re-read at launch and hourly:
 
-## The command palette
+- A strip of five: **Lifetime tokens**, **Peak tokens**, **Longest task**, **Longest streak**,
+  **Current streak**.
+- **Showcase** — the top three projects by tokens.
+- **Token activity** — a heatmap, *Daily* / *Weekly* / *Cumulative*.
+- **Top tools** — up to nine, with use counts on hover.
+- **Insights** — most used reasoning, most used agent, plan mode runs, skills explored, total
+  skills used.
+- *"No Copilot history found."* for each CLI with none.
 
-`⌘K`, or clicking `+` in the rail. From the reference:
+While indexing: *"Reading your history…"*.
 
-```
-  To: | Search or create Bots
-  ┌───────────────────────────────────────────────┐
-  │  +   Create new Bot                    ⌘ 1    │
-  │  ✉️   Gmail                             ⌘ 2    │
-  │  🎭  Orchestrator                      ⌘ 3    │
-  │  ⚫  Grok                              ⌘ 4    │
-  │  🟢  monday                            ⌘ 5    │
-  ├───────────────────────────────────────────────┤
-  │                          Tab add    ⏎ open    │
-  └───────────────────────────────────────────────┘
-```
+## The account menu
 
-Fuzzy search over name, label, and description. **`Tab` adds an agent to the current channel; `⏎`
-opens it** — the two-verb model in the reference, and the entry point to multi-agent channels. The
-footer states both, because a keyboard affordance nobody knows about does not exist.
+The account button opens a small card:
 
----
+- Your picture and name, and the plans the agents report (*"Claude Max · ChatGPT Plus"*, or
+  *"Claude Code · Codex"* when none have).
+- **Usage remaining** (folds): for Claude Code and Codex, the **5h** and **Weekly** windows — what
+  is left and when it resets — and when it was last updated. Before any data: *"Run a turn to see
+  Claude Code's usage."* / *"No Codex usage yet."* Read from the CLIs' own output and logs; no
+  password or token is read.
+- **Profile** and **Settings** (⌘,).
 
 ## Settings
 
-**In the main window, not a `Settings` scene.** A list on the left and the pane on the right, the
-shape macOS System Settings uses and the one the rail already establishes here. Opened by the gear
-at the foot of the rail, by ⌘,, and closed by Escape or the back chevron.
-
-A separate floating panel was tried first and removed: it put settings somewhere a person had to go
-and find, and it hid the rail — so which agent was selected stopped being visible while its model
-was being changed.
-
-**Shipped today:** General, Models, **Agents** (default model + description; shared preamble deferred), **Computer** (auto-review + preset deny rules + boundaries admin webview), **Usage** (real per-agent token counts; the agent sums `usage_metadata` across a turn and emits `xbot.usage`), Updates (Sparkle scaffold + engine install with health rollback), Advanced (Plugins, Engine admin, uninstall).
+A separate Settings window (⌘,), with five tabs.
 
 | Tab | Contents |
 | --- | --- |
-| **General** | Account (local), appearance, language, microphone, timezone, launch at login |
-| **Models** | Providers, keys, Ollama detection, default model. See [04](04-model-providers.md) |
-| **Agents** | Defaults for new agents, the shared instruction preamble |
-| **Computer** | What agents may reach. Policy rules in plain language, with an advanced editor |
-| **Usage** | Tokens and estimated cost, per agent and per provider. **No percentage meter** — see [04](04-model-providers.md) |
-| **Advanced** | Engine state, ports, volumes, resource limits, admin surfaces, diagnostics, reset |
-| **Updates** | App and engine versions, channel, check now, install when a newer digest is published (blocked while a turn is streaming) |
+| **General** | **Default agent** (*Most recent* or a CLI), **Default reasoning** (*The agent's default* or a level), **Default permission** |
+| **Appearance** | Appearance (Dark / Light / Match System); Wallpaper; App icon; Font |
+| **Agents** | For each CLI: **Found at** (path, *Looking…* or *Not installed*), **Signed in**, **Plan**, and 5-hour and weekly usage left where known; **Look Again** |
+| **Devices** | Pair an iPhone or iPad, the paired devices, and the stay-awake note |
+| **About** | Icon, version and build, credits |
 
-### General
+**Wallpaper** tiles: **Sunset**, **Desktop** (the current desktop picture), **Choose…** (a picture
+of your own), **Randomize…** and **None**. Randomize opens a sheet in which an agent draws a
+text-art wallpaper: Kind (Still / Animated), Agent and model (Claude Code or Codex), Reasoning, and
+an optional Idea; **Generate**, then **Another one** or **Use as wallpaper**, with *"The prompt
+xBot wrote"* to read.
 
-Mirrors the reference's structure — Account, Appearance, System, Bot — because it is a sensible
-structure.
+**App icon**: Ink, Rose, Sunset, Plum. **Font**: *System (SF Pro)* or any installed family; code
+and file names stay in SF Mono.
 
-The **Account** row shows the local user, not a signed-in identity. It is a name and an avatar for
-message attribution, stored locally. There is no sign-in and no Sign Out. Where the reference has
-Sign Out, we have nothing, and that absence is the product.
+**Signed in** reads *Yes*/*No* for Claude Code, *Yes*/*Not seen yet* for Codex, and *Checked on
+the first turn* for Antigravity and Copilot.
 
-**Auto-review** carries over as the policy switch, and its copy should be exact:
+**Devices**: *"Keep working from your iPhone or iPad: your chats live, and the agents still run
+here. On the same Wi-Fi it connects directly; away, through your iCloud."* **Pair an iPhone or
+iPad…** opens a QR code (*"Open xBot on it and scan this code."*, *"The code pairs one device. Keep
+it to yourself: it's the key to this Mac."*), which turns into *"Paired. You can close this."*
+Each paired device shows *Connected · same network*, *Connected · through iCloud*, *Last seen …*
+or *Not connected yet*, with **Remove**. A note says the Mac stays awake while a device is
+connected or an agent is working (with the lid closed on battery it still sleeps); an iCloud
+problem shows under it.
 
-> **Auto-review**
-> xBot checks each action before it runs and asks you first when needed. Add rules to customise what
-> agents can do automatically.
+## Menus
 
-### Computer
+Beyond the standard ones: **About xBot**, **Check for Updates…** (Sparkle; inert until a release
+feed is configured), **File › New Chat** and **Close Tab**, **View › Files and Changes**,
+**Window › Tab 1…9**, **Edit › Search Chats**, **Help › xBot Documentation**.
 
-Where policy becomes legible to a non-technical person. The engine's policy is CEL; the settings
-screen is a rule list in plain language:
+## Toasts and motion
 
-```
-   Always ask before…
-     ▸ Buying anything or entering payment details
-     ▸ Sending an email or a message
-     ▸ Deleting files
-     ▸ Signing in to a new site
+Toasts are short notes at the bottom of the window, some with **Undo**. Every looping animation —
+the worlds, faces, Galaxy, animated wallpapers — pauses while xBot is not the active app; Reduce
+Motion stills the worlds, text-art wallpapers and Galaxy.
 
-   Never allow…
-     ▸ Visiting these sites          [ + ]
+## Keyboard shortcuts
 
-   [ Advanced: edit rules directly ]
-```
-
-The advanced editor is the raw policy with the dry-run tool upstream provides.
+| Keys | Does |
+| --- | --- |
+| ⌘N | New chat |
+| ⌘W | Close the current tab |
+| ⌘1 … ⌘9 | Go to tab 1 … 9 |
+| ⌘K | Search chats (Escape clears) |
+| ⌃⌘S | Show or hide the sidebar |
+| ⌥⌘0 | Show or hide files and changes |
+| ⏎ | Send |
+| ⌘. | Stop the running turn |
+| ⌃` | Show or hide this chat's terminal |
+| ← → | Move the effort slider (when it has focus) |
+| ⌘↩ | Run plan (on a plan in review); commit (in the commit box) |
+| ⌥↑ ⌥↓ | Move a plan step |
+| ⏎ / ⌫ | Next plan step / remove an empty step |
+| Escape | Cancel an edit; close a diff; close the explorer's filter |
+| ⌘, | Settings |
 
 ---
 
-## Admin surfaces
+# The iPhone and iPad app
 
-Audit, boundaries, computers, credentials, people, plugins, components, playground. Per
-[ADR-0004](decisions/0004-native-vs-webview.md), dense operational tools open in a dedicated window
-from Settings → Advanced, not inside the main window.
+A remote for the Mac. The agents run on the Mac; the phone shows its projects, chats, crew, notes,
+automations and abilities, and acts on them through the Mac. It connects directly on the same
+network and through iCloud elsewhere; how that works is in [14-iphone-and-ipad.md](14-iphone-and-ipad.md).
+The look is Liquid Glass over calm charcoal cards, rounded type and one accent colour.
 
-**What ships today:**
+## Pairing
 
-| Surface | How |
+Until paired, the app shows one screen:
+
+> **Your Mac, in your pocket**
+> Keep working with your agents from here. They still run on your Mac; this is the remote.
+
+then three steps — open xBot › Settings › Devices on the Mac, click **Pair an iPhone or iPad**,
+scan the code — and **Scan the code**, which opens the camera with a framing square and
+**Cancel**. A wrong code says *"That isn't an xBot pairing code."* Opening an `xbot://pair` link
+pairs too.
+
+## The tab bar
+
+**Home**, **Chats**, **Agents**, **Projects** and **Search**, along the bottom. The bar folds away
+as you scroll down. Each tab keeps its own navigation; a chat pushed from any tab hides the bar.
+
+## Home
+
+- **Toolbar**: the Mac's name with a status dot, opening a menu headed by the connection state with
+  **Settings** and **Add a project…**; **+** (new chat, ⌘N) and ⚙ Settings.
+- **The plan board** — every connected plan at a glance, in each provider's colours. One to four
+  plans are concentric open rings, outermost first, each with a glowing tip; five or more share one
+  arc in segments. The middle shows the tightest plan's percentage *left on Claude*. The legend
+  gives each plan's 5-hour and weekly windows and when they reset. Tap opens Profile. With no usage
+  yet, a single arc counts *chats today*. Pull to refresh.
+- **A sentence**: *"Claude has 62% of its 5-hour limit left."* (or *"12 chats on Studio."*), then
+  *"Everyone's free."*, *"Forge is working."* or *"3 agents are working."*
+- **Working** and **Today** tiles (tap for Agents or Chats).
+- **Working now** — up to four running chats with what each is doing.
+- **Recent** — the latest four chats.
+- **Places** — round glass buttons for **Notes**, **Automations**, **Abilities**, **Terminal** and
+  **Profile**, each opening full screen with a zoom from its button, and × to close.
+
+The page glows in the accent from the top.
+
+## Chats
+
+Every chat, newest first: loose chats under **Recent**, then a section per project. A row shows the
+chat's mark (the agent's initial in its colour, or a spinner), title, *"Forge · Claude Code"* or
+*"… is working…"*, and its age.
+
+- Swipe left to **Delete** (at once); swipe right to **Rename**. Long-press: **Rename**, **Delete**
+  (asks first: *"It's deleted on your Mac too. You can undo right after."*).
+- After a delete, a banner at the bottom offers **Undo** for six seconds.
+- **+** (⌘N) opens **New chat**: the first message (*"Ask anything…"*), Project, Agent, Model,
+  Permissions and **Plan first**; **Send** (⌘↩).
+- Empty: *"No chats yet"*, or *"Connecting"* with the link state while not connected.
+
+**Search** finds chats by title across all projects: *"Search your chats"* until you type.
+
+## A chat
+
+- **Title** with a subtitle of member · agent · project. ⋯ menu: **Rename**, **Ask again**, **Copy
+  chat**, **Delete**.
+- **Your messages** are accent bubbles. Long-press: **Copy**, **Edit and resend** (a sheet).
+- **Replies**: Markdown, with fenced code in its own scrolling box; tool rows (spinner, ✓ or ✗,
+  label, target, size); notes from the agent folded into *"2 notes from the agent"*; failures in
+  red; *"Thinking…"* before the first word. Long-press: **Copy**, **Share**. After a failed reply,
+  **Try again**.
+- **Plans** are a card: *Making a plan…*, *Plan ready*, *Running the plan*, *Plan done* or *Plan
+  stopped*, the steps with their state, and in review **Cancel** and **Run plan**. Steps are not
+  edited on the phone.
+- **The composer** sits at the bottom in glass. Above the field, the same chips as on the Mac:
+  agent · model, permission, reasoning (*The agent's default* or the levels the model offers) and
+  **Plan** (dimmed for CLIs that can't plan). Chips are locked while a turn runs. The field reads
+  *"Message Forge"*, or the reason when the chat can't take a message. **Send** (⌘↩) becomes
+  **Stop** (Escape) while running. A failed send puts the text back.
+
+## Agents
+
+The same pixel world as the Mac (the shared `XBotWorld` library), drawn compact and filling the
+whole page, with the bars kept dark over it.
+
+- **The world menu** (top left) picks the world; the choice is the Mac's, and changing it on either
+  side changes both.
+- **Crew actions** (top right): **Hire someone** and **Organise like a company**.
+- **The world**: tap someone for their page; long-press for a new chat or edit.
+- **Crew cards** in a row under it: face, name (a crown for HeadMaster), role, and *Working · …*,
+  *Done* or *Free*. Long-press: **Message**, **Edit**, **Let go**.
+- **Suggested agents** — thirteen ready-made members not yet on the crew (Nova the CTO, Penny the
+  CFO, Scout the researcher, Sentry the security reviewer and others; `SuggestedAgents.swift`), two
+  to a row. Each card has a look, a role, a pitch and **Hire**, which hires in one tap under the
+  suggested manager. Tapping the card opens the editor first.
+- Letting someone go shows *"Forge left"* with **Undo**.
+
+**A member's page**: their sprite, role, status and **Message Forge**; **In the company** (*Reports
+to*, *You* for HeadMaster; *Team*); **Works on** (agent, home project); their instructions; their
+chats; and **Let Forge go** (*"Their chats stay. You can undo right after."*). **Edit** in the
+toolbar.
+
+**The editor** (sheet): **Look** — the sprite drawn by the Mac, a stepper for each part, and
+shuffle; **Who** — name, role, instructions; **Reports to** with *(suggested)*, and the footer
+*"When they finish work their manager gave them, the manager's chat hears about it. HeadMaster
+reports to you."*; **Works on** — agent, model, home project. **Hire** / **Save**.
+
+**Talking to someone** opens a half-height sheet, *"What should Forge do?"*, and **Send** opens the
+new chat.
+
+## Projects
+
+Each project is a card with its chat count and folder, and a spinner while a chat in it is working.
+Long-press: **New chat here**. **+** adds a project by browsing the Mac's folders (*"Add “xbot” as
+a project"*). Empty: *"No projects yet"* and **Add a project…**.
+
+**A project** has **Files** and **Changes**, and a ⋯ menu: **New chat here**, **Terminal here**,
+**Copy path on the Mac**, **Remove from xBot** (*"Its chats are removed too. The folder and its
+files stay on the Mac."*).
+
+- **Files** — folders and files with git letters. Swipe for **Trash** and **Rename**; long-press
+  for **Mention in a new chat**, **Copy path**, **Rename**, **Move to Trash**. **New** › **New
+  File** / **New Folder**.
+- **Changes** — the branch and +/− totals, a sync line, the merge warning with **Ask the agent to
+  merge**, problems, the pull request with its checks, **Publish Branch** or **Sync Changes**, and
+  **Fetch**. A commit field with **Commit staged** or **Commit all**. Changed files: swipe right
+  to **Stage**/**Unstage**, left to **Discard**; long-press adds **Mention in a new chat**. A file
+  opens its diff.
+
+**A file** opens with line numbers. Text files have **Edit** / **Save**; the ⋯ menu has **Mention
+in a new chat**, **Copy text**, **Wrap lines**, and for Markdown **Show as code**. Over the size
+limit: *"Showing the first N KB of … Too big to edit here."* Binary: *"Not a text file"*.
+
+**Markdown files open as a document** — headings, lists, checklists, quotes and code — edited in
+place: tap a block to change it. The keyboard bar has a block style menu (Text, Title, Heading,
+Subheading, Bulleted list, Numbered list, Checklist, Quote), **Bold**, **Italic**,
+**Strikethrough**, **Code** and **Done**. Return makes the next list item or paragraph; Return on
+an empty item ends the list. Leaving a block saves it, written back as Markdown, with untouched
+blocks exactly as they were in the file. Checkboxes tick with a tap.
+
+Saving sends what the phone last read with the new text; if the file changed on the Mac since,
+the Mac refuses: *"It changed on the Mac since you opened it. Open it again to see the new
+version."* A good save shows *"Saved on the Mac"*.
+
+## Places
+
+Full-screen pages from Home, each closed with ×.
+
+- **Notes** — a project picker, the project's notes, swipe to delete (with Undo), **+**. A note
+  is plain text with *"Title on the first line…"*; it saves 1.2 s after typing stops, and its file
+  follows the first line. Empty: *"No notes yet"*; with no projects, *"Notes live in a project.
+  Add one first."*
+- **Automations** — **Run while xBot is closed** at the top, then each automation with its
+  schedule in words (*"Weekdays at 09:00 · next tomorrow"*, *Off*, *Running now…*) and a warning
+  when its last run failed. Swipe right to **Run now**, left to **Delete**; long-press adds
+  **Turn on/off**. The editor: name and **On**; **When** (When I run it, Every hour, Every day,
+  Weekdays, Once a week); **Steps** from the same apps and connectors as the Mac (*"Steps run in
+  order, by an agent with full access on your Mac."*); **Agent**, Model, Reasoning, **Works in**;
+  **Runs**; **Save** and **Run now**.
+- **Abilities** — Connectors, Plugins, Skills, MCPs as a segmented picker, with search. Switches
+  where allowed, status otherwise (*Connected*, *Needs sign-in*, *Failed*, *Checking*); swipe to
+  **Remove**. **+**: **Browse plugins**, **Add an MCP server** (a command or an address, for which
+  agents), **Manage connectors on claude.ai**.
+- **Terminal** — a real login shell on the Mac in a project's folder or home, drawn by SwiftTerm.
+  The menu picks the **Folder** and starts a **New shell**. When it exits: *"The shell ended."* and
+  **Start a new one**.
+- **Profile** — lifetime tokens, best day, day streak, longest; a 26-week activity grid; tokens and
+  tasks per agent and *plans run*; **Plan usage** per provider with what is left and when it
+  resets; top projects, tools and skills. With no history: *"No agent history yet"*.
+
+## Settings
+
+A sheet from Home's ⚙ or the Mac menu.
+
+| Section | Contents |
 | --- | --- |
-| **Plugins (full manager)** | `WKWebView` at the engine's `/admin/plugins` — OAuth setup, catalogue, per-tool config |
-| **Plugin grants (per agent)** | Native — **What it can reach** and **Handoff grants** in the panel's Agent settings |
-| **Everything else** — credentials, boundaries, computers, skills, components, playground, people, identity providers | Same webview, opened at `/admin` from Settings → Advanced → **Engine admin…**. Upstream's admin sidebar reaches each one, so no per-surface wiring |
+| *(top)* | **Mac** — its name, and the link state. *"The agents run on your Mac. Keep it on and awake; while this device is connected, xBot keeps it from sleeping."* |
+| **Appearance** | *Match the device*, *Light*, *Dark* |
+| **Accent colour** | Eight swatches — Orchid, Violet, Blue, Teal, Green, Amber, Coral, Graphite — and **Custom colour**. *"Used for buttons, highlights and Home's glow."* |
+| **Files** | **Show .md files as code** — opens Markdown as text instead of a document (each file can still switch from its menu) |
+| — | **Unpair this device** (*"To use xBot here again, pair it from the Mac's Settings › Devices."*) |
 
-The webview injects the loopback bearer token at document start so the upstream React admin can call
-`/api` without a sign-in flow. The token never appears in page-visible UI.
+## iPad
 
-**They are labelled as advanced and they look it.** No attempt to make a dense operational tool feel
-like the chat app.
+The same app. The tab bar becomes a sidebar (`sidebarAdaptable`), and pages keep to a readable
+width: Home and Projects 700 pt, chats 760 pt, pairing 520 pt. ⌘N, ⌘↩ and Escape work from a
+hardware keyboard as on the phone.
 
-**Exception: the audit trail gets a native view before v1.0.** It is the product's central trust
-claim. A user who wants to know what their agent did should not meet a webview at that moment.
+## Connection
 
----
+The link shows as a dot and a line wherever the Mac's name appears:
 
-## Empty and error states
+| State | Dot | Line |
+| --- | --- | --- |
+| Searching | orange | *Looking for Studio…* |
+| Same network | green | *Studio · same Wi-Fi* |
+| Through iCloud | green | *Studio · through iCloud* |
+| Unreachable | red | the reason, e.g. *"Your Mac isn't on this network, and iCloud is off on this device."* |
+| Not paired | red | *Not paired* |
 
-Every empty state is a sentence and an action. Never "No items."
-
-| Situation | What we show |
-| --- | --- |
-| No agents | "Create your first agent" + a button. Not "No agents." |
-| Engine stopped | "The engine isn't running" + **Start**. Not an empty list |
-| No model connected | "Connect a model to start" + **Open Settings**. Composer disabled with this reason |
-| Agent has never browsed | The monitor glyph + "*Agent*'s screen" |
-| No routines | "Nothing standing" + how to ask the agent for one. **No create button** — see Routines |
-| Turn failed | The reason, inline, + **Retry** |
-| Provider rejected the key | "Anthropic didn't accept this key" + **Update key** |
-| Rate limited | "Anthropic is rate-limiting you. Try again in about a minute." |
-
-**Never show an empty state that implies emptiness when the real cause is that something is down.**
-This is the single most common way an app quietly lies to its user.
+The app connects when it comes to the foreground and lets go in the background. Sending is
+disabled while not connected. When the Mac refuses something, an alert titled **Your Mac said no**
+gives its reason; a request with no answer says *"Your Mac didn't answer."*

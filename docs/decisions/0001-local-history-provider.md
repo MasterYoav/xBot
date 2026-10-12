@@ -5,7 +5,7 @@
 **Status:** Accepted
 **Date:** 2026-09
 **Supersedes:** nothing
-**Related:** [03-openbot-fork.md](../03-openbot-fork.md), [12-roadmap.md](../12-roadmap.md) M1
+**Related:** 03-openbot-fork.md (removed with the engine; in git history), [12-roadmap.md](../12-roadmap.md) M1
 
 ---
 

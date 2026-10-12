@@ -1,6 +1,9 @@
 # xBot for iPhone and iPad: a remote for the Mac
 
-Status: draft for approval, 2026-10-11.
+Status: approved and built, 2026-10-11 to 10-12, in PRs #31–#42 (open). What the app does now:
+[The iPhone and iPad app](../../14-iphone-and-ipad.md). Two details changed while building: CloudKit
+records are sealed with AES-GCM under the pairing key (not `encryptedValues`) and deleted once read,
+not after a day.
 
 ## What it is
 

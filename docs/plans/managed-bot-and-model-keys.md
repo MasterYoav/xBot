@@ -1,5 +1,8 @@
 # Plan: a Bot in the box, and model keys that reach it
 
+> **xBot 1.x history.** This plan was for the Docker/OpenBot engine, removed in
+> [ADR-0009](../decisions/0009-native-harness-redesign.md). Kept as a record; nothing in it applies to the app today.
+
 **Why this exists.** Driving the real `HTTPEngineClient` against a real engine for the first time
 (`Tests/XBotEngineTests/LiveEngineTests.swift`) found that the product's core path has never worked
 end to end:

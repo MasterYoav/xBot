@@ -1,5 +1,8 @@
 # Phase 1 Ship Readiness Implementation Plan
 
+> **xBot 1.x history.** Written for the Docker/OpenBot app, removed in
+> [ADR-0009](../../decisions/0009-native-harness-redesign.md). Kept as a record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove that the current xBot revision ships as a universal, signed, notarized Mac app that completes a real conversation and clean-VM onboarding.

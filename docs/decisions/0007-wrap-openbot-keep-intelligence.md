@@ -6,7 +6,7 @@
 **Date:** 2026-09
 **Supersedes:** nothing. **Defers** [ADR-0001](0001-local-history-provider.md) — it stays accepted
 and stays unimplemented.
-**Related:** [01-vision.md](../01-vision.md), [03-openbot-fork.md](../03-openbot-fork.md),
+**Related:** [01-vision.md](../01-vision.md), 03-openbot-fork.md (removed with the engine; in git history),
 [12-roadmap.md](../12-roadmap.md)
 
 > **Update, see [ADR-0008](0008-local-thread-runner.md).** "Keep Intelligence for v1" was written
@@ -144,7 +144,7 @@ needs rather than a measurement.
 
 **Fork the vendor package.** Rejected. `@copilotkit/runtime` is where the coupling lives, and
 forking it turns every upstream release into a merge instead of a version bump — the exact trap
-[03-openbot-fork.md](../03-openbot-fork.md) is written to avoid.
+03-openbot-fork.md (removed with the engine; in git history) is written to avoid.
 
 **Ship with no durable history at all.** Rejected outright. A conversation that forgets is not a
 product, and upstream is right that there is no useful degraded mode.

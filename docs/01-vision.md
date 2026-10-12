@@ -1,162 +1,115 @@
 # Vision
 
-> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
-> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
-> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
-> Until then, where it disagrees with the code, the code and the spec win.
-
 ## The product in one paragraph
 
-xBot is a native macOS app for creating, managing, and talking to AI agents that run on your own
-machine. Each agent gets a real computer of its own — a browser with its own logins, its own files,
-its own shell — and only the tools you grant it. You watch it work, take the wheel when it reaches
-something it should not do alone, and hand it back. Every model provider is supported through your
-own API keys, including models running locally. You install it by dragging an icon into
-Applications.
+xBot is a native Mac app for working with AI agents, and an iPhone and iPad app for working with
+them from anywhere. It drives the agent CLIs people already have and pay for (Claude Code, Codex,
+Antigravity, GitHub Copilot) and puts a real Mac experience around them: projects, chats as tabs,
+plans you can edit, git, files, notes, a terminal, automations, and a crew of agents organised like
+a company, living in a pixel-art world you can watch. Everything runs on your Mac, on your own
+subscriptions. Nothing goes through a server of ours, because there isn't one.
 
 ## Who it is for
 
-Two audiences, and the tension between them is the interesting part of the design.
-
-### The person who does not have a terminal
-
-They have a Mac. They have heard that AI can "do things for you" and have found that in practice it
-mostly writes text. They want an assistant that can actually open a browser, log into their airline
-account, and check something — without them handing an API key to a company they have never heard
-of, and without a subscription that reads their email on someone else's server.
-
-What they need from us: **an install that is a drag, a first run that asks four questions, and a
-chat window that behaves the way every other chat window on their Mac behaves.**
+Two people, and the tension between them is the interesting part of the design.
 
 ### The developer who lives in the terminal
 
-They could clone OpenBot and run `scripts/start.sh`. Some of them have. What they do not want is to
-own the operational surface of a Postgres instance, a supervisor, a browser container, and a
-`.env` file with thirty settings in it, forever, on their laptop, in order to have a useful agent.
+They already use Claude Code or Codex, often several at once, in several repos. What they want is
+not another agent: it's a place to run the ones they have. Tabs instead of terminal windows. A
+transcript that folds tool noise into one line. The diff, the branch, the pull request and its
+checks beside the chat. Plans they can reorder before a single file is touched. The same work from
+their phone when they're away from the desk.
 
-What they need from us: **the same product, plus escape hatches.** A visible container status.
-A "reveal in Finder" for the workspace. An `xbot` CLI that talks to the same local API. Bring your
-own agent endpoint. The ability to point it at Ollama and never make an outbound request.
+What they need from us: **the CLIs they trust, with everything around them done properly, and
+nothing taken away.** Each CLI's own flags, sessions and permissions are used, not reinvented. The
+terminal is always one shortcut away.
+
+### The person who has never opened a terminal
+
+They have a Mac and a ChatGPT or Claude subscription, and they've heard agents can do things,
+not just write. What they need from us: **a window that behaves like every other window on their
+Mac**, plain sentences instead of errors, and agents that feel like people they can hand things to.
+The crew, the world and the company structure are for them as much as for anyone: "ask HeadMaster,
+and it hands the work to whoever does that" is something everybody understands.
 
 ### The design consequence
 
-These two audiences want the same app with different depth. That is Apple's *simplicity* principle,
-not minimalism: **the common path first, advanced options exactly one level deeper.** The default
-path never mentions containers. The Advanced section never hides them.
+The same app, at different depths: **the common path first, advanced options exactly one level
+deeper.** The default path never mentions a flag, a session id or a sandbox mode. The inspector,
+the terminal and Abilities never hide them.
 
 ## The promise
 
-> **You never open a terminal. You never edit a text file. You never read a log.**
+> **You never open a terminal. You never edit a configuration file. You never read a log.**
 
-This is the product. Everything else in this repository is in service of it. When a design decision
-is close, the tiebreak is whichever option keeps this promise intact.
+When a design decision is close, the tiebreak is whichever option keeps this promise. In practice:
 
-### What the promise does not cover in v1
+- When something fails (a CLI signed out, a limit reached, the Mac unreachable from the phone), xBot
+  says what happened in a sentence and offers the one action that fixes it.
+- Settings are screens, not files. Connectors, plugins and MCP servers are switched in Abilities,
+  through the CLIs' own commands, never by editing their config.
+- The terminal exists because developers want it, not because anyone needs it.
 
-An earlier version of this document also promised *"no account"* and *"nothing leaves your machine
-except the calls you choose."* [ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) recorded
-that neither held for the v1 it planned, which ran on CopilotKit Intelligence for durable threads and
-memory.
+**Where the promise isn't kept yet.** Today a person needs at least one agent CLI installed and
+signed in, and installing one means a terminal. xBot links to them from Home but can't install
+them. The native agent loop for API keys and Ollama (below) is what closes this gap.
 
-**As of [ADR-0008](decisions/0008-local-thread-runner.md), both hold again, for the conversation.**
-The engine keeps threads itself (`LocalThreadRunner`) rather than on CopilotKit's infrastructure, and
-onboarding has no field anywhere that asks for a CopilotKit key. What still leaves the Mac is what it
-always did: whatever you send goes to the model you picked, unless that model runs here too. That is
-a request, not a transcript, and it is the one thing this promise never covered.
+## What stays on the Mac
 
-**Onboarding says this — where the local claim ends — in one sentence, before a model key is typed.**
-Not in a privacy policy, not afterwards. An app that sells local control cannot be vague about the
-part that is not local.
-
-Everything else on this page holds without qualification: the agents, their computers, their
-browsers, their files, and the model keys are all yours and all local.
-
-Concretely, that means the app owns:
-
-- Detecting whether a container runtime is present, and installing or guiding installation if not.
-- Pulling and updating images.
-- Starting, stopping, and health-checking the engine.
-- Generating and storing every secret the engine needs.
-- Migrating the database.
-- Surfacing failures as a sentence and a button, not a stack trace.
-
-When something breaks — and it will, because Docker will be mid-update, or the port will be taken,
-or the disk will be full — the app says what happened in one sentence and offers the action that
-fixes it. The log exists, and there is a "Copy diagnostics" button for when the user wants to send
-it to us. They are never asked to read it.
+Projects, chats, the crew, notes, automations and usage live on the Mac, in one SQLite file and in
+the project folders. What leaves it is what you send to the agent you picked: that's a request to
+its provider, on your account, as if you'd typed it into the CLI. The phone reaches the Mac directly
+on your network, or through your own iCloud with every message sealed by the pairing key.
 
 ## What xBot is not
 
-**Not a hosted service.** There is no xbot.com you sign into, no xBot account, and no subscription
-to us. The engine, the agents, the browsers and the files are on your Mac. In v1 the conversation
-transcript is the exception, and it is named as one above.
+**Not a hosted service.** No xBot account, no server, no subscription to us.
 
-**Not a model provider.** xBot ships no intelligence of its own. You supply keys, or you run
-Ollama and supply nothing. This is what makes "every AI" honest rather than a marketing line — we
-have no incentive to steer you.
+**Not a model provider, and not another agent.** xBot ships no intelligence of its own. The CLIs
+are the agents; xBot is the place they work in. This is why it can support all of them honestly:
+it has no reason to steer you to one.
 
-**Not a Mac App Store app.** An App Store app is sandboxed and cannot manage a container runtime.
-See [ADR-0005](decisions/0005-distribution-outside-app-store.md).
+**Not a sandbox.** An agent on Full access can do what you can. xBot passes each CLI's own
+permission flags and says plainly what each mode allows. A computer of its own for an agent (below)
+is where isolation will come from.
 
-**Not cross-platform in v1.** The engine is portable — it is containers. The client is deeply
-macOS. A Windows or Linux client is a separate project that would reuse the engine and share
-nothing else.
+**Not a Mac App Store app.** A sandboxed app can't start the CLIs or a shell in your folders. See
+[ADR-0005](decisions/0005-distribution-outside-app-store.md).
 
-**Not a coding agent.** Claude Code, Cursor, and their peers own that shape and own it well. xBot's
-agents have a shell because a computer without one is a toy, not because we are competing there.
+**Not cross-platform.** The Mac is where the agents run. The iPhone and iPad app is a remote for it,
+not a second place to run them. There is no Windows, Linux or Intel Mac version.
 
-## Why this can work
+## Where it is going
 
-Three things are true at once, which is unusual.
+The [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md) set the direction, and
+[the roadmap](12-roadmap.md) tracks it:
 
-**The engine is already good and already MIT.** OpenBot has per-agent container isolation, an action
-gateway that resolves-decides-audits-then-acts, a policy engine that fails closed, SPIFFE workload
-identity, and an audit trail designed by someone who has been on the wrong end of an incident
-review. Building that from scratch is a year. It is available under a licence that lets us fork it.
-
-**The consumer shape has been demonstrated.** Grok Bot showed that agents-as-contacts-in-a-chat-app
-is legible to people who do not care about agents. A rail of avatars, a conversation, and a panel
-showing what the thing is currently looking at. Nobody needs that explained.
-
-**Nobody has done both.** The self-hosted agent platforms are developer templates. The consumer
-agent apps are locked to one vendor's model and one company's servers. The gap is a native app that
-is genuinely local and genuinely model-agnostic.
+- **A native agent loop** for people with an API key or Ollama instead of a CLI, so nobody needs a
+  terminal to start.
+- **A computer of its own for any agent that needs one:** a Linux VM on Apple's Containerization,
+  with a shell, files and a browser you can watch live and take over.
+- **Agents with a memory** of their own, and habits that run on a schedule.
+- **A paid tier**, xBot Pro, as a one-time purchase with a year of updates, verified offline.
 
 ## The honest risks
 
-Recorded here rather than discovered in month four.
+**⚠️ The CLIs' stream formats belong to their vendors and change without notice.** Each CLI has
+its own parser, tested against output recorded from real runs, and a live test that runs real
+turns. A format change is found by those, not by users, only if someone runs them.
 
-**The engine's cloud dependency is gone for conversations.** OpenBot's server refused to start
-without CopilotKit Intelligence; the seam from
-[ADR-0007](decisions/0007-wrap-openbot-keep-intelligence.md) lets it run without, and
-[ADR-0008](decisions/0008-local-thread-runner.md) made local mode the one v1 ships: conversations
-are kept by the engine's own `LocalThreadRunner`. Cross-conversation memory (pgvector) is still
-[ADR-0001](decisions/0001-local-history-provider.md)'s, for v1.1.
+**⚠️ Usage limits are read from the CLIs' own data,** which isn't a public interface either.
 
-**⚠️ Container runtimes on macOS are a licensing and UX minefield.** Docker Desktop requires a paid
-licence above a company-size threshold, is a large install, and is not something we can bundle.
-Apple's own Containerization framework is the obvious long-term answer and is young. See
-[ADR-0003](decisions/0003-container-runtime.md).
-
-**⚠️ Resource cost is real.** Postgres, a Chromium per agent, and the engine will want several
-gigabytes of RAM. On an 8 GB Mac with three agents this is a bad experience. The app must be honest
-about this at onboarding and must cap concurrent browsers.
+**⚠️ The iCloud lane needs a provisioning profile with iCloud** for the Mac app. Development builds
+have one; a Developer ID release needs one from the developer portal before the phone works away
+from home on a downloaded build.
 
 **⚠️ The name and the visual reference carry trademark risk.** See
 [ADR-0006](decisions/0006-naming-and-trademark.md).
 
-**⚠️ We inherit upstream's security posture and upstream's velocity.** OpenBot is alpha and moving.
-Every merge from upstream is a review, not a pull. A fork that stops merging becomes an unmaintained
-copy of a security-sensitive codebase within a year.
-
 ## What success looks like
 
-**Milestone-level:** a non-technical person installs xBot, adds their keys, and has an agent book a
-restaurant in a browser they can watch — with no instruction beyond what is on screen.
-
-**The thing being tested is the app, not the engine.** OpenBot already does the hard part; nobody
-outside this repository can currently use it. Success is that the distance between those two
-sentences is closed by a window, an installer, and a first run.
-
-**Product-level:** a developer chooses xBot over running OpenBot directly, because the operational
-surface is not worth owning and the escape hatches are all still there.
+A developer replaces their pile of terminal windows with xBot for a week and doesn't go back. A
+person who has never opened a terminal hires a crew, asks HeadMaster for something, and watches it
+get handed down and done. Someone leaves home with only their iPhone and keeps working on their
+Mac.

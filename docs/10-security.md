@@ -1,246 +1,302 @@
 # Security
 
-> **Describes xBot 1.x (the Docker/OpenBot engine).** The app was redesigned in
-> [ADR-0009](decisions/0009-native-harness-redesign.md); this document is rewritten in the sub-project
-> that touches it (see the build order in the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md)).
-> Until then, where it disagrees with the code, the code and the spec win.
+xBot runs agent CLIs on your Mac, as you, in folders you choose, and lets a paired iPhone or iPad
+drive all of it from elsewhere. It adds no sandbox of its own. What an agent can do is decided by
+the permission mode you pick and enforced by the CLI itself; what a paired device can do is
+everything you can do sitting at the Mac, a shell included.
 
-xBot gives a language model a browser with the user's real logins in it, a filesystem, and a shell.
-That is the product. It is also, stated plainly, a large amount of trust, and the security model is
-what earns it.
+This page says what xBot does, what it reads and stores, how the remote is protected, and what is
+not built yet, checked against the code. The architecture is in
+[Architecture](02-architecture.md), the remote in [The iPhone and iPad app](14-iphone-and-ipad.md).
 
-Most of this is inherited from OpenBot, which took it seriously. The xBot-specific parts are the
-Keychain, the local token, and what the app is permitted to write down.
+## Running an agent
 
----
+Each turn is one process of the agent CLI (`HarnessBrain`), started in the chat's folder (a project,
+or `~/Library/Application Support/xBot/Inbox/` for loose chats) and ended when the turn ends. Stop
+sends it `SIGTERM`.
 
-## The threat model
+- **Environment.** The CLI inherits xBot's own environment with two changes (`HarnessLocator`):
+  `PATH` is replaced by your login shell's `PATH` (read once by running `$SHELL -l -i -c` with a
+  five-second limit, plus the usual install folders), and every variable starting `CLAUDECODE` or
+  `CLAUDE_CODE_` is removed.
+- **The prompt.** Claude Code and Codex read it on stdin, which is then closed. Antigravity and
+  Copilot can't, so it goes on their flag, attached as `--print=…` / `--prompt=…`. For those two the
+  prompt is in the process's arguments for the length of the turn, where other processes running
+  as you can see it (`ps`). The agent's instructions are arguments for all four (Claude Code's
+  `--append-system-prompt`, Codex's `developer_instructions`, and ahead of the prompt for the other
+  two).
+- **Schemas.** When a turn's answer must follow a JSON schema (plans, drawn wallpapers), Codex reads
+  the schema from a file in the temporary folder, removed when the turn ends. It holds the schema
+  only, never the prompt.
+- **Sign-in.** xBot never signs in to anything. Each CLI uses its own sign-in, wherever that CLI
+  keeps it.
 
-Ordered by likelihood, not drama.
+### Permission modes
 
-| # | Threat | Mitigation |
+The composer's chip maps to each CLI's own flags (`HarnessKind.arguments`). **Can edit** is the
+default (Settings › General › Default permission).
+
+| Mode | Claude Code | Codex | Antigravity | Copilot |
+| --- | --- | --- | --- | --- |
+| Read only | `--permission-mode default` | `sandbox_mode="read-only"` | `--mode plan` | no flag: reads allowed, anything else denied headless |
+| Can edit | `--permission-mode acceptEdits` | `sandbox_mode="workspace-write"` | `--dangerously-skip-permissions` | `--allow-tool write` |
+| Full access | `--permission-mode bypassPermissions` | `sandbox_mode="danger-full-access"` | `--dangerously-skip-permissions` | `--allow-all-tools --allow-all-paths` |
+
+- Planning turns in Plan mode are always read-only, whatever the chip says (Claude Code
+  `--permission-mode plan`, Codex `read-only`). Plan mode is offered for those two only.
+- **Antigravity's "Can edit" is full access.** Run headless, its edit mode refuses even to read,
+  so xBot gives it `--dangerously-skip-permissions`. The composer says so: "Antigravity can only
+  edit with full access, so “Can edit” runs with full access."
+- The sandboxing in these modes is the CLI's (Codex's `sandbox_mode`, Claude Code's permission
+  modes), not xBot's. xBot doesn't check what a CLI does with them.
+- **Full access means full access.** The agent can do anything you can on this Mac: read any file
+  you can read, run any command, use your network, your Git credentials, your signed-in tools.
+
+### Things that start turns without you typing
+
+- **Hand-offs.** A manager's reply can contain fenced `handoff` blocks. xBot acts only on names in
+  that manager's own team (below them, at any depth); anything else is refused with a notice in the
+  manager's reply. Each accepted hand-off starts a new chat with the member in **Can edit** mode,
+  in the manager chat's project, whatever mode the manager's own chat was in. A manager chat in
+  Read only can therefore start Can edit work, and for an Antigravity member that is full access.
+- **Automations** run with **full access**, always (`Workspace+Automations`); the editor says
+  "Automations run with full access: they can do anything you can on this Mac." They run while
+  xBot is open. **Run when xBot is closed** (off by default) installs a LaunchAgent,
+  `~/Library/LaunchAgents/dev.xbot.automations.plist`, which starts xBot's own binary with
+  `--automations-tick` every minute; it runs what's due and quits, and does nothing while the app
+  is open. Turning the toggle off unloads and removes it. macOS asks once per app the first time
+  an automation controls Mail, Calendar and so on.
+- **Run** on a shell code block in a reply types it into the chat's terminal and presses Return.
+  It needs your click, but it doesn't ask again: what you click is what runs. Only blocks tagged
+  as shell (`bash`, `sh`, `zsh` and similar) get the button.
+
+## What xBot reads of the CLIs' own files
+
+For usage, the profile page, the model lists and the Abilities page. No credential or token file
+is read: not Codex's `auth.json`, not Claude Code's Keychain item, nothing of Antigravity's or
+Copilot's.
+
+| File | What for | What is used |
 | --- | --- | --- |
-| 1 | **The model does something the user did not intend** — clicks buy, sends an email, deletes a file | The gateway: resolve → policy → **audit** → act. Fails closed |
-| 2 | **Prompt injection from a web page the agent is reading** | The gateway again. Page content is data, never instruction. Policy evaluates the *action*, not the model's stated reason for it |
-| 3 | **Keys leak** — logs, crash reports, diagnostics, screenshots | Keychain, never `process.env` in request paths, tested redaction |
-| 4 | **One agent reaches another's logins** | Per-agent computers and profiles (**v2**). ⚠️ Not true in v1 — see below |
-| 5 | **The agent reaches the database or the host network** | Network separation in compose; the private-address floor |
-| 6 | **Another process on the Mac talks to the engine** | Loopback + a bearer token in the Keychain |
-| 7 | **A malicious or compromised engine image** | Pinned digests, signature verification, no `:latest` |
-| 8 | **The user is socially engineered by their own agent** | Handover is explicit, secret entry is a separate channel, destructive actions confirm |
+| `~/.claude.json` | Plan, "Signed in", Claude Code's MCP servers | The whole file is parsed; only `oauthAccount` (its presence, and `organizationType` for the plan) and `mcpServers` (your user ones and the open project's) are looked at. For a server, its name and its command line or URL are shown |
+| Claude Code's stream | Usage left | Its `rate_limit_event` lines, as each turn runs |
+| `~/.claude/projects/**/*.jsonl` | Profile | Read incrementally: tokens per day, tasks, tool, skill and effort counts, project paths. No message text is kept |
+| `~/.codex/sessions/…/rollout-*.jsonl` | Profile, usage left | As above; for limits, the last 512 KB of the newest five logs |
+| `~/.codex/models_cache.json` | Codex's model list | Model names and their reasoning levels |
+| `~/.codex/config.toml` | Abilities | Configured MCP servers and switched-off skills. It is also **written** (below) |
+| `~/.claude/skills`, `~/.codex/skills`, a project's `.claude/skills`, plugin folders | Abilities | Each skill's `SKILL.md` |
 
----
+Antigravity's model list comes from running `agy` itself.
 
-## Secrets
+**Abilities changes go through the CLIs.** Plugins and MCP servers are switched, installed and
+removed with the CLIs' own commands (`claude plugin …`, `claude mcp add|remove`, `codex plugin …`,
+`codex mcp add|remove`). Codex has no command to switch a plugin, MCP server or skill off, so xBot
+changes one `enabled` line in `~/.codex/config.toml`, has Codex load it, and puts the file back
+exactly as it was if Codex refuses it. Adding a skill copies its folder into `~/.claude/skills` or
+`~/.codex/skills`. Abilities manages Claude Code and Codex only. An MCP server or plugin you add is
+code the agent will run as you; xBot doesn't vet it.
 
-### The three the app holds
+## What xBot stores
 
-| Secret | Where | Notes |
+| Where | What |
+| --- | --- |
+| `~/Library/Application Support/xBot/xbot.sqlite` | Projects (paths), chats, every message with its tool rows, the crew, automations, usage last read. Not encrypted: protected by your account and FileVault, like the CLIs' own logs |
+| `…/xBot/history.sqlite` | The profile's counts, derived from the CLIs' logs; rebuilt if deleted |
+| `…/xBot/Inbox/` | The working folder for chats without a project |
+| `…/xBot/profile.png` | The account picture, if you set one |
+| `<project>/notes/*.md` | Notes, in the project |
+| User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names, iCloud change tokens |
+| Keychain | Pairing keys, nothing else (below) |
+| `~/Library/LaunchAgents/dev.xbot.automations.plist` | Only while **Run when xBot is closed** is on |
+
+xBot itself makes no web requests: no telemetry, no crash reporting, no account. The network
+traffic it causes is the CLIs' own, `git` and `gh` when you use the Changes inspector, CloudKit for
+the remote's iCloud lane, and Sparkle once updates are configured.
+
+## The Keychain
+
+The only secrets xBot holds are pairing keys. There are no API keys: the native brain that would
+take them isn't built.
+
+- **On the Mac:** a generic password per device, service `dev.xbot.remote.pairing`, account the
+  key's identity (a UUID), value the 256-bit key in base64, accessible
+  `AfterFirstUnlockThisDeviceOnly` (`KeychainSecretStore`, `KeychainPairingSecrets`).
+- **On the phone:** the whole invite (Mac id, name, address, port and key) as one item, service
+  `dev.xbot.mobile.pairing`, also `AfterFirstUnlockThisDeviceOnly`, so it isn't synced or restored
+  to another device.
+- **Debug builds only:** `XBOT_PAIRING_SECRETS_FILE` makes the Mac keep pairing keys in a JSON file
+  instead (`FilePairingSecrets`), so a rebuilt, re-signed debug binary doesn't trigger a Keychain
+  password prompt every launch. The code that reads that variable is inside `#if DEBUG` in
+  `XBotApp.swift`; the type is compiled into every build, but nothing in a release build creates
+  one.
+
+## The remote
+
+A paired device has the same power as sitting at the Mac. It can start chats in any mode
+including Full access, read and write files in projects, commit and push, add any folder on the Mac
+as a project (it can browse the Mac's folders to find one), hire agents, add MCP servers, install
+plugins, switch the automations helper on, and open a login shell. Treat pairing as handing over
+the Mac.
+
+### Listening
+
+Nothing listens until you ask to pair. Pressing **Pair an iPhone or iPad…** starts one TCP
+listener on a port the system picks, advertised over Bonjour as `_xbot._tcp` with the Mac's id and
+the protocol version in its TXT record (and the Mac's name as the service name). At launch it
+starts again only if a device is paired. Removing the last device stops it. The iCloud lane
+listens on nothing.
+
+### Pairing
+
+The QR code is an `xbot://pair?v=…` link holding, in base64 JSON, the Mac's id and name, its
+Wi-Fi/Ethernet IPv4 address and port when known, and **the pairing key itself**: a UUID identity
+and 256 random bits (`PairingKey.generate`, `SecRandomCopyBytes`). Whoever sees the code, or a
+photo or screen recording of it, has the key and can pair. The sheet says so: "The code pairs one
+device. Keep it to yourself: it's the key to this Mac."
+
+On the phone, scanning the code or opening the link saves it to the Keychain and connects. A device
+appears in Settings › Devices the first time it connects.
+
+### The local lane
+
+TLS 1.2 with the pairing key as a pre-shared key, cipher suite `TLS_PSK_WITH_AES_128_GCM_SHA256`
+(`LocalTLS`). There are no certificates: a peer without one of the keys can't complete the
+handshake, and the Mac only answers a device whose identity it holds a key for. Frames are a 4-byte
+length and JSON.
+
+### The iCloud lane
+
+Messages are batched into records in the **private** CloudKit database of your own iCloud account
+(container `iCloud.dev.xbot`), so the phone and the Mac must be signed in to the same account. Each
+batch is sealed with AES-GCM under the pairing key before it's written (`CloudChannel`), so iCloud
+holds ciphertext. Alongside it, each record carries in the clear who it's from and to (device
+identity or `mac`) and a sequence number. Batches are opened in order, once, and deleted after
+reading; one older than the last delivered is dropped as a replay.
+
+This lane needs the Mac app signed with the iCloud entitlement. Builds signed by
+`scripts/sign-mac-remote.sh` have it; the Developer ID release script signs without entitlements,
+so a release falls back to the local lane and Settings › Devices says why.
+
+### Files from the phone
+
+Every project path from the phone is resolved, symlinks included, and refused unless it stays
+inside the project folder (`RemoteHost.inside`). Names for new files and renames can't contain `/`
+or be `.` or `..`. A save carries the text the phone opened, and is refused with "It changed on the
+Mac since you opened it" if the file no longer matches. Deletion moves to the Trash. These checks
+keep the file browser honest; they are not a boundary, because the same device can open a shell
+or add any folder as a project.
+
+### The shell from the phone
+
+**Terminal** opens a real login shell (`$SHELL -l`) on the Mac, in the project's folder or your home
+folder, with the Mac app's environment (`RemoteShell`). Only the connection that opened it can type
+into it, resize it or close it. It ends when that connection goes: at once on the local lane (the
+phone lets go when its app goes to the background), and on the iCloud lane after 150 seconds
+without hearing from the phone.
+
+### Keeping the Mac awake
+
+While a device is attached or an agent is working, the Mac holds an `IOPMAssertion` against idle
+system sleep ("xBot: a phone is attached or an agent is working"). The display may still sleep, and
+a closed lid on battery still sleeps.
+
+### Removing a device
+
+Settings › Devices › **Remove** deletes the key from the Keychain, closes that device's connections
+on both lanes, and restarts the listener without the key. **Unpair this device** on the phone forgets
+the pairing and the cached chat list there; it doesn't tell the Mac, so remove the device on the Mac
+too.
+
+## The in-app terminal
+
+A floating window per chat, with tabs, each a login shell drawn by SwiftTerm, as you. It gets the
+app's environment minus a few app-only variables and any starting with `XBOT_`. It is a terminal;
+it has no more and no fewer rights than Terminal.app.
+
+## Updates and signing
+
+- **Sparkle 2 with EdDSA.** The updater starts only when the bundled `Info.plist` has both
+  `SUFeedURL` and `SUPublicEDKey`; today's builds have neither, so it's inert. The feed must be
+  HTTPS. A release takes both values only from the signed bundle; reading them from the
+  environment (`XBOT_APPCAST_URL`, `XBOT_SPARKLE_PUBLIC_KEY`) is allowed in debug builds only
+  (`AppUpdateTrust`). Automatic installs are off: the injected plist sets `SUAutomaticallyUpdate`
+  to false.
+- **Code signing.** `scripts/sign-mac-app.sh` signs with Developer ID and the hardened runtime,
+  then notarises and staples when the credentials are present. `scripts/sign-mac-remote.sh` signs
+  a local build with Apple Development and the iCloud and push entitlements. The app is **not
+  sandboxed**: it starts CLIs and shells, which the App Sandbox forbids. See
+  [Packaging and updates](11-packaging-and-updates.md).
+
+## Not built
+
+The [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md) plans protections that
+don't exist yet. Don't read this page as describing them.
+
+- **A bot's own computer.** An Apple Containerization VM per bot, with the project shared read-only
+  by default and nothing listening on the Mac. Until it exists, agents run directly on the Mac.
+- **A policy gate.** Every tool call classified (read, write, execute, network, outbound message)
+  and allowed, asked about or denied per bot, with an approval card in the chat. Today the only
+  gate is the CLI's permission mode.
+- **An append-only audit trail.** A record of every tool call, written before its result returns.
+  Today the record is the chat's transcript, which can be edited and deleted like any chat.
+- **API keys.** The native brain (API keys, Ollama) is planned, with keys in the Keychain only.
+
+## Threat model
+
+| Who or what | What they could do | What stops them |
 | --- | --- | --- |
-| Provider API keys | **macOS Keychain** | One item per provider. `kSecAttrAccessibleWhenUnlocked` |
-| Engine bearer token | **macOS Keychain** | Generated on first run. Sent on every request |
-| DB encryption key | **macOS Keychain** | The engine's `KEY_ENCRYPTION_KEY`. Generated — never upstream's example value, which is public and refused in production |
+| The agent itself, doing something you didn't mean | Anything its mode allows; in Full access, anything you can | The permission mode, enforced by the CLI. Plan mode's read-only planning. Stop (⌘.). The Changes inspector to see and discard edits. No checkpoints, no gate of xBot's own |
+| Prompt injection (a web page, file, issue or tool output the agent reads) | Steer the agent within its mode; write `handoff` blocks; put a harmful command in a shell block you then **Run** | The CLI's own defences and its mode. Hand-offs only reach the manager's team, in Can edit. **Run** needs your click. Nothing else |
+| Someone who sees the pairing QR or link | Pair a device and get everything a paired device gets, the shell included, over the local network; over iCloud only if signed in to your iCloud account | Keep the code private; close the sheet. Remove unknown devices in Settings › Devices |
+| Someone on the same network without a key | See the Bonjour advertisement (the Mac's name and id); open a TCP connection | TLS-PSK: no key, no handshake |
+| A lost or stolen paired phone | If unlocked, everything a paired device can do | The phone's passcode (keys are kept after first unlock, this device only). Remove it on the Mac |
+| Anyone who can read your iCloud data | See records' sender, recipient, sequence numbers, sizes and timing | AES-GCM with the pairing key over the contents |
+| Another process running as you on the Mac | Read `xbot.sqlite` and transcripts, the CLIs' own logs and credentials, Antigravity and Copilot prompts in process arguments | Nothing of xBot's. Your macOS account is the boundary, as for every app you run |
+| An MCP server or plugin you add | Run code as you when an agent uses it | You choosing it. xBot installs only what you ask, through the CLI |
+| A tampered update | Run code as you | EdDSA signatures, HTTPS-only feed, key only from the signed bundle in release. Inert until configured |
+| An automation running unattended | Anything you can, on a schedule, while the app is closed if the helper is on | Off by default; each run is a chat in its history; the helper is removed when the toggle is turned off |
 
-**Rules, and they are absolute:**
+## Known weaknesses
 
-- **Never `UserDefaults`.** It is a plist in the user's Library, world-readable by any process
-  running as them.
-- **Never a file in Application Support.** Same problem, plus it survives an uninstall.
-- **Never a log line.** Not at debug level, not behind a flag, not temporarily.
-- **Never in an error message shown on screen.** "Anthropic rejected the key ending `…4f2a`" is
-  acceptable. Echoing the key is not.
-- **Never in a crash report.** Do not hold a decrypted key in a long-lived property; fetch, use,
-  release.
-- **Never in diagnostics.** The redaction function has a test that fails if a known-secret pattern
-  survives it. **Do not rely on care.**
+Found while writing this page and not fixed yet.
 
-### Passing keys to the engine
-
-**Diagnostics redact on three passes.** A maintained list of secret variable names, a heuristic on
-the name itself — anything containing KEY, TOKEN, SECRET or PASSWORD — and patterns matched on the
-value's shape. The middle one exists because a list is what goes stale: an upstream merge or a
-custom provider's own variable arrives under a name nobody added, and a gateway key that is only a
-random string matches none of the value shapes. It would have gone into a report in the clear.
-
-**The engine token is compared in constant time.** It is the whole boundary — behind it are the
-agents, their browser profiles, which hold real logins, and the credential vault — and anything
-running as this user can reach the loopback port. `!==` stops at the first byte that differs, which
-leaks the token to something patient enough to measure. `server/src/xbot/bearer-auth.ts`.
-
-**⚠️ The tension worth naming.** Upstream passes provider keys to the agent container as environment
-variables (`ANTHROPIC_API_KEY` and friends). Environment variables leak — into `/proc`, into child
-processes, into crash dumps. The container also runs a shell that a model controls.
-
-**xBot's position:** keys live in the engine's encrypted credential vault, not the environment. The
-model router fetches a key per request from the vault, and the vault is encrypted at rest with
-`KEY_ENCRYPTION_KEY`, which comes from the Keychain and is passed to the engine at start.
-
-This means one secret transits the environment instead of N. It is not perfect — the encryption key
-is in the process environment — but it is a much smaller surface, and it means the keys are not
-sitting in a variable a shell can read.
-
-**Corollary, and it is a rule:** *never read a provider key from `process.env` in request-handling
-code.* If you find one, that is a bug with a security label.
-
-### Secret entry to an agent
-
-Inherited from upstream and correct: when an agent needs a password to complete a task, entry is a
-separate channel from chat content. The audit records *that* a secret was requested and its
-**character count** — never its value. The value never enters the transcript, so it never enters the
-model's context on the next turn.
-
-The UI for this is a card, not a message bubble. See [09-ui-spec.md](09-ui-spec.md).
-
----
-
-## Isolation
-
-### v1 — one shared computer
-
-⚠️ **Be honest about this in the product, not just in the docs.**
-
-The v1 single-container shape has no supervisor, which means no Docker socket, which means **all
-agents share one Chromium profile and one workspace.** Agent A can read the cookies agent B used to
-log into your bank.
-
-**This is stated in the UI**, in Settings → Computer, in plain words:
-
-> In this version, all your agents share one browser. An agent can see sites another agent has
-> signed into. Give agents separate logins for anything sensitive.
-
-Shipping this quietly would be the worst decision available. Shipping it with a sentence is
-acceptable for an early version. Not shipping the sentence is not.
-
-### v2 — one computer per agent
-
-The upstream topology, and the fix. Each agent gets a container with its own workspace volume and
-its own browser profile. The supervisor holds the Docker socket — which is root-equivalent on the
-host — and exposes only four verbs: ensure, stop, reset, list.
-
-Additionally:
-
-- **gVisor** (`COMPUTER_RUNTIME=runsc`) where the host supports it. A shared kernel is not an
-  isolation story for code a model wrote.
-- **`--security-opt no-new-privileges`**, which turns setuid off for everything not explicitly
-  permitted.
-- **Root inside the container is a floor, not a boundary.** Upstream permits passwordless `sudo` for
-  the package managers only — `apt-get`, `apt`, `dpkg`, `apt-key`, `apt-cache` — because "install a
-  tool then use it" is the point of giving an agent a shell, while `sudo cat /proc/1/environ` is not.
-  Keep that list exactly as narrow as it is.
-
-### Network
-
-In the compose topology, PostgreSQL is on a **separate network** from the agents' computers, because
-an agent has a shell and a shell reaches whatever its container reaches. Only the migration service
-reaches the database by name.
-
-⚠️ **In the v1 single-container shape this separation does not exist** — the database is a sibling
-process on the same loopback. Combined with the shared-computer issue above, this is the second
-reason v1 is a stepping stone and not a destination. It is one more line in the same honest
-paragraph.
-
-### The private-address floor
-
-`AGENT_COMPUTER_ALLOW_PRIVATE_HOSTS` removes the whole private-address floor — both where an agent
-may browse and which endpoint an agent may be registered against. With it on, an agent could reach
-link-local addresses, including cloud metadata endpoints. Upstream refuses to start with it set under
-`NODE_ENV=production`.
-
-**xBot: off by default.** Exposed in Advanced, with a description of what it actually allows, and
-**never enabled to fix an unrelated problem.** If something needs it, that is a design question, not
-a settings change.
-
----
-
-## The engine boundary
-
-The engine runs in single-user mode (`OPENBOT_SINGLE_USER=true`), which upstream warns about
-plainly: *"while it is set, every visitor is an administrator."*
-
-On a laptop with loopback-only ports, a "visitor" is another process on the same Mac running as the
-same user. That is a smaller threat than a network one, but it is not nothing — a malicious npm
-postinstall script could reach `127.0.0.1:3001`.
-
-**So: loopback plus a bearer token.** Generated on first run, held in the Keychain, required on every
-request. The app has it. Nothing else on the machine does.
-
-Sign-in stays in the codebase and unreachable, so upstream merges stay clean.
-
----
-
-## The audit trail
-
-The product's central trust claim, and the reason a user should be willing to run this at all.
-
-**Properties, inherited, and none of them are to be relaxed:**
-
-- **Append-only.** Nothing in the product deletes a row. Retention is the only thing that shrinks it,
-  and it defaults to keeping everything.
-- **Written before the action, not after.** An action that crashes the computer is still recorded.
-- **A second row on failure**, so a forwarded action that then failed is distinguishable from one
-  that succeeded.
-- **Control handovers are audited** as first-class events: `computer.help_requested`,
-  `computer.control_taken`, `computer.control_released`.
-- **Secret requests are audited by count, not value.**
-- **File writes contribute path and size, never contents.**
-
-**xBot adds:** a native audit viewer before v1.0, because meeting a webview at the moment you want to
-know what your agent did is exactly the wrong seam. See [ADR-0004](decisions/0004-native-vs-webview.md).
-
----
-
-## Images
-
-- **Pinned by digest**, never `:latest`. A tag that moves under you is not a supply chain.
-- **Signature verified** before the first run of a new digest.
-- **The manifest is served over HTTPS with certificate pinning**, and it lists digest, size, minimum
-  app version, and migration compatibility.
-- **The previous image is retained** until the new one has been healthy for a full session, so
-  rollback is real.
-
----
-
-## App hardening
-
-- **Hardened runtime**, notarized, Developer ID. See [11](11-packaging-and-updates.md).
-- **Unsandboxed**, because driving a container runtime requires it. Stated plainly on the download
-  page rather than hidden — a security-conscious user will check and should find an explanation, not
-  a surprise.
-- **No entitlements beyond what is used.** Network client, and the Keychain access group.
-- **Library validation on.** No unsigned code injection.
-- **Sparkle configured with EdDSA signature verification** and an HTTPS appcast. An update channel
-  is a code-execution channel.
-
----
-
-## Telemetry
-
-**Off by default. Opt-in. Asked for after onboarding, separately, so it is a real choice rather than
-something clicked past to get in.**
-
-If enabled: app version, macOS version, crash reports, feature-use counts, aggregate error classes.
-
-**Never, under any setting:** conversation content, agent names, prompts, model responses, page
-contents, URLs visited, file names or contents, API keys, audit rows.
-
-**The privacy claim is the product.** A telemetry pipeline that could ever carry a prompt is not a
-bug we would fix later; it is a breach of the thing that makes xBot worth choosing.
-
----
+- **No forward secrecy on the local lane.** Plain PSK suites don't add an ephemeral key exchange,
+  so someone who records the traffic and later gets the pairing key can read it.
+- **Invites stay valid until relaunch.** A code shown and then cancelled, or never scanned, is
+  still accepted on the local lane until xBot quits, and its key stays in the Keychain. Because
+  the iCloud lane accepts any sender whose key is in the Keychain, it stays valid there across
+  relaunches too.
+- **One code, more than one device.** The key is the device's identity, so a second device that
+  scans the same code connects as the first.
+- **The hello isn't bound to the handshake.** On the local lane the device names itself after the
+  TLS handshake; the Mac checks it holds a key for that name, not that it's the key the handshake
+  used.
+- **The iCloud record's addressing isn't authenticated.** Sender, recipient and sequence number
+  sit outside the sealed box, so whoever can write to your private database could replay an old
+  batch under a higher sequence number.
+- **Uninstalling leaves the remote behind.** `scripts/uninstall-xbot.command` doesn't delete the
+  `dev.xbot.remote.pairing` Keychain items or the automations LaunchAgent. Remove your devices and
+  turn **Run when xBot is closed** off before uninstalling.
 
 ## What we tell the user
 
-In Settings → Privacy, in plain language, without hedging:
+In plain words, and all of it true today:
 
-> **What stays on your Mac**
-> Your conversations, your agents, their files, and their browser logins. All of it is in a database
-> on this computer. We have no server that could hold it.
+> **Your agents run on this Mac, as you.** xBot uses the agent apps you already have, signed in
+> with your own accounts. It doesn't put them in a sandbox. "Read only" and "Can edit" are each
+> agent's own settings; "Full access" lets an agent do anything you can do on this Mac.
 >
-> **What leaves your Mac**
-> Only the calls your agents make: to the model provider you connected, and to the websites you ask
-> them to visit. If you use Ollama, nothing leaves at all.
+> **What stays on your Mac.** Your chats, your crew and your automations are in a database on this
+> Mac. xBot has no server and no account, and sends nothing about you anywhere.
 >
-> **Your API keys**
-> Stored in your Mac's Keychain, encrypted, and sent only to the provider they belong to.
+> **What xBot reads.** The agents' own logs, to show your usage and your profile. Never their
+> passwords or sign-in tokens.
+>
+> **Pairing a phone.** The pairing code is the key to this Mac: anyone who sees it can pair. A
+> paired phone can do everything you can do here, including open a terminal. On the same Wi-Fi it
+> connects directly and encrypted; away, through your own iCloud, encrypted with the same key.
+> Remove a phone in Settings › Devices and it can't connect again.
+>
+> **Automations** run with full access, and only run while xBot is closed if you turn that on.
 
-Three paragraphs, true, and checkable. If any of it stops being true, that is a release blocker.
+If any of it stops being true, that is a release blocker.
