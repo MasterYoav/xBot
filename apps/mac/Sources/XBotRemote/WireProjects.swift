@@ -373,3 +373,89 @@ public struct RemotePlugin: Codable, Equatable, Sendable, Identifiable {
         self.installed = installed
     }
 }
+
+// MARK: Profile and usage
+
+public struct RemoteCount: Codable, Equatable, Sendable, Identifiable {
+    public var name: String
+    public var count: Int
+    public var id: String { name }
+    public init(name: String, count: Int) { self.name = name; self.count = count }
+}
+
+/// An agent's plan limits, as the Mac's account menu shows them.
+public struct RemoteUsage: Codable, Equatable, Sendable, Identifiable {
+    public var agent: String
+    public var plan: String?
+    public var fiveHourUsed: Double?
+    public var fiveHourResets: Date?
+    public var weeklyUsed: Double?
+    public var weeklyResets: Date?
+    public var updatedAt: Date
+    public var id: String { agent }
+
+    public init(agent: String, plan: String?, fiveHourUsed: Double?, fiveHourResets: Date?, weeklyUsed: Double?,
+                weeklyResets: Date?, updatedAt: Date) {
+        self.agent = agent
+        self.plan = plan
+        self.fiveHourUsed = fiveHourUsed
+        self.fiveHourResets = fiveHourResets
+        self.weeklyUsed = weeklyUsed
+        self.weeklyResets = weeklyResets
+        self.updatedAt = updatedAt
+    }
+}
+
+/// The Mac's Profile page: who, and what the agents did.
+public struct RemoteProfile: Codable, Equatable, Sendable {
+    public var name: String
+    public var username: String
+    public var picture: Data?
+    /// Nil while the Mac is still reading the agents' history.
+    public var stats: Stats?
+    public var usage: [RemoteUsage]
+
+    public struct Stats: Codable, Equatable, Sendable {
+        /// Tokens per day, "yyyy-MM-dd".
+        public var days: [String: Int]
+        public var lifetime: Int
+        public var peak: Int
+        public var longestStreak: Int
+        public var currentStreak: Int
+        public var tokensByAgent: [String: Int]
+        public var tasksByAgent: [String: Int]
+        public var longestTask: TimeInterval
+        public var tools: [RemoteCount]
+        public var skills: [RemoteCount]
+        public var efforts: [RemoteCount]
+        /// Folder names and tokens, busiest first.
+        public var projects: [RemoteCount]
+        public var planRuns: Int
+
+        public init(days: [String: Int], lifetime: Int, peak: Int, longestStreak: Int, currentStreak: Int,
+                    tokensByAgent: [String: Int], tasksByAgent: [String: Int], longestTask: TimeInterval, tools: [RemoteCount],
+                    skills: [RemoteCount], efforts: [RemoteCount], projects: [RemoteCount], planRuns: Int) {
+            self.days = days
+            self.lifetime = lifetime
+            self.peak = peak
+            self.longestStreak = longestStreak
+            self.currentStreak = currentStreak
+            self.tokensByAgent = tokensByAgent
+            self.tasksByAgent = tasksByAgent
+            self.longestTask = longestTask
+            self.tools = tools
+            self.skills = skills
+            self.efforts = efforts
+            self.projects = projects
+            self.planRuns = planRuns
+        }
+    }
+
+    public init(name: String, username: String, picture: Data?, stats: Stats?, usage: [RemoteUsage]) {
+        self.name = name
+        self.username = username
+        self.picture = picture
+        self.stats = stats
+        self.usage = usage
+    }
+}

@@ -118,7 +118,13 @@ struct XBotApp: App {
         }
         AppDelegate.workspace = workspace
         workspace.startAutomationClock()
-        let remote = RemoteService(workspace: workspace)
+        var secrets: any PairingSecrets = KeychainPairingSecrets()
+        #if DEBUG
+        if let file = ProcessInfo.processInfo.environment["XBOT_PAIRING_SECRETS_FILE"] {
+            secrets = FilePairingSecrets(url: URL(filePath: file))
+        }
+        #endif
+        let remote = RemoteService(workspace: workspace, secrets: secrets)
         workspace.remote = remote
         remote.wantsPushes = { NSApplication.shared.registerForRemoteNotifications() }
         remote.host.drawAvatar = { AvatarPicture.png($0) }

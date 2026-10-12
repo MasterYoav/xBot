@@ -59,7 +59,7 @@ import XBotRemote
 
     static func requestID(of message: HostMessage) -> UUID? {
         switch message {
-        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _), .abilities(let r, _, _, _), .shellOpened(let r, _, _): r
+        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _), .abilities(let r, _, _, _), .shellOpened(let r, _, _), .profile(let r, _): r
         default: nil
         }
     }
@@ -465,5 +465,38 @@ import XBotRemote
         link.hangUp()
         await waitFor { host.shellCount == 0 }
         #expect(host.shellCount == 0)
+    }
+}
+
+/// The Profile page from the phone.
+@MainActor @Suite(.serialized) struct RemoteProfileTests {
+    let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+
+    @Test func whoAndWhatTheAgentsDid() async throws {
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
+        await w.refreshHarnesses()
+        var summary = HistorySummary()
+        summary.days = ["2026-10-10": 1200, "2026-10-11": 300]
+        summary.tokensByAgent = [.claude: 1500]
+        summary.tasksByAgent = [.claude: 4]
+        summary.tools = [NameCount(name: "Read", count: 9), NameCount(name: "Edit", count: 3)]
+        summary.projects = [ProjectTotal(path: "/Users/me/Code/xBot", tokens: 1400, lastActive: .now)]
+        w.history = summary
+        w.usage[.codex] = AgentUsage(agent: .codex, limits: RateLimits(fiveHour: RateWindow(usedPercent: 42, resetsAt: .now.addingTimeInterval(3600)),
+                                                                     weekly: nil, plan: "plus"), updatedAt: .now)
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        defer { withExtendedLifetime(host) {} }
+        let link = FakeLink()
+        host.attach(link)
+
+        let ask = UUID()
+        link.say(.getProfile(requestID: ask, refresh: false))
+        guard case .profile(_, let profile) = await RemoteProjectsTests().answer(link, ask) else { Issue.record("no profile"); return }
+        #expect(!profile.name.isEmpty && profile.username == NSUserName())
+        let stats = try #require(profile.stats)
+        #expect(stats.lifetime == 1500 && stats.peak == 1200 && stats.days["2026-10-10"] == 1200)
+        #expect(stats.tools.map(\.name) == ["Read", "Edit"] && stats.projects == [RemoteCount(name: "xBot", count: 1400)])
+        #expect(stats.tokensByAgent == ["claude": 1500])
+        #expect(profile.usage.first?.agent == "codex" && profile.usage.first?.fiveHourUsed == 42 && profile.usage.first?.plan == "plus")
     }
 }

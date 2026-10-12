@@ -159,6 +159,9 @@ extension RemoteHost {
         case .listAbilities, .setAbility, .removeAbility, .listPlugins, .installPlugin, .addMCP:
             return await answerAbilities(message)
 
+        case .getProfile(let request, let refresh):
+            return (request, await answerProfile(request, refresh: refresh))
+
         default:
             return answerAutomations(message)
         }

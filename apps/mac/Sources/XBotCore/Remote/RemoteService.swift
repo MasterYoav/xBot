@@ -31,6 +31,27 @@ public struct KeychainPairingSecrets: PairingSecrets {
     public func remove(_ id: String) { try? KeychainSecretStore.remove(service: Self.service, account: id) }
 }
 
+/// Pairing keys in a JSON file (identity → base64 secret), for debug builds run on a sandbox home:
+/// each rebuild changes the binary's signature, and the login Keychain would ask for the password
+/// every time. Never used by a release.
+public struct FilePairingSecrets: PairingSecrets {
+    let url: URL
+    public init(url: URL) { self.url = url }
+
+    private func read() -> [String: String] {
+        (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+    }
+
+    private func write(_ all: [String: String]) {
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? JSONEncoder().encode(all).write(to: url, options: [.atomic, .completeFileProtection])
+    }
+
+    public func secret(for id: String) -> Data? { read()[id].flatMap { Data(base64Encoded: $0) } }
+    public func save(_ secret: Data, for id: String) { var all = read(); all[id] = secret.base64EncodedString(); write(all) }
+    public func remove(_ id: String) { var all = read(); all[id] = nil; write(all) }
+}
+
 /**
  xBot on the iPhone and iPad, from the Mac's side: pairing, the two lanes, and staying awake.
 
