@@ -4,8 +4,8 @@ import XBotBrain
 import XBotCore
 import XBotUI
 
-/// `XBot --automations-tick` (the background helper's LaunchAgent): run what's due, headless, and
-/// quit. Anything else: the app.
+/// `XBot --automations-tick` (the background helper's LaunchAgent): run the automations and Jev
+/// workflows that are due, headless, and quit. Anything else: the app.
 @main
 enum XBotEntry {
     static func main() {
@@ -29,12 +29,15 @@ enum AutomationTick {
         let appOpen = NSRunningApplication.runningApplications(withBundleIdentifier: "dev.xbot.app")
             .contains { $0.processIdentifier != me }
         guard !appOpen, let store = try? Store.live() else { return }
-        let due = (try? store.automations())?.contains { $0.isDue(at: .now) } ?? false
-        guard due else { return }
+        let automationsDue = (try? store.automations())?.contains { $0.isDue(at: .now) } ?? false
+        // Workflows only while Jev Workflows is on (Settings › AI; the app's own user defaults).
+        let workflowsDue = JevSettings().workflowsEnabled && ((try? store.workflows())?.contains { $0.isDue(at: .now) } ?? false)
+        guard automationsDue || workflowsDue else { return }
         let inbox = Store.supportDirectory.appending(path: "Inbox", directoryHint: .isDirectory)
         let workspace = Workspace(store: store, inbox: inbox, discover: { await HarnessLocator.installed() })
         await workspace.refreshHarnesses()
         workspace.runDueAutomations()
+        workspace.runDueWorkflows()
         await workspace.waitForTurns()
     }
 }

@@ -79,7 +79,7 @@ extension Workspace {
         return automations.filter { $0.isDue(at: now) }.compactMap { runAutomation($0.id, at: now)?.automationID }
     }
 
-    /// While the app is open: a look every 30 seconds.
+    /// While the app is open: a look every 30 seconds, for automations and Jev workflows.
     public func startAutomationClock() {
         guard automationClock == nil else { return }
         automationClock = Task { [weak self] in
@@ -87,6 +87,8 @@ extension Workspace {
                 try? await Task.sleep(for: .seconds(30))
                 guard let self, !self.isDiscovering else { continue }
                 self.runDueAutomations()
+                // Workflows run from the same clock (and the same helper while xBot is closed).
+                self.runDueWorkflows()
             }
         }
     }

@@ -153,6 +153,7 @@ extension Workspace {
         draft.model = nil
         draft.effort = defaultEffort
         draft.mode = defaultMode
+        draft.jevChooses = false
     }
 
     /// Where an installed agent's CLI is.

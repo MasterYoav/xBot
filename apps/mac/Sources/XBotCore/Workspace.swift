@@ -235,7 +235,8 @@ public final class Workspace {
 
     public func setHarness(_ kind: HarnessKind, for id: UUID) {
         // A session id means nothing to a different CLI, and neither does its model name.
-        update(id) { $0.harness = kind; $0.sessionID = nil; $0.model = nil }
+        // Picked by hand: Jev no longer chooses for this chat.
+        update(id) { $0.harness = kind; $0.sessionID = nil; $0.model = nil; $0.jevChooses = false }
     }
 
     public func setModel(_ model: String?, for id: UUID) { update(id) { $0.model = model } }
@@ -296,6 +297,11 @@ public final class Workspace {
         // Plan mode needs answers to a schema; on an agent that can't give them, the chat just runs.
         if chat.planMode && chat.harness.givesStructuredAnswers {
             startPlanning(turnPrompt, chat: chat, brain: brain)
+            return true
+        }
+
+        if jevChoosesActive(id) {
+            sendChoosingWithJev(turnPrompt, asked: prompt, in: id)
             return true
         }
 
