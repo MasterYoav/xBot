@@ -417,13 +417,20 @@ final class LiveRemoteUITests: XCTestCase {
         app.launch()
         let status = app.descendants(matching: .any)["link-status"].firstMatch
         XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
-        app.buttons["Profile"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Lifetime tokens"].firstMatch.waitForExistence(timeout: 90), "No stats")
+        // Places is a sideways row; Profile is the last circle in it.
+        let profile = app.buttons["Profile"].firstMatch
+        for _ in 0..<3 where !profile.isHittable { app.swipeUp() }
+        for _ in 0..<3 where !profile.isHittable { app.buttons["Notes"].firstMatch.swipeLeft() }
+        profile.tap()
+        // Stats, or (on a Mac with no agent history) the empty state; plan usage either way.
+        let shown = app.staticTexts.matching(NSPredicate(format: "label == 'Lifetime tokens' OR label == 'No agent history yet'")).firstMatch
+        XCTAssertTrue(shown.waitForExistence(timeout: 90), "No stats")
         sleep(1)
         attach(app, "1 profile")
         app.swipeUp()
         attach(app, "2 profile lower")
         back(app)
+        for _ in 0..<3 where !app.buttons["Settings"].firstMatch.isHittable { app.swipeDown() }
         app.buttons["Settings"].firstMatch.tap()
         app.buttons["Dark"].firstMatch.tap()
         sleep(1)
