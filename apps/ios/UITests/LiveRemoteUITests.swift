@@ -348,6 +348,30 @@ final class LiveRemoteUITests: XCTestCase {
         XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: card, timeout: 10))
     }
 
+    /// Abilities: the Mac's real catalog shows, each kind, and the plugin marketplace opens.
+    func testAbilities() throws {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20))
+        app.buttons["Abilities"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Plugins"].waitForExistence(timeout: 10))
+        // The Mac asks the CLIs: wait for rows (sections are named after the agents).
+        app.buttons["Skills"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == 'Codex' OR label == 'Claude Code'")).firstMatch.waitForExistence(timeout: 60), "No skills")
+        attach(app, "1 skills")
+        app.buttons["Plugins"].tap()
+        sleep(1)
+        attach(app, "2 plugins")
+        app.buttons["Add"].tap()
+        app.buttons["Browse plugins"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == 'Install'")).firstMatch.waitForExistence(timeout: 90)
+                      || app.staticTexts["Installed"].firstMatch.exists, "No marketplace")
+        attach(app, "3 marketplace")
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name

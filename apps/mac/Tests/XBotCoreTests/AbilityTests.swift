@@ -92,6 +92,14 @@ private func fixture(_ name: String) throws -> Data {
         #expect(AbilityParsing.skillFrontMatter("# No front matter").name == nil)
     }
 
+    /// YAML block scalars: `description: >` (folded) and `|` (literal), with the text on the next lines.
+    @Test func skillDescriptionsOnSeveralLines() {
+        let folded = AbilityParsing.skillFrontMatter("---\nname: ponytail\ndescription: >\n  Lazy senior\n  developer mode.\nmodel: x\n---\n")
+        #expect(folded.name == "ponytail" && folded.description == "Lazy senior developer mode.")
+        let literal = AbilityParsing.skillFrontMatter("---\ndescription: |-\n  One.\n  Two.\n---\n")
+        #expect(literal.description == "One.\nTwo.")
+    }
+
     @Test func codexDisabledSkills() {
         let toml = """
         [[skills.config]]

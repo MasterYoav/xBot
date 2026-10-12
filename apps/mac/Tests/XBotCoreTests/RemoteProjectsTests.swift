@@ -59,7 +59,7 @@ import XBotRemote
 
     static func requestID(of message: HostMessage) -> UUID? {
         switch message {
-        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _): r
+        case .reply(let r, _, _, _), .folder(let r, _), .file(let r, _), .git(let r, _), .diff(let r, _), .macFolders(let r, _, _), .notes(let r, _, _), .automations(let r, _, _, _), .crew(let r, _, _), .avatarImage(let r, _), .abilities(let r, _, _, _): r
         default: nil
         }
     }
@@ -361,5 +361,45 @@ import XBotRemote
         link.say(.undoDeleteCrew(requestID: undo))
         guard case .crew(_, let back, _) = await tests.answer(link, undo) else { Issue.record("not undone"); return }
         #expect(back.contains { $0.id == hired.id } && w.chat(chatID)?.agentID == hired.id)
+    }
+}
+
+/// Abilities from the phone, against the same recorded CLI output the catalog's own tests use.
+@MainActor @Suite(.serialized) struct RemoteAbilitiesTests {
+    let inbox = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
+
+    @Test func listSwitchAndRemove() async throws {
+        let w = Workspace(store: .inMemory(), inbox: inbox, discover: { [.claude: ScriptedBrain([.done])] })
+        await w.refreshHarnesses()
+        let host = RemoteHost(workspace: w, macName: "Mac", macID: UUID(), localInterval: .milliseconds(20), cloudInterval: .milliseconds(200))
+        defer { withExtendedLifetime(host) {} }
+        let fixtures = AbilityCatalogTests()
+        let home = try fixtures.home()
+        host.abilityCatalog = fixtures.catalog(ScriptedRunner(try fixtures.answers()), home: home)
+        let link = FakeLink()
+        host.attach(link)
+        let tests = RemoteProjectsTests()
+
+        let list = UUID()
+        link.say(.listAbilities(requestID: list, refresh: true))
+        guard case .abilities(_, let items, let missing, nil) = await tests.answer(link, list) else { Issue.record("no list"); return }
+        #expect(items.filter { $0.kind == "plugins" }.count == 34 && missing.isEmpty)
+        let pdf = try #require(items.first { $0.kind == "skills" && $0.title == "pdf" && $0.agent == "codex" })
+        #expect(pdf.enabled == true && pdf.canSwitch && pdf.canRemove)
+
+        let off = UUID()
+        link.say(.setAbility(requestID: off, abilityID: pdf.id, enabled: false))
+        guard case .abilities(_, let after, _, _) = await tests.answer(link, off) else { Issue.record("not switched"); return }
+        #expect(after.first { $0.id == pdf.id }?.enabled == false)
+
+        let unknown = UUID()
+        link.say(.setAbility(requestID: unknown, abilityID: "nope/skills/x", enabled: true))
+        guard case .reply(_, false, _, _) = await tests.answer(link, unknown) else { Issue.record("switched nothing"); return }
+
+        let remove = UUID()
+        link.say(.removeAbility(requestID: remove, abilityID: pdf.id))
+        guard case .abilities(_, let gone, _, _) = await tests.answer(link, remove) else { Issue.record("not removed"); return }
+        #expect(!gone.contains { $0.id == pdf.id })
+        #expect(!FileManager.default.fileExists(atPath: home.appending(path: ".codex/skills/pdf").path))
     }
 }
