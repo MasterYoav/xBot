@@ -91,6 +91,50 @@ public struct Workflow: Identifiable, Equatable, Sendable {
     }
 
     public func step(_ id: UUID) -> WorkflowStep? { steps.first { $0.id == id } }
+
+    /// The editor's palette: the kinds of step that can be dragged in.
+    public enum PaletteKind: String, CaseIterable, Sendable {
+        case agent, gate, route, score
+    }
+
+    /// What a palette tile or a step card carries when dragged.
+    public static func dragItem(for kind: PaletteKind) -> String { "wadd:" + kind.rawValue }
+    public static func dragItem(for step: WorkflowStep) -> String { "wstep:" + step.id.uuidString }
+
+    /// A drop at `index` (0…steps.count): "wadd:gate" adds a step there, "wstep:<id>" moves that
+    /// step there. False when the item isn't one of these.
+    @discardableResult
+    public mutating func drop(_ item: String, at index: Int) -> Bool {
+        let index = min(max(index, 0), steps.count)
+        if item.hasPrefix("wadd:"), let kind = PaletteKind(rawValue: String(item.dropFirst(5))) {
+            steps.insert(Self.newStep(kind), at: index)
+            return true
+        }
+        if item.hasPrefix("wstep:"), let id = UUID(uuidString: String(item.dropFirst(6))), step(id) != nil {
+            move(id, to: index)
+            return true
+        }
+        return false
+    }
+
+    /// A new step of a kind, with something to edit already in it.
+    public static func newStep(_ kind: PaletteKind) -> WorkflowStep {
+        switch kind {
+        case .agent:
+            WorkflowStep(title: String(localized: "Agent step"), kind: .agent(AgentStep(prompt: "")))
+        case .gate:
+            WorkflowStep(title: String(localized: "Gate"), kind: .jev(JevStep(question: "", decision: .gate(JevGate()))))
+        case .route:
+            WorkflowStep(title: String(localized: "Route"), kind: .jev(JevStep(question: "", decision: .route([
+                RouteOption(label: String(localized: "First option")), RouteOption(label: String(localized: "Second option")),
+            ]))))
+        case .score:
+            WorkflowStep(title: String(localized: "Score"), kind: .jev(JevStep(question: "", decision: .score([
+                ScoreLevel(label: String(localized: "Low")), ScoreLevel(label: String(localized: "Medium")),
+                ScoreLevel(label: String(localized: "High")),
+            ]))))
+        }
+    }
 }
 
 public struct WorkflowStep: Identifiable, Equatable, Codable, Sendable {

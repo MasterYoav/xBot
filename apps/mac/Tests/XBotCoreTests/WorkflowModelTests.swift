@@ -129,6 +129,36 @@ import XBotBrain
         #expect(w.steps.map(\.title) == ["a", "b", "c"])
     }
 
+    @Test func droppingAPaletteTileAddsThatKindOfStepWhereItLands() {
+        var w = Workflow(name: "x", trigger: .manual, steps: [fix])
+        do { let ok = w.drop(Workflow.dragItem(for: .gate), at: 0); #expect(ok) }
+        do { let ok = w.drop(Workflow.dragItem(for: .route), at: 99); #expect(ok) }
+        do { let ok = w.drop(Workflow.dragItem(for: .score), at: 1); #expect(ok) }
+        do { let ok = w.drop(Workflow.dragItem(for: .agent), at: 1); #expect(ok) }
+        let kinds = w.steps.map { step -> String in
+            switch step.kind {
+            case .agent: "agent"
+            case .jev(let j): switch j.decision { case .gate: "gate"; case .route: "route"; case .score: "score" }
+            }
+        }
+        #expect(kinds == ["gate", "agent", "score", "agent", "route"])
+        // New Jev steps start with something to edit: two options, three levels.
+        guard case .jev(let route) = w.steps[4].kind, case .route(let options) = route.decision,
+              case .jev(let score) = w.steps[2].kind, case .score(let levels) = score.decision else { Issue.record("kinds"); return }
+        #expect(options.count == 2)
+        #expect(levels.count == 3)
+    }
+
+    @Test func droppingAStepCardMovesIt() {
+        let a = WorkflowStep(title: "a", kind: .agent(AgentStep(prompt: "a")))
+        let b = WorkflowStep(title: "b", kind: .agent(AgentStep(prompt: "b")))
+        var w = Workflow(name: "x", trigger: .manual, steps: [a, b])
+        do { let ok = w.drop(Workflow.dragItem(for: b), at: 0); #expect(ok) }
+        #expect(w.steps.map(\.title) == ["b", "a"])
+        do { let ok = w.drop("hello", at: 0); #expect(!ok) }
+        do { let ok = w.drop("wstep:\(UUID().uuidString)", at: 0); #expect(!ok) }
+    }
+
     @Test func removingAStepSendsGoTosAtItToTheNextStep() {
         let target = WorkflowStep(title: "t", kind: .agent(AgentStep(prompt: "t")))
         let gate = WorkflowStep(title: "g", kind: .jev(JevStep(question: "?", decision: .gate(JevGate(yes: .step(target.id), no: .stop)))))

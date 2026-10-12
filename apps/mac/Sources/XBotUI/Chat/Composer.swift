@@ -96,6 +96,14 @@ struct Composer: View {
 
     private var agentMenu: some View {
         Menu {
+            // Only while Jev Workflows is on (Settings › AI).
+            if workspace.jev.workflowsEnabled {
+                Button { setJevChooses(true) } label: {
+                    Label(String(localized: "Let Jev choose"), systemImage: "sparkles")
+                }
+                .help(String(localized: "Jev picks the cheapest agent, model and effort that can answer each message."))
+                Divider()
+            }
             ForEach(workspace.availableHarnesses, id: \.self) { kind in
                 Section(kind.displayName) {
                     Button(String(localized: "Default model")) { choose(kind, nil) }
@@ -105,8 +113,12 @@ struct Composer: View {
                 }
             }
         } label: {
-            Chip(harness?.displayName ?? String(localized: "No agent"), detail: modelName.map { "· \($0)" },
-                 dot: harness.map(Palette.agent), showsChevron: true)
+            if jevChooses {
+                Chip(String(localized: "Let Jev choose"), systemImage: "sparkles", showsChevron: true)
+            } else {
+                Chip(harness?.displayName ?? String(localized: "No agent"), detail: modelName.map { "· \($0)" },
+                     dot: harness.map(Palette.agent), showsChevron: true)
+            }
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -249,7 +261,18 @@ struct Composer: View {
             : String(localized: "Describe the change. The plan runs straight away.")
     }
 
+    /// "Let Jev choose" is on for this chat (or the draft), and Jev Workflows is on.
+    private var jevChooses: Bool {
+        if let chat { return workspace.jevChoosesActive(chat.id) }
+        return workspace.jev.workflowsEnabled && workspace.draft.jevChooses
+    }
+
+    private func setJevChooses(_ on: Bool) {
+        if let chat { workspace.setJevChooses(on, for: chat.id) } else { workspace.draft.jevChooses = on }
+    }
+
     private func choose(_ kind: HarnessKind, _ model: String?) {
+        setJevChooses(false)
         if let chat {
             if chat.harness != kind { workspace.setHarness(kind, for: chat.id) }
             workspace.setModel(model, for: chat.id)
