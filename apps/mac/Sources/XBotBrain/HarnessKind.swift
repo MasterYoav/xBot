@@ -60,8 +60,11 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
     /// Whether the prompt goes on stdin. Antigravity and Copilot read it only from their flag.
     var readsPromptFromStdin: Bool { self == .claude || self == .codex }
 
-    /// Never the prompt: it goes on stdin, because a prompt starting with "-" would be read as a
-    /// flag and argv has a length limit. Codex reads a schema from a file, which the caller writes.
+    /// Claude Code and Codex never get the prompt here: it goes on stdin, because a prompt starting
+    /// with "-" would be read as a flag and argv has a length limit. Antigravity and Copilot read it
+    /// only from a flag, so theirs is attached to it (`--print=…`, `--prompt=…`), which can't be
+    /// taken for an option; the length limit stands for them. Codex reads a schema from a file,
+    /// which the caller writes.
     public func arguments(for request: TurnRequest, schemaFile: URL? = nil) -> [String] {
         switch self {
         case .claude:
