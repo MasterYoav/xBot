@@ -100,6 +100,20 @@ public final class ProjectNotes {
         }
     }
 
+    /// Writes a note without the editor: a new one when `current` is nil. Named after its title
+    /// exactly as `save()` does. Returns where it ended up.
+    public static func write(_ text: String, to current: URL?, in notesFolder: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: notesFolder, withIntermediateDirectories: true)
+        let url = current ?? uniqueURL(for: "untitled", in: notesFolder)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        let wanted = slug(title(of: text))
+        let stem = url.deletingPathExtension().lastPathComponent
+        guard !wanted.isEmpty, stem != wanted, !isNumbered(stem, of: wanted) else { return url }
+        let target = uniqueURL(for: wanted, in: notesFolder)
+        try FileManager.default.moveItem(at: url, to: target)
+        return target
+    }
+
     // MARK: Naming
 
     public static func title(of text: String) -> String {
@@ -130,7 +144,9 @@ public final class ProjectNotes {
         return Int(stem.dropFirst(base.count + 1)) != nil
     }
 
-    private func uniqueURL(for stem: String) -> URL {
+    private func uniqueURL(for stem: String) -> URL { Self.uniqueURL(for: stem, in: notesFolder) }
+
+    static func uniqueURL(for stem: String, in notesFolder: URL) -> URL {
         var url = notesFolder.appending(path: "\(stem).md")
         var n = 2
         while FileManager.default.fileExists(atPath: url.path) {

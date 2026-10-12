@@ -163,3 +163,18 @@ public struct RemoteFolder: Codable, Equatable, Sendable, Identifiable {
         self.isProject = isProject
     }
 }
+
+/// A note in a project's notes/ folder.
+public struct RemoteNote: Codable, Equatable, Sendable, Identifiable {
+    /// The file's name in notes/, e.g. "ideas.md".
+    public var name: String
+    public var title: String
+    public var modified: Date
+    public var id: String { name }
+
+    public init(name: String, title: String, modified: Date) {
+        self.name = name
+        self.title = title
+        self.modified = modified
+    }
+}

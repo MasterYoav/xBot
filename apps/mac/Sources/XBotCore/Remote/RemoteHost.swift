@@ -44,6 +44,8 @@ public final class RemoteHost {
     private var watching = false
     private var flushTask: Task<Void, Never>?
     private var awake: Bool?
+    /// The last note a phone deleted: where it was, and where the Trash put it.
+    var deletedNote: (projectID: UUID, from: URL, to: URL)?
     /// Chats deleted from a phone, so the phone can undo (the newest few).
     private var deleted: [DeletedChat] = []
 
@@ -294,7 +296,8 @@ public final class RemoteHost {
             }
             workspace.restoreChat(deleted.remove(at: index))
             answer(client, request, workspace.chat(chatID) != nil, chatID: chatID)
-        case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject:
+        case .listFolder, .readFile, .gitStatus, .gitDiff, .gitAction, .fileAction, .browseMac, .addProject, .removeProject,
+             .listNotes, .saveNote, .deleteNote, .undoDeleteNote:
             handleProject(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }

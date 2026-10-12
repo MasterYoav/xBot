@@ -19,6 +19,11 @@ struct ChatListView: View {
 
     var body: some View {
         List(selection: $selection) {
+            if query.isEmpty {
+                Section {
+                    NavigationLink(value: Destination.notes) { Label(String(localized: "Notes"), systemImage: "note.text") }
+                }
+            }
             let loose = shown.filter { $0.projectID == nil }
             if !loose.isEmpty {
                 Section(String(localized: "Recent")) { ForEach(loose) { row($0) } }

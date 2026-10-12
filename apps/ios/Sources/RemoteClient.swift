@@ -338,7 +338,7 @@ final class RemoteClient {
         case .reply(let requestID, let ok, let reason, let chatID):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: ok, reason: reason, chatID: chatID))
         case .folder(let requestID, _), .file(let requestID, _), .git(let requestID, _), .diff(let requestID, _),
-             .macFolders(let requestID, _, _):
+             .macFolders(let requestID, _, _), .notes(let requestID, _, _):
             pending.removeValue(forKey: requestID)?.resume(returning: Answer(ok: true, reason: nil, chatID: nil, payload: message))
         }
     }

@@ -183,6 +183,8 @@ public enum HostMessage: Codable, Equatable, Sendable {
     case diff(requestID: UUID, lines: [RemoteDiffLine])
     /// Folders on the Mac, to pick a new project from; `path` is the one listed.
     case macFolders(requestID: UUID, path: String, folders: [RemoteFolder])
+    /// A project's notes, newest first; `saved` is the file a save wrote (it's renamed after its title).
+    case notes(requestID: UUID, notes: [RemoteNote], saved: String?)
 }
 
 /// Phone → Mac.
@@ -219,6 +221,13 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case browseMac(requestID: UUID, path: String?)
     case addProject(requestID: UUID, path: String)
     case removeProject(requestID: UUID, projectID: UUID)
+    // Notes (read one with `readFile` at "notes/<name>").
+    case listNotes(requestID: UUID, projectID: UUID)
+    /// Writes a note (`name` nil: a new one) and names its file after its first line. Answered with `notes`.
+    case saveNote(requestID: UUID, projectID: UUID, name: String?, text: String)
+    /// To the Mac's Trash; `undoDeleteNote` puts the last one deleted from a phone back.
+    case deleteNote(requestID: UUID, projectID: UUID, name: String)
+    case undoDeleteNote(requestID: UUID, projectID: UUID)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
 }
