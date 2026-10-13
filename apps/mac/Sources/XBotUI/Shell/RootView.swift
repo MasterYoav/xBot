@@ -15,6 +15,15 @@ public struct RootView: View {
     public init(workspace: Workspace) { self.workspace = workspace }
 
     public var body: some View {
+        // DEBUG ONLY: XBOT_SCENE=<Name> shows one onboarding scene instead (Onboarding/Scenes/ScenePreviewHost.swift).
+        #if DEBUG
+        if let name = ScenePreviewHost.requested { ScenePreviewHost(name: name) } else { window }
+        #else
+        window
+        #endif
+    }
+
+    private var window: some View {
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar(workspace: workspace, addProject: { addingProject = true },
                     hide: { withAnimation(Motion.panel) { columns = .detailOnly } })
