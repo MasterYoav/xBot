@@ -97,6 +97,7 @@ struct XBotApp: App {
                     .keyboardShortcut("k", modifiers: .command)
             }
             CommandGroup(replacing: .help) {
+                Button(String(localized: "Welcome Tour")) { workspace.onboarding?.reopen() }
                 Button(String(localized: "xBot Documentation")) { NSWorkspace.shared.open(AboutPanel.documentationURL) }
             }
         }
@@ -122,6 +123,8 @@ struct XBotApp: App {
             )
         }
         AppDelegate.workspace = workspace
+        // Read after the library: someone upgrading with chats or projects isn't sent through it.
+        workspace.onboarding = OnboardingModel(hasLibrary: workspace.hasLibrary)
         workspace.startAutomationClock()
         var secrets: any PairingSecrets = KeychainPairingSecrets()
         #if DEBUG

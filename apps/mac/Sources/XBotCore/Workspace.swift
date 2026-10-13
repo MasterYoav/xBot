@@ -23,6 +23,8 @@ public final class Workspace {
     public internal(set) var agents: [Agent] = []
     /// xBot on the iPhone and iPad; set by the app at launch (not in tests or the headless tick).
     public var remote: RemoteService?
+    /// The welcome tour; set by the app at launch (not in tests or the headless tick).
+    public var onboarding: OnboardingModel?
     /// Automations, in their order.
     public internal(set) var automations: [Automation] = []
     @ObservationIgnored var automationClock: Task<Void, Never>?
