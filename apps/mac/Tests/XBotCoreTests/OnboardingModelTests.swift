@@ -37,6 +37,7 @@ import Testing
 
     @Test func goingToAStepRecordsTheDirectionOfTravel() {
         let model = OnboardingModel(defaults: defaults(), hasLibrary: false)
+        model.agentsReady = true
         model.go(to: .files)
         #expect(model.step == .files && model.direction == 1)
         model.go(to: .chats)
@@ -59,9 +60,25 @@ import Testing
         #expect(model.step == .chats)
     }
 
+    /// A progress dot can't jump past the agents step before it's done.
+    @Test func dotsDoNotJumpPastAnUnfinishedAgentsStep() {
+        let model = OnboardingModel(defaults: defaults(), hasLibrary: false)
+        #expect(model.canGo(to: .agents))
+        #expect(!model.canGo(to: .files))
+        model.go(to: .files)
+        #expect(model.step == .welcome)
+        model.agentsSkipped = true
+        #expect(model.canGo(to: .files))
+        model.go(to: .files)
+        #expect(model.step == .files)
+        model.go(to: .welcome)
+        #expect(model.step == .welcome)
+    }
+
     @Test func otherStepsAlwaysContinue() {
         let model = OnboardingModel(defaults: defaults(), hasLibrary: false)
         #expect(model.canContinue)
+        model.agentsSkipped = true
         model.go(to: .files)
         #expect(model.canContinue)
     }

@@ -27,6 +27,8 @@ public enum Palette {
     public static let textInverse = dynamic(0xFFFFFF, 0x1A1A1A)
 
     // Accent and state, each with the tint its pill sits on
+    /// A switch's knob, as macOS draws it: white, a touch softer in dark mode.
+    public static let knob = dynamic(0xFFFFFF, 0xECECEC)
     public static let accent = dynamic(0xB65E8C, 0xD08AB0)
     public static let accentTint = dynamic(0xB65E8C, 0xD08AB0, alpha: (0.12, 0.18))
     public static let running = dynamic(0x2C6FD1, 0x4C90EE)

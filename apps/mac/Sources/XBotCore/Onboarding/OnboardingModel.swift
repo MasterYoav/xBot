@@ -81,9 +81,13 @@ public final class OnboardingModel {
         step = previous
     }
 
-    /// A progress dot: any step, either way.
+    /// A progress dot: any step back, or forward once the agents step is done.
+    public func canGo(to target: OnboardingStep) -> Bool {
+        target.rawValue <= max(index, OnboardingStep.agents.rawValue) || agentsReady || agentsSkipped
+    }
+
     public func go(to target: OnboardingStep) {
-        guard target != step else { return }
+        guard target != step, canGo(to: target) else { return }
         direction = target.rawValue > index ? 1 : -1
         step = target
     }

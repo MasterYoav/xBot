@@ -90,4 +90,21 @@ public enum Metrics {
     public static let notesListWidth: CGFloat = 240
     /// How much of the content height the backdrop covers before it has faded out.
     public static let backdropHeight: CGFloat = 0.62
+    /// Onboarding: the scene's height range (it takes about 42 % of the window between them), the
+    /// text column and the controls beside it.
+    public static let onboardingScene: ClosedRange<CGFloat> = 150...340
+    public static let onboardingSceneShare: CGFloat = 0.42
+    public static let onboardingText: CGFloat = 400
+    public static let onboardingControls: CGFloat = 420
+    /// One CLI's card on the agents step.
+    public static let agentCard = CGSize(width: 196, height: 176)
+    /// The pairing code, on the iPhone step.
+    public static let onboardingQR: CGFloat = 150
+    /// The install sheet, and the terminal in it.
+    public static let installSheet = CGSize(width: 640, height: 500)
+    /// The guide panel that sits beside System Settings, and its gap from that window.
+    public static let guidePanel = CGSize(width: 260, height: 300)
+    public static let guideIcon: CGFloat = 72
+    /// The guide's switch.
+    public static let guideSwitch = CGSize(width: 44, height: 26)
 }
