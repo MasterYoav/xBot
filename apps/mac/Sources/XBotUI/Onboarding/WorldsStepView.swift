@@ -13,7 +13,9 @@ struct WorldsStepView: View {
         } controls: {
             VStack(alignment: .leading, spacing: Space.m) {
                 Text(String(localized: "World")).labelText().foregroundStyle(Palette.textTertiary)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: Space.s)], alignment: .leading, spacing: Space.s) {
+                // Two columns: three would cut "Underwater Kingdom" short in the controls' width.
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s), count: 2),
+                          alignment: .leading, spacing: Space.s) {
                     ForEach(WorkplaceSetting.allCases, id: \.self) { world in worldChoice(world) }
                 }
                 Text(String(localized: "Appearance")).labelText().foregroundStyle(Palette.textTertiary)

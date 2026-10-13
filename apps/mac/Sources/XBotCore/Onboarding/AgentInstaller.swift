@@ -30,10 +30,9 @@ public struct AgentRecipe: Equatable, Sendable {
     /// `login`, with the CLI's name swapped for the binary that was found: a login shell started
     /// right after an install may not have the install folder on its PATH yet.
     public func loginCommand(executable: URL?) -> String {
-        guard let executable else { return login }
         let name = kind.executableName
-        let rest = login.hasPrefix(name) ? String(login.dropFirst(name.count)) : ""
-        return AgentInstaller.shellQuoted(executable.path) + rest
+        guard let executable, login == name || login.hasPrefix(name + " ") else { return login }
+        return AgentInstaller.shellQuoted(executable.path) + login.dropFirst(name.count)
     }
 }
 

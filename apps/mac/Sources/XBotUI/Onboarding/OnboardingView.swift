@@ -1,4 +1,5 @@
 import SwiftUI
+import XBotBrain
 import XBotCore
 
 /// The welcome tour, edge to edge in the main window in place of its content: a scene, a title,
@@ -7,7 +8,7 @@ import XBotCore
 public struct OnboardingView: View {
     @Bindable var model: OnboardingModel
     let workspace: Workspace
-    @State private var setup = AgentSetup()
+    @State private var setup = AgentSetup(recipes: OnboardingView.recipes)
     @State private var files = FileAccess()
     /// The step on screen. It follows `model.step` one beat later, so the outgoing screen has
     /// already been told which way to leave (the direction of travel) when it's removed.
@@ -51,6 +52,19 @@ public struct OnboardingView: View {
         }
         .onChange(of: setup.anyReady, initial: true) { _, ready in model.agentsReady = ready }
         .task { await setup.detect() }
+    }
+
+    /// The official commands. A debug build can swap in a harmless one, to look at the install
+    /// sheet without installing anything: `XBOT_ONBOARDING_FAKE_COMMAND='echo hi; exit 3'`.
+    static let recipes: @Sendable (HarnessKind) -> AgentRecipe = { kind in
+        var recipe = AgentInstaller.recipe(for: kind)
+        #if DEBUG
+        if let fake = ProcessInfo.processInfo.environment["XBOT_ONBOARDING_FAKE_COMMAND"] {
+            recipe.install = fake
+            recipe.login = fake
+        }
+        #endif
+        return recipe
     }
 
     /// In from the side it's travelling towards, out the other; a cross-fade under Reduce Motion.
@@ -261,13 +275,16 @@ struct StepCopy {
 struct StepPage<Stage: View, Controls: View>: View {
     let copy: StepCopy
     let stageIsScene: Bool
+    /// Controls centred under the words (Ready's Start) rather than beside them.
+    let controlsBelow: Bool
     @ViewBuilder let stage: () -> Stage
     @ViewBuilder let controls: () -> Controls
 
-    init(copy: StepCopy, stageIsScene: Bool = true, @ViewBuilder stage: @escaping () -> Stage,
+    init(copy: StepCopy, stageIsScene: Bool = true, controlsBelow: Bool = false, @ViewBuilder stage: @escaping () -> Stage,
          @ViewBuilder controls: @escaping () -> Controls) {
         self.copy = copy
         self.stageIsScene = stageIsScene
+        self.controlsBelow = controlsBelow
         self.stage = stage
         self.controls = controls
     }
@@ -290,7 +307,11 @@ struct StepPage<Stage: View, Controls: View>: View {
                 } else {
                     stage()
                 }
-                if hasControls {
+                if hasControls && controlsBelow {
+                    words(alignment: .center)
+                        .frame(maxWidth: Metrics.onboardingText + Metrics.onboardingControls / 2)
+                    controls()
+                } else if hasControls {
                     HStack(alignment: .top, spacing: Space.xxl) {
                         words(alignment: .leading)
                             .frame(maxWidth: Metrics.onboardingText, alignment: .leading)

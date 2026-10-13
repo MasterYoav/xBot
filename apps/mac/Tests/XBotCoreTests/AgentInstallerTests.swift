@@ -48,6 +48,10 @@ import XBotBrain
         #expect(run == "'/Users/me/my bin/claude' auth login")
         #expect(AgentInstaller.recipe(for: .antigravity).loginCommand(executable: URL(filePath: "/x/agy")) == "'/x/agy'")
         #expect(recipe.loginCommand(executable: nil) == "claude auth login")
+        // A command that doesn't start with the CLI is left alone.
+        var other = recipe
+        other.login = "claudette login"
+        #expect(other.loginCommand(executable: URL(filePath: "/x/claude")) == "claudette login")
         #expect(AgentInstaller.shellQuoted("it's") == "'it'\\''s'")
     }
 }

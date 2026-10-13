@@ -5,10 +5,10 @@ struct ReadyStepView: View {
     let start: () -> Void
 
     var body: some View {
-        StepPage(copy: .of(.ready)) {
+        StepPage(copy: .of(.ready), controlsBelow: true) {
             ReadyScene()
         } controls: {
-            VStack(alignment: .leading, spacing: Space.s) {
+            VStack(spacing: Space.s) {
                 Button(String(localized: "Start"), action: start)
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
