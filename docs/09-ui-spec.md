@@ -5,7 +5,7 @@ views live in `apps/mac/Sources/XBotUI`; the phone's in `apps/ios/Sources`. **Th
 of truth.** Where this document and the code disagree, the code wins, and this document is wrong.
 
 Nothing here is a plan. Features the redesign still owes — a bot's own computer, the native brain,
-checkpoints, worktrees, split panes, the Quick Composer, onboarding — are in the
+checkpoints, worktrees, split panes, the Quick Composer — are in the
 [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md) and the
 [roadmap](12-roadmap.md), not here.
 
@@ -84,6 +84,58 @@ Open chats are tabs, in the title bar row.
 - With the sidebar hidden, the traffic lights sit at the strip's left with a button to show the
   sidebar again (⌃⌘S).
 
+## The welcome tour
+
+The first run (and **Help › Welcome Tour**) replaces the whole window's content with the tour
+(`OnboardingView`), over the wallpaper. Which steps, and what each does, is in
+[First run](06-onboarding.md#the-tour); this is how it looks.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ ● ● ●                     (drag area)                            │
+│                ┌──────────────────────────────┐                  │
+│                │    animated scene (16 : 9,   │                  │
+│                │    150–340 pt tall)          │                  │
+│                └──────────────────────────────┘                  │
+│   Title (hero)                       controls of the step,        │
+│   One sentence.                      when it has any (≤ 420 pt)  │
+│   ✓ up to three bullets                                          │
+│                                                                  │
+│ Skip               ● ━ ● ● ● ● ● ● ● ● ●          Back  Continue  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- The scene takes about 42 % of the height, between 150 and 340 pt; it is decoration (no clicks,
+  hidden from VoiceOver). Words and controls sit side by side under it; a step with no controls
+  centres its words. Ready centres **Start** under them.
+- **Your agents** puts four cards (196 × 176 pt; two by two when the window is too narrow) where
+  the scene would be. Each card: the CLI's colour dot and name, a status pill (LOOKING, NOT
+  INSTALLED, INSTALLING, NOT SIGNED IN, SIGNING IN, READY, NEEDS A TOOL, DIDN'T WORK), a sentence,
+  and its one button (Install, Sign in, Get npm, Try again; a green check when ready). Beside the
+  words: **Skip for now** (a checkbox) and **Look again**; once one CLI is ready, *"You're set:
+  continue whenever you like."*
+- **The install sheet** (640 × 500): an icon tile, *"Installing Claude Code"* or *"Signing in to
+  Claude Code"* with a line under it, ×; the command in mono on an inset strip; the terminal; then
+  the outcome (*"Claude Code is ready."*, *"Installed. Now sign in."*, or the failure in red) and
+  **Cancel** / **I've signed in** while it runs, **Done** after.
+- **Your files**: three rows (folder symbol, name, *"Not asked yet"* / *"Allowed"* / *"Not allowed:
+  change it in System Settings."*, and **Allow** / ✓ / **Open Settings**), then **Allow all** and
+  **Or give Full Disk Access…**.
+- **The Full Disk Access guide** is a 260 × 300 floating panel with only a close button, docked to
+  the right of System Settings' window 12 pt away and 56 pt below its top (to the left when there's
+  no room): xBot's icon over *DRAG INTO THE LIST*, a row with xBot's icon and name and a switch that
+  flips on every couple of seconds (still, and on, under Reduce Motion), and *"Turn xBot on under
+  Full Disk Access. Not in the list? Drag the icon above into it."* Granted, it shows a green check
+  and *"Full Disk Access is on."* and closes.
+- **Your iPhone**: **Show the code** and **Not now**; then a 150 pt QR on a white tile with two
+  lines beside it and **Hide the code**; *"Paired with <device>."* once a phone says hello.
+- **Make it yours**: the five worlds as chips in two columns (symbol and name; the chosen one in the
+  accent), then Dark · Light · Match System as a segmented control.
+- Dots: the current one is a 18 pt capsule, the rest 6 pt dots; each is a button.
+- A new step slides in from the side it's moving towards and the old one out the other side
+  (`Motion.standard`), cross-fading under Reduce Motion. The tour and the window's content
+  cross-fade into each other.
+
 ## The sidebar
 
 Top to bottom:
@@ -125,6 +177,10 @@ With no agent CLI found, Home says instead:
 
 with links **Get Claude Code**, **Get Codex**, **Get Antigravity** and **Get GitHub Copilot** (in a
 row, or a column when the window is too narrow), and **Look again**.
+
+While the welcome tour was skipped and not finished, a row sits above the composer: ✦ **Finish
+setting up** — *"Your agents, file access and your iPhone, in the welcome tour."* — with
+**Continue** (the tour, from the start) and × (dismissed for good).
 
 ## The composer
 
@@ -448,7 +504,8 @@ problem shows under it.
 
 Beyond the standard ones: **About xBot**, **Check for Updates…** (Sparkle; inert until a release
 feed is configured), **File › New Chat** and **Close Tab**, **View › Files and Changes**,
-**Window › Tab 1…9**, **Edit › Search Chats**, **Help › xBot Documentation**.
+**Window › Tab 1…9**, **Edit › Search Chats**, **Help › Welcome Tour** and **Help › xBot
+Documentation**.
 
 ## Toasts and motion
 
@@ -475,6 +532,7 @@ Motion stills the worlds, text-art wallpapers and Galaxy.
 | ⏎ / ⌫ | Next plan step / remove an empty step |
 | Escape | Cancel an edit; close a diff; close the explorer's filter |
 | ⌘, | Settings |
+| ← → / ⏎ | In the welcome tour: previous / next step; Continue (Start on the last step) |
 
 ---
 

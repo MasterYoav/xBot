@@ -22,8 +22,8 @@ XBotMarkdown                                    (Foundation; used by the iOS app
 | `XBotRemote` | The wire to the phone: `HostMessage` and `ClientMessage`, the value types they carry, `Frame` (length-prefixed JSON), `PairingKey` and `PairingInvite`, `LocalTransport` (TLS-PSK listener and browser, `FramedConnection`) and `CloudTransport` (`CloudChannel` over a `CloudMailbox`; `CloudKitMailbox` is the real one) |
 | `XBotWorld` | The crew's look and home, shared with the phone: `AgentAvatar` and `AvatarSprite` (pixel avatars), `WorkplaceWorld` (who stands and walks where), the five realms and `WorkplaceBackdrop`, `WorldStage` (the drawn world, in tiers by rank), `OrgChart` (who reports to whom, suggested managers), `Motion` (the `motionPaused` environment value) |
 | `XBotMarkdown` | `MarkdownDocument` (a Markdown file as blocks that keep their exact source, so an edit changes only what was touched) and `InlineMarkdown` |
-| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite, schema v6); `Workspace`, the `@MainActor @Observable` object every view and the remote talk to, split by feature (`+Plan`, `+Edit`, `+Panels`, `+Home`, `+Abilities`, `Agents/`, `Automations/`); `Git/` (status, diffs, pull requests through `gh`, a folder watcher); `History/` (the profile, built from the CLIs' own history); `Abilities/` (connectors, plugins, skills and MCP servers through the CLIs); `Notes`; `Usage`; `Appearance` and `AsciiWallpaper`; `TerminalDeck` (each chat's terminal window and its tabs); `Remote/` (`RemoteService`: pairing, the lanes, keep-awake; `RemoteHost` and one extension per feature; `RemoteShell`). Re-exports `XBotBrain` and `XBotWorld` |
-| `XBotUI` | The design system and every view: `Shell/` (root, sidebar, top bar, Home), `Chat/` (transcript, composer, plan cards, effort control), `Inspector/`, `Agents/`, `Abilities/`, `Notes/`, `Automations/`, `Profile/`, `Account/`, `Settings/`, `Terminal/` (SwiftTerm views), `Components/` |
+| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite, schema v6); `Workspace`, the `@MainActor @Observable` object every view and the remote talk to, split by feature (`+Plan`, `+Edit`, `+Panels`, `+Home`, `+Abilities`, `Agents/`, `Automations/`); `Git/` (status, diffs, pull requests through `gh`, a folder watcher); `History/` (the profile, built from the CLIs' own history); `Abilities/` (connectors, plugins, skills and MCP servers through the CLIs); `Notes`; `Usage`; `Appearance` and `AsciiWallpaper`; `TerminalDeck` (each chat's terminal window and its tabs); `Onboarding/` (`OnboardingModel`: the welcome tour's steps and completion; `AgentSetup` and `AgentInstaller`: finding, installing and signing in to the CLIs; `FileAccess`: folder grants and Full Disk Access); `Remote/` (`RemoteService`: pairing, the lanes, keep-awake; `RemoteHost` and one extension per feature; `RemoteShell`). Re-exports `XBotBrain` and `XBotWorld` |
+| `XBotUI` | The design system and every view: `Shell/` (root, sidebar, top bar, Home), `Chat/` (transcript, composer, plan cards, effort control), `Inspector/`, `Agents/`, `Abilities/`, `Notes/`, `Automations/`, `Profile/`, `Account/`, `Settings/`, `Terminal/` (SwiftTerm views), `Onboarding/` (the welcome tour, its step views, the install sheet, the Full Disk Access guide panel, and `Scenes/`), `Components/` |
 | `XBotApp` | `@main`, menus and commands, Sparkle, the app icon, quitting cleanly (`AppDelegate` stops running turns so their replies are saved), and the headless `--automations-tick` run for the automations helper |
 
 `XBotBrain` and `XBotRemote` never import SwiftUI. Views hold no logic: they read the workspace and
@@ -38,7 +38,7 @@ pairing keys in the Keychain. See [architecture](02-architecture.md#storage).
 
 ## Tests
 
-443 tests, Swift Testing, in six targets: `XBotBrainTests`, `XBotCoreTests`, `XBotRemoteTests`,
+521 tests, Swift Testing, in six targets: `XBotBrainTests`, `XBotCoreTests`, `XBotRemoteTests`,
 `XBotWorldTests`, `XBotMarkdownTests` and `XBotUITests`. (`Tests/XBotRuntimeTests` is an empty
 folder left from 1.x.)
 
@@ -55,6 +55,12 @@ folder left from 1.x.)
   actions run against a scripted `CommandRunner`.
 - **The remote**: every wire message round-trips, the local transport over loopback (a wrong key is
   refused), the cloud channel against a fake mailbox, and `RemoteHost` for each feature.
+- **Onboarding**: `OnboardingModel` (first launch, completion and its version, skip and Home's
+  reminder, reopening, existing libraries, Back/Continue and the agents rule); `AgentSetup` with a
+  scripted Mac (each state, install → sign in → ready, failures keep their reason, a missing tool
+  offers its page, looking again after a run); `AgentInstaller`'s exact commands and sources;
+  `FileAccess` with scripted probes (no prompt on appearing, each folder, Full Disk Access, polling
+  stops on grant, close or cancel); the guide panel's docking geometry (`GuideDockTests`).
 - **The world**: `OrgChartTests` (tiers, loops, suggestions by role) and `WorkplaceWorld`'s slots.
 - **Live**, opt-in: `LiveHarnessTests` runs real turns against the installed CLIs with
   `XBOT_LIVE_HARNESS=1`; `scripts/e2e_automations.py` has launchd run automations through the

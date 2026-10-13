@@ -294,9 +294,8 @@ Mac; that's a decision on the [checklist](13-launch-checklist.md).
 1. Download `xBot.dmg`, open it, drag xBot to Applications, eject.
 2. Open xBot. **Gatekeeper checks the notarization ticket**; because the app is stapled, this works
    offline and shows no warning.
-3. Home. With no agent CLI installed it says "xBot works through an agent you already have", with
-   links to get Claude Code, Codex, Antigravity and GitHub Copilot. There's no onboarding flow in the redesigned app yet
-   ([06-onboarding.md](06-onboarding.md) describes today's first run).
+3. The welcome tour, which finds the agent CLIs and installs and signs in to the missing ones
+   from inside the app, then Home ([06-onboarding.md](06-onboarding.md) describes the first run).
 
 Step 2 is the one that goes wrong. An unsigned or unstapled build shows "xBot cannot be opened
 because the developer cannot be verified", and a non-technical person stops there. Check every
