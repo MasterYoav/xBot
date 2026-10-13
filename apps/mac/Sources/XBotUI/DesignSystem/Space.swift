@@ -92,8 +92,10 @@ public enum Metrics {
     public static let backdropHeight: CGFloat = 0.62
     /// Onboarding: the scene's height range (it takes about 42 % of the window between them), the
     /// text column and the controls beside it.
-    public static let onboardingScene: ClosedRange<CGFloat> = 150...340
-    public static let onboardingSceneShare: CGFloat = 0.42
+    public static let onboardingScene: ClosedRange<CGFloat> = 200...560
+    public static let onboardingSceneShare: CGFloat = 0.6
+    /// The plan scene is composed small on its canvas; this fills the stage with it.
+    public static let onboardingMockZoom: CGFloat = 1.35
     public static let onboardingText: CGFloat = 400
     public static let onboardingControls: CGFloat = 420
     /// One CLI's card on the agents step.

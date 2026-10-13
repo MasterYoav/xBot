@@ -277,12 +277,15 @@ struct StepPage<Stage: View, Controls: View>: View {
     let stageIsScene: Bool
     /// Controls centred under the words (Ready's Start) rather than beside them.
     let controlsBelow: Bool
+    /// How much the scene is enlarged on its stage: 1 for the drawn worlds, more for mock windows.
+    let zoom: CGFloat
     @ViewBuilder let stage: () -> Stage
     @ViewBuilder let controls: () -> Controls
 
-    init(copy: StepCopy, stageIsScene: Bool = true, controlsBelow: Bool = false, @ViewBuilder stage: @escaping () -> Stage,
-         @ViewBuilder controls: @escaping () -> Controls) {
+    init(copy: StepCopy, stageIsScene: Bool = true, controlsBelow: Bool = false, zoom: CGFloat = 1,
+         @ViewBuilder stage: @escaping () -> Stage, @ViewBuilder controls: @escaping () -> Controls) {
         self.copy = copy
+        self.zoom = zoom
         self.stageIsScene = stageIsScene
         self.controlsBelow = controlsBelow
         self.stage = stage
@@ -298,9 +301,17 @@ struct StepPage<Stage: View, Controls: View>: View {
             VStack(spacing: Space.xl) {
                 Spacer(minLength: 0)
                 if stageIsScene {
+                    let size = CGSize(width: min(height * 12 / 7, geometry.size.width - Space.xxl * 2),
+                                      height: min(height, (geometry.size.width - Space.xxl * 2) * 7 / 12))
+                    // Every scene sits on one stage card, so the drawn worlds and the mock windows
+                    // read as the same thing. The mock windows are composed small on their canvas;
+                    // zoomed, they fill the stage like the worlds do.
                     stage()
-                        .frame(width: min(height * 16 / 9, geometry.size.width - Space.xxl * 2), height: height)
+                        .scaleEffect(zoom)
+                        .frame(width: size.width, height: size.height)
+                        .background(StageCard())
                         .clipShape(RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.large, style: .continuous).strokeBorder(Palette.hairline))
                         .floatingShadow()
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
@@ -354,8 +365,8 @@ struct StepPage<Stage: View, Controls: View>: View {
 }
 
 extension StepPage where Controls == EmptyView {
-    init(copy: StepCopy, @ViewBuilder stage: @escaping () -> Stage) {
-        self.init(copy: copy, stage: stage, controls: { EmptyView() })
+    init(copy: StepCopy, zoom: CGFloat = 1, @ViewBuilder stage: @escaping () -> Stage) {
+        self.init(copy: copy, zoom: zoom, stage: stage, controls: { EmptyView() })
     }
 }
 
@@ -366,6 +377,17 @@ struct SceneStepView<Scene: View>: View {
     @ViewBuilder let scene: () -> Scene
 
     var body: some View {
-        StepPage(copy: .of(step), stage: scene)
+        StepPage(copy: .of(step), zoom: step == .plan ? Metrics.onboardingMockZoom : 1, stage: scene)
+    }
+}
+
+/// The card behind a scene: frosted, with a soft glow of the accent from the top. The world scenes
+/// paint over it edge to edge.
+private struct StageCard: View {
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.regularMaterial)
+            LinearGradient(colors: [Palette.accent.opacity(0.18), .clear], startPoint: .top, endPoint: .bottom)
+        }
     }
 }

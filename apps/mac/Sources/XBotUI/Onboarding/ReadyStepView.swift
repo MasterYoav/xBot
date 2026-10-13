@@ -5,7 +5,7 @@ struct ReadyStepView: View {
     let start: () -> Void
 
     var body: some View {
-        StepPage(copy: .of(.ready), controlsBelow: true) {
+        StepPage(copy: .of(.ready), controlsBelow: true, zoom: 1) {
             ReadyScene()
         } controls: {
             VStack(spacing: Space.s) {
