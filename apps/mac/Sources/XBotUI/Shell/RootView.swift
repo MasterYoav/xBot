@@ -15,6 +15,15 @@ public struct RootView: View {
     public init(workspace: Workspace) { self.workspace = workspace }
 
     public var body: some View {
+        // DEBUG ONLY: XBOT_SCENE=<Name> shows one onboarding scene instead (Onboarding/Scenes/ScenePreviewHost.swift).
+        #if DEBUG
+        if let name = ScenePreviewHost.requested { ScenePreviewHost(name: name) } else { window }
+        #else
+        window
+        #endif
+    }
+
+    private var window: some View {
         ZStack {
             // The welcome tour, in place of the window's content until it's finished or skipped.
             if let onboarding = workspace.onboarding, onboarding.isPresented {
