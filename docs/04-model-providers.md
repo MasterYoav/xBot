@@ -14,7 +14,8 @@ Four are supported today, each a case of `HarnessKind` (`apps/mac/Sources/XBotBr
 | GitHub Copilot | `copilot` | Whatever models the person's Copilot plan includes |
 
 With none installed, Home says "xBot works through an agent you already have" and links to Claude
-Code and Codex. There is no onboarding flow and no key field anywhere in the app.
+Code and Codex; the welcome tour's agents step installs and signs in to any of the four
+([First run](06-onboarding.md)). There is no key field anywhere in the app.
 
 ## How a turn runs
 

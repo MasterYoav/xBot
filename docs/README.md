@@ -20,7 +20,7 @@ Then, as needed:
 | Document | What it covers |
 | --- | --- |
 | [Agents and providers](04-model-providers.md) | Claude Code, Codex, Antigravity and GitHub Copilot: how each turn is run, models, reasoning, plan mode, usage limits |
-| [First run](06-onboarding.md) | What happens the first time on the Mac and when pairing a phone; the onboarding still planned |
+| [First run](06-onboarding.md) | The welcome tour (agents installed in the app, file access, the phone), and pairing a phone |
 | [UI specification](09-ui-spec.md) | Every screen of both apps, and the keyboard shortcuts |
 | [Security](10-security.md) | What xBot can do on the Mac, what it stores and where, pairing, the remote lanes |
 | [Packaging and updates](11-packaging-and-updates.md) | Building, signing, Sparkle, installing the phone app |

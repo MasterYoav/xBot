@@ -73,6 +73,12 @@ xBot is now a native app that drives the agent CLIs you already have. See
   with your choice of accent colour, a plan board for every provider you use, suggested agents to
   hire, and Markdown files you edit as documents.
 - Animations pause while xBot isn't the active app (idle CPU from about 19.6% to 0.0%).
+- A welcome tour on first run (and from **Help › Welcome Tour**): eleven steps with animated
+  scenes. It finds Claude Code, Codex, Antigravity and GitHub Copilot and installs or signs in to
+  a missing one with the vendor's official command, in a terminal shown in the app; asks for
+  Desktop, Documents and Downloads up front, or guides you to Full Disk Access with a panel docked
+  beside System Settings; pairs an iPhone; and sets the crew's world and the theme. Skip leaves a
+  **Finish setting up** row on Home. Libraries with chats or projects already count as done.
 
 ### Changed
 - Automations replace the Inbox in the sidebar; loose chats are listed under Recent.

@@ -74,9 +74,9 @@ default (Settings › General › Default permission).
 
 ## What xBot reads of the CLIs' own files
 
-For usage, the profile page, the model lists and the Abilities page. No credential or token file
-is read: not Codex's `auth.json`, not Claude Code's Keychain item, nothing of Antigravity's or
-Copilot's.
+For usage, the profile page, the model lists, the Abilities page and the welcome tour. No credential
+or token file is read: not Codex's `auth.json` (the tour checks only that it **exists**), not Claude
+Code's Keychain item, nothing of Antigravity's or Copilot's.
 
 | File | What for | What is used |
 | --- | --- | --- |
@@ -88,7 +88,9 @@ Copilot's.
 | `~/.codex/config.toml` | Abilities | Configured MCP servers and switched-off skills. It is also **written** (below) |
 | `~/.claude/skills`, `~/.codex/skills`, a project's `.claude/skills`, plugin folders | Abilities | Each skill's `SKILL.md` |
 
-Antigravity's model list comes from running `agy` itself.
+Antigravity's model list comes from running `agy` itself. The tour's agents step also runs
+`codex login status` (only its exit code is used) when `auth.json` isn't there, because Codex can
+keep its login in the Keychain instead.
 
 **An MCP server's command line or URL can hold a token**, so before it's shown on the Abilities page
 or sent to a paired phone, xBot masks what looks like one (`SecretRedaction`): a URL's user name and
@@ -114,7 +116,7 @@ code the agent will run as you; xBot doesn't vet it.
 | `…/xBot/Inbox/` | The working folder for chats without a project |
 | `…/xBot/profile.png` | The account picture, if you set one |
 | `<project>/notes/*.md` | Notes, in the project |
-| User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names and installation ids, the identities of outstanding invites, iCloud change tokens and replay marks |
+| User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names and installation ids, the identities of outstanding invites, iCloud change tokens and replay marks; the welcome tour's state (`onboarding.completedVersion`, `onboarding.skipped`, `onboarding.reminderDismissed`, and which of Desktop, Documents and Downloads it has asked for, `onboarding.foldersAsked`) |
 | Keychain | Pairing keys, nothing else (below) |
 | `~/Library/LaunchAgents/dev.xbot.automations.plist` | Only while **Run when xBot is closed** is on |
 
@@ -245,6 +247,28 @@ on both lanes, and restarts the listener without the key. **Unpair this device**
 the pairing and the cached chat list there; it doesn't tell the Mac, so remove the device on the Mac
 too.
 
+## The welcome tour: installers and file access
+
+**Installers run the vendors' official commands, in a terminal you can see.** The agents step's
+**Install** and **Sign in** run one fixed command per CLI (`AgentInstaller`; the commands and their
+sources are in [First run](06-onboarding.md#step-2-your-agents)) in your login shell, as you, in a
+sheet that shows the command and a live terminal. Each install is `curl -fsSL <vendor URL> | bash`
+(or `| sh`): it runs whatever the vendor's server sends at that moment, over HTTPS, the same as
+pasting the vendor's documented command into Terminal. Nothing runs without a click; Cancel hangs
+the command up. xBot doesn't install npm, Homebrew or anything else on its own: if an installer
+needed a tool the Mac doesn't have, the card would offer that tool's download page. The commands
+are pinned by a test, so a change to one is a reviewed change to the code. In debug builds only,
+`XBOT_ONBOARDING_FAKE_COMMAND` swaps a harmless command in for all of them, to look at the sheet
+without installing anything; the code that reads it is inside `#if DEBUG`.
+
+**File access is asked for, not taken.** **Allow** lists Desktop, Documents or Downloads once from
+xBot itself, so macOS asks you there; xBot keeps no list of what's in them. A folder never asked
+about isn't touched, because touching it is what asks. **Full Disk Access is optional**, and only
+you can grant it, in System Settings. While the guide panel is up xBot checks for it once a second
+by listing `~/Library/Safari` (or `~/Library/Mail`), which macOS refuses without Full Disk Access;
+the names in it aren't kept. Full Disk Access lets xBot, and the agents and shells it starts, read
+what any app of yours can, including other apps' data such as Mail and Messages.
+
 ## The in-app terminal
 
 A floating window per chat, with tabs, each a login shell drawn by SwiftTerm, as you. It gets the
@@ -293,6 +317,7 @@ don't exist yet. Don't read this page as describing them.
 | Another process running as you on the Mac | Read `xbot.sqlite` and transcripts, the CLIs' own logs and credentials, Antigravity and Copilot prompts in process arguments | Nothing of xBot's. Your macOS account is the boundary, as for every app you run |
 | An MCP server or plugin you add | Run code as you when an agent uses it | You choosing it. xBot installs only what you ask, through the CLI |
 | A tampered update | Run code as you | EdDSA signatures, HTTPS-only feed, key only from the signed bundle in release. Inert until configured |
+| A compromised vendor install script | Run code as you, once, when you press Install | The vendor's own HTTPS URL; you see the command and its output; nothing runs without a click. The same trust as pasting the vendor's command into Terminal |
 | An automation running unattended | Anything you can, on a schedule, while the app is closed if the helper is on | Off by default; each run is a chat in its history; the helper is removed when the toggle is turned off |
 
 ## Known weaknesses

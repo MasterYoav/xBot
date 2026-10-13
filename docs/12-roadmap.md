@@ -22,7 +22,7 @@ Docker/OpenBot engine and its milestones M0–M7) is in git and in the [changelo
 | — | The iPhone and iPad app | **Open**, a stack of PRs, each based on the one before: #31 pairing, lanes and chats → #32 managing chats → #33 projects → #34 notes → #35 automations → #36 crew → #37 abilities → #38 terminal → #39 profile → #40 Liquid Glass and the shared world → #41 accent, plan board, suggested agents, Markdown documents |
 | — | The crew as a company: who reports to whom | **Open** (#42, on top of the stack) |
 | 1b | Split panes, checkpoints, worktrees | Not started (the Changes inspector is built) |
-| 3 | Onboarding rewrite | Not started. Today's first run is in [06-onboarding.md](06-onboarding.md) |
+| 3 | Onboarding: the welcome tour, agents installed in the app, files and Full Disk Access | **Built** on `onboarding-core` (the animated scenes separately). See [06-onboarding.md](06-onboarding.md); API keys wait for the native brain |
 | 4 | Native brain: Anthropic, OpenAI, Google, Ollama tool loop | Not started |
 | 5 | The machine: Containerization driver, image, `xbot-agentd`, shell and file tools | Not started |
 | 6 | Browser and live screen: CDP, screencast inspector, take over | Not started |
