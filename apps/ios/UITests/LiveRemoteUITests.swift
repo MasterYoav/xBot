@@ -762,6 +762,36 @@ final class LiveRemoteUITests: XCTestCase {
         mode(app, "Developer")
     }
 
+    /// A turn that uses tools: one activity line while HeadMaster works, then "Did N things", which opens.
+    func testAgenticActivity() throws {
+        let app = try launchConnected()
+        mode(app, "Agentic")
+        app.buttons["thread-HeadMaster"].firstMatch.tap()
+        let composer = app.descendants(matching: .any)["agentic-composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 10))
+        let folds = app.buttons.matching(identifier: "did-things")
+        composer.tap()
+        composer.typeText("Run the shell commands `pwd` and then `ls`, one at a time, then tell me in one short line how many entries ls printed.")
+        app.buttons["Send"].firstMatch.tap()
+        let activity = app.descendants(matching: .any)["activity-line"].firstMatch
+        XCTAssertTrue(activity.waitForExistence(timeout: 120), "No activity line while working")
+        attach(app, "1 working")
+        // Done: the activity line goes, and the reply's tools fold into "Did N things" (the list is
+        // lazy, so count only what's on screen: the newest is the last).
+        XCTAssertTrue(NSPredicate(format: "exists == false").wait(for: activity, timeout: 240), "Still working")
+        XCTAssertTrue(folds.firstMatch.waitForExistence(timeout: 10), "No Did N things after the reply")
+        let did = folds.element(boundBy: folds.count - 1)
+        sleep(1)
+        attach(app, "2 replied")
+        did.tap()
+        sleep(1)
+        attach(app, "3 things open")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(1)
+        attach(app, "4 list")
+        mode(app, "Developer")
+    }
+
     private func launchConnected() throws -> XCUIApplication {
         let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
         let app = XCUIApplication()
