@@ -152,6 +152,19 @@ struct AgentsView: View {
                             Text(agent.role).captionText().foregroundStyle(Palette.textSecondary).lineLimit(1)
                         }
                         Spacer(minLength: Space.s)
+                        let learnt = workspace.lessons(of: agent.id).count
+                        if learnt > 0 {
+                            // Compact: the row is narrow, and the role is what should get the room.
+                            HStack(spacing: Space.xxs) {
+                                Image(systemName: "lightbulb")
+                                Text(verbatim: "\(learnt)")
+                            }
+                            .captionText().foregroundStyle(Palette.textTertiary)
+                            .fixedSize()
+                            .help(String(localized: "\(agent.name) has learnt \(AgentExperienceSection.count(learnt)). Edit them to see or change them."))
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(AgentExperienceSection.count(learnt))
+                        }
                         Text(agent.harness.displayName).captionText().foregroundStyle(Palette.textTertiary)
                         IconButton("pencil", help: String(localized: "Edit \(agent.name)")) {
                             editing = AgentDraft(agent, isNew: false)
@@ -212,6 +225,10 @@ struct AgentEditor: View {
     @State private var agent: Agent
     let isNew: Bool
     @State private var walking = false
+    /// The scrolling part's natural height, so the sheet is only as tall as it needs.
+    @State private var contentHeight: CGFloat = 0
+    /// Bumped by the lessons chip beside the name: scrolls down to Experience.
+    @State private var experienceRequest = 0
     @Environment(\.dismiss) private var dismiss
 
     init(workspace: Workspace, draft: AgentDraft) {
@@ -222,17 +239,44 @@ struct AgentEditor: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: Space.xl) {
-                creator
-                persona
+            ScrollViewReader { proxy in
+                scrolling.onChange(of: experienceRequest) {
+                    withAnimation(Motion.standard) { proxy.scrollTo(Self.experienceAnchor, anchor: .top) }
+                }
             }
-            .padding(Space.xl)
+            .frame(height: min(max(contentHeight, 1), Metrics.agentEditorMaxHeight))
+            // Forgetting a lesson offers Undo here: the window's own toasts are under the sheet.
+            .overlay(alignment: .bottom) { ToastHost(center: workspace.toasts) }
             Divider()
             footer
                 .padding(.horizontal, Space.xl)
                 .padding(.vertical, Space.m)
         }
         .frame(width: Metrics.agentEditorWidth)
+    }
+
+    private static let experienceAnchor = "experience"
+
+    /// Who they are, then (for someone already on the crew) what they've learnt.
+    private var scrolling: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.xl) {
+                HStack(alignment: .top, spacing: Space.xl) {
+                    creator
+                    persona
+                }
+                // A new hire hasn't learnt anything yet.
+                if !isNew {
+                    Divider()
+                    AgentExperienceSection(workspace: workspace, agentID: agent.id,
+                                           name: agent.name.isEmpty ? String(localized: "This agent") : agent.name)
+                        .id(Self.experienceAnchor)
+                }
+            }
+            .padding(Space.xl)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private var creator: some View {
@@ -278,7 +322,21 @@ struct AgentEditor: View {
 
     private var persona: some View {
         VStack(alignment: .leading, spacing: Space.m) {
-            Text(isNew ? String(localized: "Hire an agent") : agent.name).titleText()
+            HStack(alignment: .firstTextBaseline) {
+                Text(isNew ? String(localized: "Hire an agent") : agent.name).titleText()
+                Spacer(minLength: Space.s)
+                // Experience is below the fold: this says it's there, and goes to it.
+                if !isNew {
+                    let learnt = workspace.lessons(of: agent.id).count
+                    Button { experienceRequest += 1 } label: {
+                        Chip(learnt > 0 ? AgentExperienceSection.count(learnt) : String(localized: "Experience"),
+                             systemImage: "lightbulb")
+                    }
+                    .buttonStyle(XBotButtonStyle())
+                    .help(String(localized: "What they've learnt"))
+                    .accessibilityLabel(String(localized: "Show what they've learnt"))
+                }
+            }
             field(String(localized: "Name")) {
                 TextField(String(localized: "Name"), text: $agent.name, prompt: Text(verbatim: "Pixel"))
                     .textFieldStyle(.roundedBorder)

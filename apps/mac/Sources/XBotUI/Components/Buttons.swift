@@ -18,22 +18,26 @@ public struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-/// A secondary action: text that gets a fill on hover.
+/// A secondary action: text that gets a fill on hover. `destructive` draws it in the failure
+/// colour: the style sets the label's colour, so tinting the button from outside does nothing.
 public struct QuietButtonStyle: ButtonStyle {
-    public init() {}
+    let destructive: Bool
+
+    public init(destructive: Bool = false) { self.destructive = destructive }
 
     public func makeBody(configuration: Configuration) -> some View {
-        QuietLabel(configuration: configuration)
+        QuietLabel(configuration: configuration, destructive: destructive)
     }
 
     private struct QuietLabel: View {
         let configuration: ButtonStyleConfiguration
+        let destructive: Bool
         @State private var hovering = false
 
         var body: some View {
             configuration.label
                 .font(Typography.chip)
-                .foregroundStyle(Palette.textSecondary)
+                .foregroundStyle(destructive ? Palette.failure : Palette.textSecondary)
                 .padding(.horizontal, Space.s)
                 .frame(height: Metrics.chipHeight)
                 .background(hovering ? Palette.hover : .clear, in: Capsule())

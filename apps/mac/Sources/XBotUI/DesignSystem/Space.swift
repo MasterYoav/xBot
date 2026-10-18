@@ -86,6 +86,9 @@ public enum Metrics {
     /// Agents: the page, and the editor sheet.
     public static let agentsWidth: CGFloat = 1040
     public static let agentEditorWidth: CGFloat = 720
+    /// The editor's scrolling part, at most: with the footer below it, the sheet fits the smallest
+    /// window (600), and Experience scrolls into view under the persona.
+    public static let agentEditorMaxHeight: CGFloat = 540
     /// Notes: the list of notes beside the editor.
     public static let notesListWidth: CGFloat = 240
     /// How much of the content height the backdrop covers before it has faded out.

@@ -53,6 +53,8 @@ How each CLI is run, its models and reasoning levels are in
   limits last read), `agents` (the crew, with each one's manager) and `automations`. WAL mode,
   schema version 6, migrated forward in place.
 - `Inbox/`: the working folder for chats that don't belong to a project.
+- `Experience/<agent-id>.json`: what each agent has learnt (below). Kept beside the library, so a
+  library in memory (tests, or one that couldn't open) gets a temporary folder of its own.
 
 Notes live in the project itself, as Markdown in `<project>/notes/`, so they travel with it.
 Settings and appearance are in the app's user defaults. Pairing keys are in the Keychain. Nothing
@@ -112,6 +114,24 @@ When the turn ends, `handOff(from:reply:)` starts a chat with each named member 
 manager (at any depth) and sends them the task "From <manager>: …". A name outside the team, or not
 on the crew, is refused with a notice in the manager's reply. When the member's turn finishes,
 `reportBack` adds a notice to the manager's chat with the gist of what they did.
+
+**Experience.** From Google's [Harness²](https://github.com/google-research/harness2): each agent
+keeps evidence-backed lessons, *cue → lesson*, for later tasks (`ExperienceStore`, in
+`XBotCore/Agentic/Experience.swift`). A `Lesson` has a cue, the lesson, a confidence (low, medium,
+high), one line of evidence, when it was learnt and how many turns it was given to (`uses`). The
+agent writes them itself, at the end of its own turn, through the `xbot_remember` tool — one
+reflection per task and no second model run; `remember` replaces a lesson with the same cue
+(ignoring case, spacing and punctuation). On each turn, `instructions(for:toolsAttached:)` adds
+the agent's `selection` under *"What you've learnt (from earlier tasks; apply when the cue fits):"*,
+one line each (*"- When <cue>: <lesson> (high confidence)"*; the evidence stays out): ranked by
+confidence, then the newest, then the cue, at most 12 lines and 1,500 characters, skipping a line
+too long for what's left rather than stopping there. Each one sent counts a use. When the turn has
+xBot's tools attached, the instructions end with the reflection: *"When you finish a task, if you
+learnt something general that would help next time (not task-specific facts), call the
+xbot_remember tool once with the cue, the lesson, your confidence and the evidence."* When the
+library opens, `decay` drops low-confidence lessons more than 30 days old that were never used.
+The person reads, rewords and forgets them in the agent editor (`Workspace+Experience.swift`;
+forgetting returns an Undo).
 
 **The world.** `WorldStage` (in `XBotWorld`, shared with the phone) draws the crew in one of five
 pixel-art settings, in tiers by rank: HeadMaster on top, each team below its manager. Each agent
