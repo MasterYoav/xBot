@@ -242,7 +242,7 @@ private struct ToolRow: View {
 }
 
 /// Markdown with fenced code blocks as their own boxes.
-private struct MarkdownBlock: View {
+struct MarkdownBlock: View {
     let text: String
 
     var body: some View {
@@ -347,7 +347,7 @@ private struct PlanCard: View {
     }
 }
 
-private struct EditSheet: View {
+struct EditSheet: View {
     let original: String
     let send: (String) -> Void
     @State private var text = ""

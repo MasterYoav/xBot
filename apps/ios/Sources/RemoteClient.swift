@@ -376,11 +376,11 @@ final class RemoteClient {
         case .world(let world):
             self.world = world
         case .transcript(let chatID, let messages):
-            transcripts[chatID] = messages
+            transcripts[chatID] = kept(messages, in: chatID)
         case .message(let chatID, let message):
             var list = transcripts[chatID] ?? []
             if let index = list.firstIndex(where: { $0.id == message.id }) { list[index] = message } else { list.append(message) }
-            transcripts[chatID] = list.sorted { $0.createdAt < $1.createdAt }
+            transcripts[chatID] = kept(list.sorted { $0.createdAt < $1.createdAt }, in: chatID)
         case .messageRemoved(let chatID, let messageID):
             transcripts[chatID]?.removeAll { $0.id == messageID }
         case .live(let chatID, let parts):
@@ -437,6 +437,48 @@ final class RemoteClient {
         let before = world
         world?.setting = setting
         if !(await act { .setWorld(requestID: $0, setting: setting) }) { world = before }
+    }
+
+    // MARK: Agentic Mode
+
+    /// Each crew member's thread, by member.
+    var threads: [UUID: RemoteChat] { AgenticDigest.threads(in: chats) }
+
+    func thread(for memberID: UUID) -> RemoteChat? { threads[memberID] }
+
+    /// A thread keeps its last 200 messages here (pictures and all); the rest stay on the Mac.
+    static let threadMemory = 200
+
+    private func kept(_ messages: [RemoteMessage], in chatID: UUID) -> [RemoteMessage] {
+        guard chat(chatID)?.isThread == true, messages.count > Self.threadMemory else { return messages }
+        return Array(messages.suffix(Self.threadMemory))
+    }
+
+    /// Sends to a member's thread (the Mac starts it on the first message) and opens it.
+    @discardableResult
+    func threadSend(_ memberID: UUID, text: String, images: [Data]) async -> Answer {
+        let answer = await request { .threadSend(requestID: $0, memberID: memberID, text: text, images: images) }
+        if answer.ok, let chatID = answer.chatID { open(chatID) } else if !answer.ok { notice = answer.reason }
+        return answer
+    }
+
+    /// Allow or Don't allow on an approval card; false (reason shown) when the Mac refused.
+    @discardableResult
+    func answerApproval(_ id: UUID, allow: Bool) async -> Bool {
+        await act { .answerApproval(requestID: $0, approvalID: id, allow: allow) }
+    }
+
+    /// When each thread was last looked at, for the list's unread dot (kept on this device).
+    private(set) var seen: [UUID: Date] = SeenStore.load()
+
+    func markSeen(_ chatID: UUID) {
+        seen[chatID] = .now
+        SeenStore.save(seen)
+    }
+
+    func isUnread(_ chat: RemoteChat) -> Bool {
+        guard !chat.isRunning, chat.preview != nil else { return false }
+        return chat.updatedAt > (seen[chat.id] ?? .distantPast).addingTimeInterval(1)
     }
 
     func chat(_ id: UUID) -> RemoteChat? { chats.first { $0.id == id } }
@@ -501,6 +543,18 @@ enum CloudMark {
     static func load() -> Int64 { (UserDefaults.standard.object(forKey: key) as? NSNumber)?.int64Value ?? -1 }
     static func save(_ mark: Int64) { if mark > load() { UserDefaults.standard.set(NSNumber(value: mark), forKey: key) } }
     static func clear() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
+/// When each Agentic Mode thread was last read on this device.
+enum SeenStore {
+    static let key = "agentic.seen"
+    static func load() -> [UUID: Date] {
+        let raw = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+        return Dictionary(uniqueKeysWithValues: raw.compactMap { key, value in UUID(uuidString: key).map { ($0, Date(timeIntervalSince1970: value)) } })
+    }
+    static func save(_ seen: [UUID: Date]) {
+        UserDefaults.standard.set(Dictionary(uniqueKeysWithValues: seen.map { ($0.key.uuidString, $0.value.timeIntervalSince1970) }), forKey: key)
+    }
 }
 
 /// The last chat list, so the app opens on something while it finds the Mac.

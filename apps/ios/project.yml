@@ -58,6 +58,8 @@ targets:
         NSLocalNetworkUsageDescription: xBot connects straight to your Mac when you're on the same network.
         NSBonjourServices: [_xbot._tcp]
         NSCameraUsageDescription: Scan the pairing code on your Mac.
+        NSMicrophoneUsageDescription: Dictate messages to your crew in Agentic Mode.
+        NSSpeechRecognitionUsageDescription: Turn what you say into a message, on this device where it can.
         UIBackgroundModes: [remote-notification]
         CFBundleURLTypes:
           - CFBundleURLName: dev.xbot.pair
