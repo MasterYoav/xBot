@@ -24,8 +24,11 @@ public final class LiveMac: MacControlling {
 
     public func runningApps() -> [RunningApp] {
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        // Apps with a Dock icon, and whatever is in front even without one: a system alert
+        // (UserNotificationCenter asking about the firewall, say) takes the keys, and an agent
+        // that didn't know would type into it.
         return NSWorkspace.shared.runningApplications
-            .filter { $0.activationPolicy == .regular }
+            .filter { $0.activationPolicy == .regular || $0.processIdentifier == front }
             .map { app in
                 RunningApp(name: app.localizedName ?? app.bundleIdentifier ?? "pid \(app.processIdentifier)",
                            bundleID: app.bundleIdentifier, pid: app.processIdentifier,
