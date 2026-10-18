@@ -419,7 +419,7 @@ HeadMaster.
 **Below the world**: **Working now** (who, what, for how long; *"Nobody's working right now."*),
 **Just finished** (*"Finished — open to read"*; *"Nothing new for you."*), **Activity** (replies
 from the crew over 14 days, as bars), and **Crew** (face, name, *Founder* for HeadMaster, role,
-CLI, ✎ and **Talk**).
+a 💡 count of what they've learnt when there's anything, CLI, ✎ and **Talk**).
 
 **The editor** (a sheet, for hiring and editing):
 
@@ -432,6 +432,21 @@ CLI, ✎ and **Talk**).
   suggestion *(suggested)*. A new hire's manager follows the suggestion as the role is typed.
 - For HeadMaster, instead of Reports to: *"HeadMaster founded this place and runs it for you: it
   reports to you, hands work to the crew, and can't be let go."*
+- Beside the name (not for a new hire), a 💡 chip — *"2 lessons"*, or *Experience* — that scrolls
+  down to **Experience**. The sheet scrolls; its scrolling part is at most 540 pt, so with the
+  footer it fits the smallest window.
+- **Experience**, below both columns (not for a new hire): 💡 **Experience**, the count in mono
+  capitals, **Forget everything…** (red) and *"Lessons <name> wrote down after its tasks. The
+  surest and newest go into every turn it takes, up to 12."* Then a panel per lesson, surest and
+  newest first: the cue, *↳ the lesson*, a confidence pill (● HIGH green, ● MEDIUM blue, ● LOW
+  grey), the evidence in italics, and *LEARNT 3 DAYS AGO · USED 7 TIMES* (*NOT USED YET*), with ✎
+  and 🗑 beside it. ✎ turns the panel into fields — **When this happens**, **Do this**,
+  **Confidence** (Low / Medium / High) — with **Cancel** and **Save lesson** (Return saves, Esc
+  cancels; a blank cue or lesson can't be saved). 🗑 forgets it at once with a toast, *"Forgot
+  “<cue>”"* and **Undo**, shown inside the sheet. **Forget everything…** asks first (*"Forget
+  everything <name> has learnt?"* — *"N lessons will go. <name> starts learning again from its next
+  task in Agentic Mode."*), then offers **Undo** too. Changes here are saved at once, not on Save.
+  Empty: *"Nothing yet. In Agentic Mode, <name> writes down what it learns after each task."*
 - Footer: **Let go…** (not for HeadMaster), **Cancel**, **Hire** / **Save**. Letting someone go
   moves their team up to their manager, keeps their chats, and shows a toast with **Undo**.
 

@@ -79,6 +79,11 @@ xBot is now a native app that drives the agent CLIs you already have. See
   Desktop, Documents and Downloads up front, or guides you to Full Disk Access with a panel docked
   beside System Settings; pairs an iPhone; and sets the crew's world and the theme. Skip leaves a
   **Finish setting up** row on Home. Libraries with chats or projects already count as done.
+- Experience (Agentic Mode, after Google's Harness²): agents write down what they learn after a
+  task — *when this happens, do this*, how sure they are and why — and the surest, newest lessons go
+  into their later turns (up to 12). Read, reword or forget them in the agent editor's
+  **Experience**, with Undo, or **Forget everything…**. Unused low-confidence lessons go after 30
+  days.
 
 ### Changed
 - Automations replace the Inbox in the sidebar; loose chats are listed under Recent.
