@@ -57,6 +57,11 @@ fatal.
   changed, a transcript, live parts of a reply as it streams, replies to commands, folders, files,
   git status and diffs, notes, automations, the crew, abilities, the profile, shell output, and
   the world (which setting, who lives there and who reports to whom).
+- **Agentic Mode**: chats carry `thread`, `agentID` and, for threads, `preview` (the last message
+  in a line); messages carry pictures, approvals and lessons as parts (a part a side doesn't know
+  arrives as nothing). The phone sends `threadSend` (a member, text and photos) and
+  `answerApproval` (allow or not); an approval reaches the phone as its card in the thread, and an
+  answer is recorded with the phone's name.
 - **Phone → Mac** (`ClientMessage`): open and close a chat, send, stop, edit, plan answers, chat
   settings, rename, retry, delete and undo; list and act on folders, files and git; add or remove a
   project (browsing the Mac's folders); notes, automations, crew (hire, edit, let go, undo, talk
@@ -89,6 +94,42 @@ scroll, in Liquid Glass.
 
 On iPad the tab bar can become a sidebar (`.sidebarAdaptable`); the screens are the same.
 
+## Agentic Mode
+
+Settings › **Mode** switches between **Developer** (everything above, the default) and
+**Agentic**: no tab bar and no Places, just a chat with each crew member, who do the work on the
+Mac. The choice is kept on the phone (`UserDefaults` `mode`); switching is instant and Settings
+stays open. The design is in the [Agentic Mode spec](superpowers/specs/2026-10-13-agentic-mode-design.md).
+
+- **Chats**: the Mac's name with a dot (same Wi-Fi, through iCloud, connecting, offline), ⚙ for
+  Settings and a hire button (the suggested agents). HeadMaster is pinned first, *"Ask me
+  anything"*; then everyone on the crew, most recent first, each with their still pixel face, the
+  last message, its time, an unread dot and *typing…* while a turn runs. Pull down to search.
+- **A thread**: your bubbles on the right in the accent colour, theirs on the left (Markdown, code
+  in its own well). While they work: the typing dots, then one activity line that changes in place
+  (*"Running swift test…"*), folded into *"Did 7 things ›"* when the reply lands. Cards: a Mac
+  screenshot (tap for full screen, pinch to zoom), an approval with **Allow** / **Don't Allow** and
+  then the answer and who gave it, a hand-off (opens that member's thread), a member finishing, and
+  a quiet *Learnt: …* line. Long-press: Copy and Retry on theirs, Copy and **Edit and resend** on
+  yours.
+- **Composer**: a growing field; the mic dictates with `SFSpeechRecognizer` (on the device where
+  it can), the live transcript going into the field until tapped again; **+** picks up to four
+  photos, downscaled on the phone to JPEGs of at most 1600 px (quality 0.7); send, or stop while
+  they work.
+
+On the Mac each member's **thread** is one chat flagged `chats.thread` (schema 7), started by the
+first message and kept going: Full access, on the member's own CLI and model, in xBot's Inbox
+folder. Photos are saved as JPEGs ≤ 1600 px in `~/Library/Application Support/xBot/Images` and in
+the folder's `Attachments/`, and the prompt names them (*"Attached: /…/Attachments/<id>.jpg"*); the
+person's message shows the text and the pictures. When the session can't be resumed (the member
+moved to another CLI, or the CLI says it lost or can't fit the session), the thread continues in a
+new chat that starts with the last twelve messages; the old one stays as a plain chat with that
+member. Threads are listed on the Mac like any chat with an agent.
+
+Light by design: the list and thread draw no world and run no timers; messages render lazily; a
+thread keeps its last 200 messages on the phone (older ones stay on the Mac); pictures are decoded
+at the size they're shown, off the main thread, and cached small (12 MB at most).
+
 ## Code
 
 ```
@@ -101,6 +142,7 @@ apps/ios/
     HomeScreen, UsageBoard, ChatListView, ChatScreen, Composer, AgentsWorldScreen, CrewScreen,
     SuggestedAgents, ProjectsScreen, ProjectScreen, MarkdownEditor, NotesScreen,
     AutomationsScreen, AbilitiesScreen, TerminalScreen, ProfileScreen, PairView
+    AgenticRoot, AgenticChatsView, AgenticThreadView, AgenticCards, AgenticComposer   Agentic Mode
   UITests/LiveRemoteUITests.swift
 ```
 
@@ -132,8 +174,14 @@ launch. There's no TestFlight or App Store build yet.
   used); the cloud channel against a fake mailbox (order, dedupe, cleanup, renumbered, reflected
   and replayed batches refused); pairing in `RemoteService` (codes withdrawn on close, expired,
   removed at relaunch, used once, a hello that names another key refused); `RemoteHost` for each feature with a scripted brain; remote shells;
-  path checks; the world and the org chart.
-- **Live phone tests** (`UITests/LiveRemoteUITests.swift`, 18 of them): the simulator pairs with a
+  path checks; the world and the org chart. Agentic Mode: threads (schema 7 and its migration, one
+  per member in Full access in the Inbox, photos downscaled and attached by path, a lost session
+  continuing in a new thread), `threadSend` and `answerApproval` from a phone, and what the phone
+  derives (`AgenticDigest`: threads by member, the activity line, *Did N things*, hand-off notes,
+  previews).
+- **Live phone tests** (`UITests/LiveRemoteUITests.swift`, 20 of them; `testAgenticMode` switches
+  to Agentic Mode and gets HeadMaster to answer, `testAgenticCards` answers an approval card and
+  opens a screenshot from the debug Mac's `XBOT_AGENTIC_DEMO=1` cards): the simulator pairs with a
   debug build of the Mac app (pairing link in `TEST_RUNNER_XBOT_PAIR_URL`) and goes through each
   feature for real: a new Codex chat answering, managing chats, projects and files, notes,
   automations, the crew and the org chart, suggested agents, abilities, the terminal (typing

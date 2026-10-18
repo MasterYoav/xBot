@@ -6,6 +6,11 @@ xBot is now a native app that drives the agent CLIs you already have. See
 [ADR-0009](docs/decisions/0009-native-harness-redesign.md).
 
 ### Added
+- iPhone **Agentic Mode** (Settings › Mode): a Telegram-like chat with each crew member, HeadMaster
+  pinned as *Ask me anything*. Threads with typing dots, one live activity line folding into *Did N
+  things*, screenshot, approval, hand-off and lesson cards, on-device dictation and photos (sent as
+  JPEGs ≤ 1600 px). On the Mac each member's thread is one Full-access chat in the Inbox
+  (`chats.thread`, schema 7) that carries on in a new chat when its session can't be resumed.
 - Projects: add any folder; chats in it work in that folder.
 - Chats as tabs, with Claude Code or Codex answering on your own subscription, streamed live, with
   each tool call shown and its output a click away. Every chat continues its CLI session.
