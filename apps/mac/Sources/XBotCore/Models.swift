@@ -37,6 +37,9 @@ public struct Chat: Identifiable, Equatable, Sendable {
     public var agentID: UUID?
     /// The automation this chat is a run of. Nil: a chat the person started.
     public var automationID: UUID?
+    /// Agentic Mode's thread with this chat's agent: full access, xBot's tools attached, kept
+    /// going for good. Not stored yet in this commit (the Agentic Mode phone branch stores it).
+    public var isThread: Bool = false
     public var createdAt: Date
     public var updatedAt: Date
 
