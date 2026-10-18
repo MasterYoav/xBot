@@ -129,6 +129,9 @@ struct AgentReply: View {
                 case .tools(let tools): ToolFold(tools: tools, isLive: isLive)
                 case .notice(let text): notice(text)
                 case .failure(let reason): FailureCallout(reason: reason, retry: isLive ? nil : retry)
+                case .image(let image): PartImage(image: image)
+                case .approval(let approval): ApprovalCard(approval: approval)
+                case .lesson(let text): notice(String(localized: "Learnt: \(text)"))
                 }
             }
             if !isLive {
@@ -264,5 +267,52 @@ private struct FailureCallout: View {
         }
         .padding(Space.m)
         .background(Palette.failureTint, in: RoundedRectangle(cornerRadius: Radius.medium, style: .continuous))
+    }
+}
+
+/// A picture in a reply (a screenshot an agent took, a photo sent from the phone), at most a column wide.
+struct PartImage: View {
+    let image: ImagePart
+
+    var body: some View {
+        if let picture = NSImage(contentsOfFile: image.path) {
+            Image(nsImage: picture)
+                .resizable()
+                .aspectRatio(CGFloat(max(image.width, 1)) / CGFloat(max(image.height, 1)), contentMode: .fit)
+                .frame(maxWidth: Metrics.readingWidth * 0.8, alignment: .leading)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.medium, style: .continuous))
+                .accessibilityLabel(image.caption ?? String(localized: "Screenshot"))
+        }
+    }
+}
+
+/// A risky action and its answer. The buttons belong to Agentic Mode's approval center; here it
+/// shows the state.
+struct ApprovalCard: View {
+    let approval: ApprovalPart
+    var answer: ((Bool) -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            Label(approval.summary, systemImage: "hand.raised.fill").emphasisText().foregroundStyle(Palette.textPrimary)
+            Text(approval.detail).font(Typography.mono).foregroundStyle(Palette.textSecondary).lineLimit(4)
+            switch approval.state {
+            case .pending:
+                if let answer {
+                    HStack(spacing: Space.s) {
+                        Button(String(localized: "Allow")) { answer(true) }.buttonStyle(PrimaryButtonStyle())
+                        Button(String(localized: "Don't Allow")) { answer(false) }.buttonStyle(QuietButtonStyle())
+                    }
+                } else {
+                    Text(String(localized: "Waiting for your answer…")).captionText().foregroundStyle(Palette.textTertiary)
+                }
+            case .allowed: Text(String(localized: "Allowed\(approval.answeredBy.map { " on \($0)" } ?? "")")).captionText().foregroundStyle(Palette.success)
+            case .refused: Text(String(localized: "Not allowed\(approval.answeredBy.map { " on \($0)" } ?? "")")).captionText().foregroundStyle(Palette.failure)
+            case .expired: Text(String(localized: "No answer in time, so it didn't run.")).captionText().foregroundStyle(Palette.textTertiary)
+            }
+        }
+        .padding(Space.m)
+        .frame(maxWidth: Metrics.readingWidth * 0.8, alignment: .leading)
+        .raisedSurface()
     }
 }

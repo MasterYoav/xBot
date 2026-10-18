@@ -101,6 +101,50 @@ public enum Part: Codable, Equatable, Sendable {
     case notice(String)
     case failure(String)
     case plan(Plan)
+    /// A picture in the conversation: a Mac screenshot an agent took, or a photo the person sent.
+    case image(ImagePart)
+    /// A risky action waiting for the person's yes or no (Agentic Mode's guardrails).
+    case approval(ApprovalPart)
+    /// Something the agent learnt for next time (its experience).
+    case lesson(String)
+}
+
+/// A picture kept as a file beside the library (`Images/<id>.jpg`), not in the database.
+public struct ImagePart: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    /// The JPEG on disk.
+    public var path: String
+    public var width: Int
+    public var height: Int
+    public var caption: String?
+
+    public init(id: UUID = UUID(), path: String, width: Int, height: Int, caption: String? = nil) {
+        self.id = id; self.path = path; self.width = width; self.height = height; self.caption = caption
+    }
+}
+
+/// An action that needs the person's say-so before it runs. See the Agentic Mode spec.
+public struct ApprovalPart: Codable, Equatable, Sendable, Identifiable {
+    public enum State: String, Codable, Sendable { case pending, allowed, refused, expired }
+
+    public var id: UUID
+    /// Who asks.
+    public var agent: String
+    /// One line: "Delete 3 files in ~/Projects/old".
+    public var summary: String
+    /// The command or call, as it will run.
+    public var detail: String
+    /// Which rule caught it: "delete", "send", "push", "purchase", "quit", "settings".
+    public var risk: String
+    public var state: State
+    /// "iPhone", "Mac", or nil while pending.
+    public var answeredBy: String?
+
+    public init(id: UUID = UUID(), agent: String, summary: String, detail: String, risk: String,
+                state: State = .pending, answeredBy: String? = nil) {
+        self.id = id; self.agent = agent; self.summary = summary; self.detail = detail
+        self.risk = risk; self.state = state; self.answeredBy = answeredBy
+    }
 }
 
 public struct ChatMessage: Identifiable, Equatable, Sendable {

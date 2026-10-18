@@ -6,6 +6,9 @@ public enum ReplySegment: Equatable, Sendable {
     case tools([ToolPart])
     case notice(String)
     case failure(String)
+    case image(ImagePart)
+    case approval(ApprovalPart)
+    case lesson(String)
 }
 
 public enum ReplyLayout {
@@ -24,6 +27,9 @@ public enum ReplyLayout {
             case .notice(let text): segments.append(.notice(text))
             case .failure(let reason): segments.append(.failure(reason))
             case .plan: break
+            case .image(let image): segments.append(.image(image))
+            case .approval(let approval): segments.append(.approval(approval))
+            case .lesson(let text): segments.append(.lesson(text))
             }
         }
         return segments

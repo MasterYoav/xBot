@@ -417,6 +417,14 @@ public final class RemoteHost {
             .plan(RemotePlan(status: plan.status.rawValue, summary: plan.summary, note: plan.note,
                              steps: plan.steps.map { RemotePlanStep(id: $0.id, title: $0.title, status: $0.status.rawValue) },
                              problem: plan.problem, closing: plan.closing))
+        case .image(let image):
+            // The picture itself rides along: it's downscaled when it's made (≤ 1600 px).
+            .image(RemoteImage(id: image.id, jpeg: FileManager.default.contents(atPath: image.path),
+                               width: image.width, height: image.height, caption: image.caption))
+        case .approval(let a):
+            .approval(RemoteApproval(id: a.id, agent: a.agent, summary: a.summary, detail: a.detail, risk: a.risk,
+                                     state: a.state.rawValue, answeredBy: a.answeredBy))
+        case .lesson(let text): .lesson(text)
         }
     }
 

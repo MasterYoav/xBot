@@ -46,6 +46,10 @@ public final class Workspace {
     public let toasts = ToastCenter()
     /// Each chat's floating terminal windows.
     public let terminals = TerminalDeck()
+    /// Agentic Mode: risky actions waiting for the person's answer.
+    public let approvals = ApprovalCenter()
+    /// Agentic Mode: what each agent has learnt (Harness2's experience). Tests point it elsewhere.
+    @ObservationIgnored public var experience = ExperienceStore.live
     /// What Home's composer holds before a chat exists.
     public var draft = ChatDraft()
     /// Bumped to ask the sidebar's search field for focus (⌘K).

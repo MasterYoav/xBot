@@ -174,6 +174,17 @@ struct AssistantParts: View {
                     Label(text, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.red)
                         .padding(10).background(RoundedRectangle(cornerRadius: 12).fill(.red.opacity(0.1)))
                 case .plan(let plan): PlanCard(client: client, chatID: chatID, messageID: messageID, plan: plan)
+                // Agentic Mode's parts; Developer Mode shows them plainly (Agentic Mode draws cards).
+                case .image(let image):
+                    if let data = image.jpeg, let picture = UIImage(data: data) {
+                        Image(uiImage: picture).resizable().scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                case .approval(let approval):
+                    Label(approval.summary, systemImage: "hand.raised.fill").font(.callout)
+                case .lesson(let text):
+                    Label(text, systemImage: "lightbulb").font(.footnote).foregroundStyle(.secondary)
+                case .unknown: EmptyView()
                 }
             }
             if writing && parts.isEmpty {
