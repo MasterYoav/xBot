@@ -208,9 +208,12 @@ the CLI's own environment too. Each CLI's flags, checked against its own help an
 | GitHub Copilot | `--additional-mcp-config <json>` (`{"mcpServers":{"xbot":{"type":"local","command":…,"args":["--mcp"],"tools":["*"],"env":{…},"timeout":900000}}}`, the shape `copilot mcp add --json` writes), plus `--allow-tool xbot` outside Full access | `copilot --help`, `copilot mcp add --help --json` |
 | Antigravity | No per-run flag. `agy mcp add xbot -- <XBot> --mcp` once, the first time an Antigravity turn has the tools (remembered with the binary's path in `agentic.antigravityMCP`; added again if the app moves); Settings › Agents › xBot tools removes it (`agy mcp remove xbot`). The token reaches the server through the `agy` process's environment | `agy mcp add --help` |
 
-Live-checked: a Claude Code turn and a Codex turn each called `xbot_crew` and `mac_apps` through
-the debug app; Claude Code's hook blocked a `git push` the scripted approval refused. Copilot and
-Antigravity attachment is checked by tests of their arguments only.
+Live-checked through a sandboxed debug app (`XBOT_DEBUG_AGENTIC_PROMPT`): a Claude Code turn and a
+Codex turn each called `xbot_crew` and `mac_apps`; a Claude Code turn opened a test document in
+TextEdit, typed, read it with `mac_ui`, took a `mac_screenshot` of its window, undid and closed it;
+`xbot_ask` and `xbot_remember` round trips; Claude Code's hook blocked a `git push` a scripted
+approval refused and let it through when allowed. Copilot and Antigravity attachment is checked by
+tests of their arguments only.
 
 ## Comparison
 

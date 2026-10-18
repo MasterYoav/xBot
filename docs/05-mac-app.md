@@ -40,7 +40,7 @@ pairing keys in the Keychain. See [architecture](02-architecture.md#storage).
 
 ## Tests
 
-633 tests, Swift Testing, in seven targets: `XBotBrainTests`, `XBotCoreTests`, `XBotToolsTests`,
+634 tests, Swift Testing, in seven targets: `XBotBrainTests`, `XBotCoreTests`, `XBotToolsTests`,
 `XBotRemoteTests`, `XBotWorldTests`, `XBotMarkdownTests` and `XBotUITests`. (`Tests/XBotRuntimeTests` is an empty
 folder left from 1.x.)
 
