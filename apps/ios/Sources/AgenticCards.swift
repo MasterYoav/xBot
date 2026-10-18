@@ -170,7 +170,7 @@ struct ApprovalCard: View {
             HStack(spacing: 8) {
                 Image(systemName: symbol).font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
                     .frame(width: 28, height: 28).background(Circle().fill(tint.gradient))
-                Text(String(localized: "\(approval.agent) wants to")).font(.subheadline).foregroundStyle(.secondary)
+                Text(String(localized: "Needs your OK")).font(.subheadline).foregroundStyle(.secondary)
             }
             Text(approval.summary).font(.headline).fixedSize(horizontal: false, vertical: true)
             if !approval.detail.isEmpty {

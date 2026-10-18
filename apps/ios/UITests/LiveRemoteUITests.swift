@@ -728,28 +728,41 @@ final class LiveRemoteUITests: XCTestCase {
         head.tap()
         let composer = app.descendants(matching: .any)["agentic-composer"].firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 10))
+        let send = app.buttons["Send"].firstMatch
+        // The thread keeps earlier runs: count what's there, and wait for any turn to end.
+        let word = "shot\(Int.random(in: 1000...9999))"
         composer.tap()
-        composer.typeText("Use the mac_screenshot tool once to take a screenshot of my Mac, then reply with exactly the word: done")
-        app.buttons["Send"].firstMatch.tap()
-        let shot = app.descendants(matching: .any)["screenshot-card"].firstMatch
-        XCTAssertTrue(shot.waitForExistence(timeout: 240), "No screenshot card from the Mac")
+        composer.typeText("Use the mac_screenshot tool once to take a screenshot of my Mac, then reply with exactly the word: \(word)")
+        XCTAssertTrue(waitUntil(300) { send.exists && send.isEnabled }, "Still busy")
+        send.tap()
+        let reply = app.staticTexts.containing(NSPredicate(format: "label == %@", word)).firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: 240), "No reply after the screenshot")
+        XCTAssertTrue(app.descendants(matching: .any)["screenshot-card"].firstMatch.exists, "No screenshot card from the Mac")
         attach(app, "1 screenshot card")
-        let done = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH[c] 'done'")).firstMatch
-        XCTAssertTrue(done.waitForExistence(timeout: 180), "No reply after the screenshot")
-        attach(app, "2 done")
 
         composer.tap()
         composer.typeText("Use the mac_quit tool to quit the app named Stickies (it may not be running; just call the tool), then reply with exactly the word: finished")
-        app.buttons["Send"].firstMatch.tap()
+        XCTAssertTrue(waitUntil(300) { send.exists && send.isEnabled }, "The screenshot turn didn't end")
+        attach(app, "2 done")
+        send.tap()
         let refuse = app.buttons["Don't Allow"].firstMatch
         XCTAssertTrue(refuse.waitForExistence(timeout: 240), "No approval card on the phone")
         attach(app, "3 approval")
         refuse.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'not allowed'")).firstMatch.waitForExistence(timeout: 30))
-        let finished = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'finished' OR label CONTAINS[c] 'allow'")).firstMatch
-        XCTAssertTrue(finished.waitForExistence(timeout: 180), "No reply after the refusal")
+        XCTAssertTrue(waitUntil(240) { app.buttons["Stop"].firstMatch.exists == false }, "The turn didn't end after the refusal")
         attach(app, "4 refused")
+        app.navigationBars.buttons.firstMatch.tap()
         mode(app, "Developer")
+    }
+
+    private func waitUntil(_ seconds: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+        }
+        return condition()
     }
 
     /// The cards, from the sandbox Mac's demo (`XBOT_AGENTIC_DEMO=1`): an approval answered here,
@@ -876,3 +889,4 @@ extension NSPredicate {
         XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: self, object: object)], timeout: timeout) == .completed
     }
 }
+
