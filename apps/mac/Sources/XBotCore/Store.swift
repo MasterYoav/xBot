@@ -102,6 +102,10 @@ public final class Store {
         try Store(database: Database(url: supportDirectory.appending(path: "xbot.sqlite")))
     }
 
+    /// The folder the library's file is in; nil for one in memory. Things kept beside the library
+    /// (each agent's experience) follow it, so a test's library never touches the person's.
+    public var folder: URL? { db.url?.deletingLastPathComponent() }
+
     public static func inMemory() -> Store {
         // An in-memory database cannot fail to open or to take this schema.
         try! Store(database: Database())

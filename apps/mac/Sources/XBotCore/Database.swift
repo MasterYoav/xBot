@@ -15,8 +15,11 @@ public final class Database {
     }
 
     private var handle: OpaquePointer?
+    /// The file, or nil in memory.
+    public let url: URL?
 
     public init(url: URL) throws {
+        self.url = url
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true
         )
@@ -26,6 +29,7 @@ public final class Database {
 
     /// A private database that lives as long as this object.
     public init() throws {
+        url = nil
         try open(":memory:")
     }
 

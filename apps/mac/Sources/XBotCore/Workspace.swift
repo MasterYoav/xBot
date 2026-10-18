@@ -48,8 +48,15 @@ public final class Workspace {
     public let terminals = TerminalDeck()
     /// Agentic Mode: risky actions waiting for the person's answer.
     public let approvals = ApprovalCenter()
-    /// Agentic Mode: what each agent has learnt (Harness2's experience). Tests point it elsewhere.
-    @ObservationIgnored public var experience = ExperienceStore.live
+    /// Agentic Mode: what each agent has learnt (Harness2's experience), beside the library (a
+    /// library in memory gets a folder of its own). Tests can point it elsewhere.
+    @ObservationIgnored public var experience: ExperienceStore {
+        didSet { lessonCache = [:]; experienceRevision += 1 }
+    }
+    /// Bumped when xBot changes someone's lessons, so the agent editor redraws.
+    var experienceRevision = 0
+    /// Each agent's lessons as last read, with the file's date: the crew card reads them every second.
+    @ObservationIgnored var lessonCache: [UUID: (date: Date?, lessons: [Lesson])] = [:]
     /// What Home's composer holds before a chat exists.
     public var draft = ChatDraft()
     /// Bumped to ask the sidebar's search field for focus (⌘K).
@@ -106,9 +113,14 @@ public final class Workspace {
         self.loadCodexModels = codexModels
         self.codexUsage = codexUsage
         self.defaults = defaults
+        experience = store.folder.map { ExperienceStore(folder: $0.appending(path: "Experience", directoryHint: .isDirectory)) }
+            ?? ExperienceStore(folder: FileManager.default.temporaryDirectory
+                .appending(path: "xBot-experience-\(UUID().uuidString)", directoryHint: .isDirectory))
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
         agents = attempt { try store.agents() } ?? []
+        // Once a launch: stale guesses go. A few small files, so it's done here, synchronously.
+        try? experience.decay()
         automations = attempt { try store.automations() } ?? []
         usage = attempt { try store.usage() } ?? [:]
         applyDraftDefaults()
