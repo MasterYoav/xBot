@@ -49,14 +49,23 @@ public struct RemoteChat: Codable, Equatable, Sendable, Identifiable {
     public var isRunning: Bool
     /// Why it can't send right now ("Codex isn't installed…"), if it can't.
     public var blocked: String?
+    /// Agentic Mode: this is the crew member's thread (absent from older Macs: not a thread).
+    public var thread: Bool?
+    /// The crew member it's with, if any.
+    public var agentID: UUID?
+    /// A thread's last message in one line, for the phone's chat list (threads only).
+    public var preview: String?
+
+    public var isThread: Bool { thread == true }
 
     public init(id: UUID, title: String, projectID: UUID?, agent: String, agentName: String, model: String?,
                 mode: String, effort: String?, planMode: Bool, crewName: String?, updatedAt: Date,
-                isRunning: Bool, blocked: String?) {
+                isRunning: Bool, blocked: String?, thread: Bool? = nil, agentID: UUID? = nil, preview: String? = nil) {
         self.id = id; self.title = title; self.projectID = projectID; self.agent = agent
         self.agentName = agentName; self.model = model; self.mode = mode; self.effort = effort
         self.planMode = planMode; self.crewName = crewName; self.updatedAt = updatedAt
         self.isRunning = isRunning; self.blocked = blocked
+        self.thread = thread; self.agentID = agentID; self.preview = preview
     }
 }
 
@@ -369,6 +378,12 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case setWorld(requestID: UUID, setting: String)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
+    // Agentic Mode.
+    /// A message to a crew member in their thread (started on the first message), with photos as
+    /// JPEGs (≤ 1600 px). Answered with a `reply` carrying the thread's chat.
+    case threadSend(requestID: UUID, memberID: UUID, text: String, images: [Data])
+    /// Allow or Don't allow on an approval card. Answered with a `reply` (refused once answered).
+    case answerApproval(requestID: UUID, approvalID: UUID, allow: Bool)
 }
 
 /// One frame on the wire. Messages a side doesn't know (a newer peer's) fail to decode and are
