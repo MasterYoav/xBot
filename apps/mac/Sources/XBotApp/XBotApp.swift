@@ -2,13 +2,18 @@ import AppKit
 import SwiftUI
 import XBotBrain
 import XBotCore
+import XBotTools
 import XBotUI
 
 /// `XBot --automations-tick` (the background helper's LaunchAgent): run what's due, headless, and
-/// quit. Anything else: the app.
+/// quit. `XBot --mcp` (started by an agent CLI for a turn): the xbot MCP server over stdio.
+/// `XBot --hook`: Claude Code's PreToolUse hook. Anything else: the app.
 @main
 enum XBotEntry {
     static func main() {
+        // Headless and light: no SwiftUI app, no window, just the server or the hook.
+        if CommandLine.arguments.contains(ToolEntry.mcpArgument) { ToolEntry.serve() }
+        if CommandLine.arguments.contains(ToolEntry.hookArgument) { ToolEntry.hook() }
         guard CommandLine.arguments.contains(AutomationHelper.tickArgument) else {
             XBotApp.main()
             return
@@ -16,6 +21,35 @@ enum XBotEntry {
         Task { @MainActor in
             await AutomationTick.run()
             exit(0)
+        }
+        dispatchMain()
+    }
+}
+
+/// The xbot MCP server and Claude Code's hook, as the CLIs start them.
+enum ToolEntry {
+    static let mcpArgument = "--mcp"
+    static let hookArgument = "--hook"
+
+    /// Serves MCP on stdio until the CLI closes it, forwarding each call to the app.
+    static func serve() -> Never {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        let server = MCPServer(tools: ToolCatalog.all, forwarder: ToolClient.fromEnvironment(), version: version)
+        Task {
+            await MCPStdio.serve(server)
+            exit(0)
+        }
+        dispatchMain()
+    }
+
+    /// Reads the hook event on stdin; exit 0 lets the tool run, exit 2 blocks it (stderr says why).
+    static func hook() -> Never {
+        let input = FileHandle.standardInput.readDataToEndOfFile()
+        let client = ToolClient.fromEnvironment()
+        Task {
+            let decision = await ToolHook.decide(input, token: client.token) { call in await client.send(call) }
+            if !decision.allow { FileHandle.standardError.write(Data((decision.reason + "\n").utf8)) }
+            exit(decision.exitCode)
         }
         dispatchMain()
     }
@@ -137,6 +171,30 @@ struct XBotApp: App {
         remote.wantsPushes = { NSApplication.shared.registerForRemoteNotifications() }
         remote.host.drawAvatar = { AvatarPicture.png($0) }
         remote.start()
+        startTools(for: workspace, remote: remote)
         return workspace
+    }
+
+    /// xBot's own tools for agents: the socket the CLIs' `XBot --mcp` reach the app on.
+    @MainActor
+    private static func startTools(for workspace: Workspace, remote: RemoteService) {
+        guard let executable = Bundle.main.executableURL else { return }
+        let host = ToolHost(workspace: workspace, mac: LiveMac(guide: { MacPermissionGuide.show($0) }), executable: executable)
+        host.phoneAttached = { !remote.attached.isEmpty }
+        // No phone to show the card: bring the chat with it forward and bounce the Dock icon.
+        host.alertMac = { _, chatID in
+            workspace.open(chatID)
+            NSApp.requestUserAttention(.criticalRequest)
+        }
+        do {
+            try host.start()
+            workspace.toolHost = host
+        } catch {
+            // Turns run without xBot's tools; the agents still work.
+            workspace.toasts.show(String(localized: "xBot's tools for agents couldn't start: \(String(describing: error))"))
+        }
+        #if DEBUG
+        DebugAgenticTurn.startIfAsked(workspace)
+        #endif
     }
 }

@@ -67,6 +67,12 @@ extension Workspace {
         return { await host.antigravity.ensureInstalled(agy: agy.executable, xbot: host.executable, environment: agy.environment) }
     }
 
+    #if DEBUG
+    /// Debug builds' end-to-end check (`XBOT_DEBUG_AGENTIC_PROMPT`) makes a chat a thread without
+    /// the thread machinery.
+    public func debugMakeThread(_ id: UUID) { update(id) { $0.isThread = true } }
+    #endif
+
     /// Tool guidance for a turn with xBot's tools (Harness2's term): what there is, how to use it
     /// well, and the guardrails the agent's own shell isn't held to by xBot.
     static let toolGuidance = """

@@ -104,5 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Self.workspace?.stopAll()
+        // The socket goes with the app: a CLI's server finds no one and says xBot isn't running.
+        Self.workspace?.toolHost?.stop()
     }
 }

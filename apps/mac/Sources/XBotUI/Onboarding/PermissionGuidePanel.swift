@@ -2,13 +2,40 @@ import AppKit
 import SwiftUI
 import XBotCore
 
-/// Full Disk Access is granted only in System Settings, so the help goes there: a small floating
-/// panel that docks beside the System Settings window and follows it, with xBot's icon to drag into
-/// the list and a switch showing what to turn on. It checks the grant every second while it's up;
-/// when it flips, it shows a check, closes, and brings xBot back to the front.
+/// Full Disk Access, Accessibility and Screen Recording are granted only in System Settings, so the
+/// help goes there: a small floating panel that docks beside the System Settings window and
+/// follows it, with xBot's icon to drag into the list and a switch showing what to turn on. It
+/// checks the grant every second while it's up; when it flips, it shows a check, closes, and
+/// brings xBot back to the front.
 @MainActor
 final class PermissionGuide {
     static let shared = PermissionGuide()
+
+    /// One permission the guide can walk through: where it is, what the list is called, and the
+    /// live check that says it's on.
+    struct Topic {
+        var settingsURL: URL
+        /// The list's name in System Settings: "Full Disk Access".
+        var listName: String
+        /// Waits while the closure says so; true once granted.
+        var waitForGrant: @MainActor (_ keepWaiting: @escaping @MainActor () -> Bool) async -> Bool
+
+        @MainActor static func fullDiskAccess(_ files: FileAccess) -> Topic {
+            Topic(settingsURL: FileAccess.fullDiskAccessSettings, listName: String(localized: "Full Disk Access")) { keepWaiting in
+                await files.waitForFullDiskAccess(while: keepWaiting)
+            }
+        }
+
+        @MainActor static func mac(_ permission: MacPermission) -> Topic {
+            let name = switch permission {
+            case .accessibility: String(localized: "Accessibility")
+            case .screenRecording: String(localized: "Screen Recording")
+            }
+            return Topic(settingsURL: MacControlAccess.settingsURL(permission), listName: name) { keepWaiting in
+                await MacControlAccess.waitUntilAllowed(permission, while: keepWaiting)
+            }
+        }
+    }
 
     private var panel: NSPanel?
     private let state = GuideState()
@@ -18,11 +45,14 @@ final class PermissionGuide {
     /// When System Settings was last seen running. It takes a moment to start.
     private var settingsSeen = Date.now
 
-    func show(files: FileAccess) {
-        NSWorkspace.shared.open(FileAccess.fullDiskAccessSettings)
+    func show(files: FileAccess) { show(.fullDiskAccess(files)) }
+
+    func show(_ topic: Topic) {
+        NSWorkspace.shared.open(topic.settingsURL)
         let panel = panel ?? makePanel()
         self.panel = panel
         state.granted = false
+        state.listName = topic.listName
         settingsSeen = .now
         panel.orderFrontRegardless()
 
@@ -35,7 +65,7 @@ final class PermissionGuide {
         }
         waiting?.cancel()
         waiting = Task { [weak self] in
-            let granted = await files.waitForFullDiskAccess(while: { self?.panel?.isVisible == true })
+            let granted = await topic.waitForGrant({ self?.panel?.isVisible == true })
             if granted { await self?.succeed() }
         }
     }
@@ -109,6 +139,16 @@ final class PermissionGuide {
 @MainActor @Observable
 final class GuideState {
     var granted = false
+    var listName = String(localized: "Full Disk Access")
+}
+
+/// The guide for Mac control's permissions, for the app to open when a tool needs one.
+public enum MacPermissionGuide {
+    @MainActor public static func show(_ permission: MacPermission) {
+        // macOS's own prompt first: it puts xBot in the list, so the person only turns it on.
+        MacControlAccess.request(permission)
+        PermissionGuide.shared.show(.mac(permission))
+    }
 }
 
 /// Where the guide goes. Pure geometry, so it's tested.
@@ -169,16 +209,16 @@ private struct GuideContent: View {
                     .imageScale(.large)
                     .foregroundStyle(Palette.success)
                     .transition(.scale.combined(with: .opacity))
-                Text(String(localized: "Full Disk Access is on.")).titleText()
+                Text(String(localized: "\(state.listName) is on.")).titleText()
                 Spacer()
             } else {
                 Image(nsImage: icon)
                     .resizable()
                     .frame(width: Metrics.guideIcon, height: Metrics.guideIcon)
-                    // The app itself, as a file: dropped on the Full Disk Access list it adds xBot.
+                    // The app itself, as a file: dropped on the permission's list it adds xBot.
                     .onDrag { NSItemProvider(object: Bundle.main.bundleURL as NSURL) }
                     .help(String(localized: "Drag into the list"))
-                    .accessibilityLabel(String(localized: "xBot. Drag into the Full Disk Access list."))
+                    .accessibilityLabel(String(localized: "xBot. Drag into the \(state.listName) list."))
                 Text(String(localized: "Drag into the list")).labelText().foregroundStyle(Palette.textTertiary)
                 HStack(spacing: Space.s) {
                     Image(nsImage: icon).resizable().frame(width: Space.l + Space.xs, height: Space.l + Space.xs)
@@ -189,7 +229,7 @@ private struct GuideContent: View {
                 .padding(.horizontal, Space.m)
                 .padding(.vertical, Space.s)
                 .raisedSurface(radius: Radius.medium)
-                Text(String(localized: "Turn xBot on under Full Disk Access. Not in the list? Drag the icon above into it."))
+                Text(String(localized: "Turn xBot on under \(state.listName). Not in the list? Drag the icon above into it."))
                     .captionText()
                     .foregroundStyle(Palette.textSecondary)
                     .multilineTextAlignment(.center)
