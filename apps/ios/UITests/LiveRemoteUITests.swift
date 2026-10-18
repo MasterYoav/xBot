@@ -718,6 +718,40 @@ final class LiveRemoteUITests: XCTestCase {
         mode(app, "Developer")
     }
 
+    /// The real thing: from the phone, HeadMaster takes a screenshot of the Mac with xBot's tools
+    /// (the card arrives on the phone), then reaches for a risky action and the approval comes here.
+    func testAgenticRealTools() throws {
+        let app = try launchConnected()
+        mode(app, "Agentic")
+        let head = app.buttons["thread-HeadMaster"].firstMatch
+        XCTAssertTrue(head.waitForExistence(timeout: 10))
+        head.tap()
+        let composer = app.descendants(matching: .any)["agentic-composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 10))
+        composer.tap()
+        composer.typeText("Use the mac_screenshot tool once to take a screenshot of my Mac, then reply with exactly the word: done")
+        app.buttons["Send"].firstMatch.tap()
+        let shot = app.descendants(matching: .any)["screenshot-card"].firstMatch
+        XCTAssertTrue(shot.waitForExistence(timeout: 240), "No screenshot card from the Mac")
+        attach(app, "1 screenshot card")
+        let done = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH[c] 'done'")).firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 180), "No reply after the screenshot")
+        attach(app, "2 done")
+
+        composer.tap()
+        composer.typeText("Use the mac_quit tool to quit the app named Stickies (it may not be running; just call the tool), then reply with exactly the word: finished")
+        app.buttons["Send"].firstMatch.tap()
+        let refuse = app.buttons["Don't Allow"].firstMatch
+        XCTAssertTrue(refuse.waitForExistence(timeout: 240), "No approval card on the phone")
+        attach(app, "3 approval")
+        refuse.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'not allowed'")).firstMatch.waitForExistence(timeout: 30))
+        let finished = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'finished' OR label CONTAINS[c] 'allow'")).firstMatch
+        XCTAssertTrue(finished.waitForExistence(timeout: 180), "No reply after the refusal")
+        attach(app, "4 refused")
+        mode(app, "Developer")
+    }
+
     /// The cards, from the sandbox Mac's demo (`XBOT_AGENTIC_DEMO=1`): an approval answered here,
     /// a screenshot opened full screen, a hand-off and a lesson.
     func testAgenticCards() throws {

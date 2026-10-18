@@ -53,8 +53,6 @@ extension RemoteHost {
         workspace.save(ChatMessage(chatID: thread.id, role: .user, parts: [.text(text)]))
         switch text {
         case "/demo approval":
-            workspace.approvals.post = { [weak workspace] approval, chat in workspace?.showApproval(approval, in: chat) }
-            workspace.approvals.update = { [weak workspace] approval, chat in workspace?.showApproval(approval, in: chat) }
             let approval = ApprovalPart(agent: agent.name, summary: String(localized: "Delete 3 files in ~/Projects/old"),
                                         detail: "rm ~/Projects/old/a.txt ~/Projects/old/b.txt ~/Projects/old/c.txt", risk: "delete")
             Task { @MainActor [weak workspace] in _ = await workspace?.approvals.ask(approval, in: thread.id) }

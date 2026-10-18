@@ -13,8 +13,9 @@ extension Workspace {
 
     /// An approval is a card in its chat, from the agent; answered, the same card shows the answer.
     func wireApprovals() {
-        approvals.post = { [weak self] approval, chatID in self?.post([.approval(approval)], in: chatID) }
-        approvals.update = { [weak self] approval, chatID in self?.rewrite(approval, in: chatID) }
+        // One path for both, so the card moves its chat up the lists and reaches a phone either way.
+        approvals.post = { [weak self] approval, chatID in self?.showApproval(approval, in: chatID) }
+        approvals.update = { [weak self] approval, chatID in self?.showApproval(approval, in: chatID) }
     }
 
     /// A message from the agent outside its reply: a card, a screenshot, a lesson, a question. Saved
@@ -27,21 +28,6 @@ extension Workspace {
         let message = ChatMessage(chatID: chatID, role: .assistant, parts: parts)
         save(message)
         return message
-    }
-
-    /// The approval card, rewritten with its answer, in memory and in the library.
-    func rewrite(_ approval: ApprovalPart, in chatID: UUID) {
-        if transcripts[chatID] == nil { transcripts[chatID] = attempt { try store.messages(in: chatID) } ?? [] }
-        guard var messages = transcripts[chatID] else { return }
-        for index in messages.indices.reversed() {
-            guard let part = messages[index].parts.firstIndex(where: {
-                if case .approval(let card) = $0 { card.id == approval.id } else { false }
-            }) else { continue }
-            messages[index].parts[part] = .approval(approval)
-            attempt { try store.replace(messages[index]) }
-            transcripts[chatID] = messages
-            return
-        }
     }
 
     /// The person's answer to an approval card on the Mac.
