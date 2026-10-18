@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import XBotCore
 
@@ -91,6 +92,7 @@ private struct AgentSettings: View {
                         .disabled(workspace.isDiscovering)
                 }
             }
+            XBotToolsSettings(workspace: workspace)
         }
         .formStyle(.grouped)
         .task { await workspace.refreshCodexUsage() }
@@ -107,6 +109,60 @@ private struct AgentSettings: View {
 
     private func plan(_ kind: HarnessKind) -> String? {
         kind == .claude ? workspace.claudePlan : workspace.usage[.codex]?.limits.plan
+    }
+}
+
+/// Agentic Mode's tools: whether every chat gets them, the two Mac permissions they need, and
+/// Antigravity's copy of xBot's server.
+private struct XBotToolsSettings: View {
+    let workspace: Workspace
+    @AppStorage("agentic.toolsEverywhere") private var everywhere = false
+    @State private var allowed: [MacPermission: Bool] = [:]
+    @State private var antigravity = false
+
+    var body: some View {
+        Section {
+            Toggle(String(localized: "xBot tools in every chat"), isOn: $everywhere)
+            Text(String(localized: "Agents in any chat can then use xBot and your Mac: projects, chats, the crew, automations, notes, screenshots, clicks and typing. Deleting, sending, pushing, buying, quitting apps and changing settings always ask you first. Threads with your agents have the tools either way."))
+                .captionText().foregroundStyle(Palette.textSecondary)
+            ForEach(MacPermission.allCases, id: \.self) { permission in
+                LabeledContent(title(permission)) {
+                    if allowed[permission] == true {
+                        Label(String(localized: "Allowed"), systemImage: "checkmark.circle.fill").foregroundStyle(Palette.success)
+                    } else {
+                        Button(String(localized: "Allow…")) { MacPermissionGuide.show(permission) }
+                    }
+                }
+            }
+            if antigravity {
+                LabeledContent(String(localized: "Antigravity")) {
+                    Button(String(localized: "Remove xBot's Tools")) {
+                        Task {
+                            await workspace.removeAntigravityTools()
+                            antigravity = workspace.antigravityHasTools
+                        }
+                    }
+                }
+                Text(String(localized: "Antigravity keeps xBot's tools in its own settings. Outside xBot they can't do anything."))
+                    .captionText().foregroundStyle(Palette.textSecondary)
+            }
+        } header: {
+            Text(String(localized: "xBot tools"))
+        }
+        .task { refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
+    }
+
+    private func refresh() {
+        allowed = Dictionary(uniqueKeysWithValues: MacPermission.allCases.map { ($0, MacControlAccess.isAllowed($0)) })
+        antigravity = workspace.antigravityHasTools
+    }
+
+    private func title(_ permission: MacPermission) -> String {
+        switch permission {
+        case .accessibility: String(localized: "Accessibility (read the screen, click, type)")
+        case .screenRecording: String(localized: "Screen Recording (screenshots)")
+        }
     }
 }
 

@@ -67,6 +67,18 @@ extension Workspace {
         return { await host.antigravity.ensureInstalled(agy: agy.executable, xbot: host.executable, environment: agy.environment) }
     }
 
+    /// Whether xBot's server is in Antigravity's own settings (added on its first tool turn).
+    public var antigravityHasTools: Bool { toolHost?.antigravity.isInstalled ?? false }
+
+    /// Takes xBot's server out of Antigravity's settings (Settings › Agents). It's added again on
+    /// the next Antigravity turn with xBot's tools.
+    public func removeAntigravityTools() async {
+        guard let host = toolHost else { return }
+        let agy = brains[.antigravity] as? HarnessBrain
+        guard let executable = agy?.executable else { return }
+        await host.antigravity.remove(agy: executable, environment: agy?.environment ?? [:])
+    }
+
     #if DEBUG
     /// Debug builds' end-to-end check (`XBOT_DEBUG_AGENTIC_PROMPT`) makes a chat a thread without
     /// the thread machinery.

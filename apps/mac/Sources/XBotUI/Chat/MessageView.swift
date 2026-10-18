@@ -114,6 +114,8 @@ struct AgentReply: View {
     /// The crew, so hand-off notices show as cards with the member's face; and how to open theirs.
     var crew: [Agent] = []
     var openAgent: ((UUID) -> Void)?
+    /// Answers an approval card in this reply: the person's yes or no, from the Mac.
+    var answerApproval: ((UUID, Bool) -> Void)?
     @State private var hovering = false
     @State private var copied = false
 
@@ -130,7 +132,10 @@ struct AgentReply: View {
                 case .notice(let text): notice(text)
                 case .failure(let reason): FailureCallout(reason: reason, retry: isLive ? nil : retry)
                 case .image(let image): PartImage(image: image)
-                case .approval(let approval): ApprovalCard(approval: approval)
+                case .approval(let approval):
+                    ApprovalCard(approval: approval, answer: answerApproval.map { answer in
+                        { (allow: Bool) in answer(approval.id, allow) }
+                    })
                 case .lesson(let text): notice(String(localized: "Learnt: \(text)"))
                 }
             }
@@ -286,8 +291,8 @@ struct PartImage: View {
     }
 }
 
-/// A risky action and its answer. The buttons belong to Agentic Mode's approval center; here it
-/// shows the state.
+/// A risky action and its answer. Allow and Don't Allow answer Agentic Mode's approval center
+/// (as the Mac); once answered it shows the answer and where it was given.
 struct ApprovalCard: View {
     let approval: ApprovalPart
     var answer: ((Bool) -> Void)?
