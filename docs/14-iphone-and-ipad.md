@@ -179,9 +179,11 @@ launch. There's no TestFlight or App Store build yet.
   continuing in a new thread), `threadSend` and `answerApproval` from a phone, and what the phone
   derives (`AgenticDigest`: threads by member, the activity line, *Did N things*, hand-off notes,
   previews).
-- **Live phone tests** (`UITests/LiveRemoteUITests.swift`, 20 of them; `testAgenticMode` switches
-  to Agentic Mode and gets HeadMaster to answer, `testAgenticCards` answers an approval card and
-  opens a screenshot from the debug Mac's `XBOT_AGENTIC_DEMO=1` cards): the simulator pairs with a
+- **Live phone tests** (`UITests/LiveRemoteUITests.swift`, 21 of them; `testAgenticMode` switches
+  to Agentic Mode and gets HeadMaster to answer, `testAgenticActivity` watches the activity line
+  and opens *Did N things*, `testAgenticCards` answers an approval card and opens a screenshot from
+  the debug Mac's `XBOT_AGENTIC_DEMO=1` cards). Photos and dictation aren't driven live: the
+  simulator's picker and microphone are outside the app: the simulator pairs with a
   debug build of the Mac app (pairing link in `TEST_RUNNER_XBOT_PAIR_URL`) and goes through each
   feature for real: a new Codex chat answering, managing chats, projects and files, notes,
   automations, the crew and the org chart, suggested agents, abilities, the terminal (typing

@@ -174,7 +174,7 @@ func pixelSize(of url: URL) -> (Int, Int)? {
         #expect(image.path == support.appending(path: "Images/\(image.id.uuidString).jpg").path)
         #expect(image.width == 1600 && image.height == 1000)
         let size = try #require(pixelSize(of: URL(filePath: image.path)))
-        #expect(size == (1600, 1000))
+        #expect(size.0 == 1600 && size.1 == 1000)
         #expect(FileManager.default.contents(atPath: image.path)?.starts(with: [0xFF, 0xD8]) == true, "a JPEG")
         // And in the thread's folder, where the agent can open it, named in the prompt.
         let attachment = inbox.appending(path: "Attachments/\(image.id.uuidString).jpg")
