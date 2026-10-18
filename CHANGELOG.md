@@ -80,6 +80,16 @@ xBot is now a native app that drives the agent CLIs you already have. See
   beside System Settings; pairs an iPhone; and sets the crew's world and the theme. Skip leaves a
   **Finish setting up** row on Home. Libraries with chats or projects already count as done.
 
+- Agentic Mode's tools: agents in a thread (or in every chat, with Settings › Agents › **xBot tools
+  in every chat**) get xBot's own MCP server — projects, chats, the crew and hand-offs, automations,
+  notes, settings and worlds, lessons, a question to you (`xbot_ask`) — and the Mac: screenshots,
+  the screen through Accessibility, clicks, typing, keys, scrolling, opening and quitting apps.
+  Attached per turn to Claude Code, Codex and GitHub Copilot, and added once to Antigravity.
+  Deleting, sending, pushing, buying, quitting apps and changing system settings ask you first,
+  with a card in the chat you answer on the Mac or the phone; Claude Code's own shell is held to
+  the same rules by a hook. Accessibility and Screen Recording rows in the welcome tour and in
+  Settings open the floating guide beside System Settings.
+
 ### Changed
 - Automations replace the Inbox in the sidebar; loose chats are listed under Recent.
 

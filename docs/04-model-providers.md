@@ -193,6 +193,25 @@ Parsed by `CopilotStream`: reply text from `assistant.message_delta` only (`assi
 repeats it, and `assistant.reasoning*` is the model thinking), tools from `tool.execution_start` and
 `tool.execution_complete`, and a final `result` line that carries the session id and exit code.
 
+## xBot's tools on a turn
+
+Thread turns (and every turn, with Settings › Agents › **xBot tools in every chat**) carry
+`TurnRequest.tools`: the running XBot binary, which each CLI starts as `XBot --mcp`, and the turn's
+token, passed in the server's environment as `XBOT_TOOLS_TOKEN` (with `XBOT_TOOLS_SOCKET`) and in
+the CLI's own environment too. Each CLI's flags, checked against its own help and docs
+(Claude Code 2.1.296, Codex 0.162.1, Copilot 1.0.95, Antigravity 1.4.2):
+
+| CLI | Attachment | Source |
+| --- | --- | --- |
+| Claude Code | `--mcp-config <file>` (`{"mcpServers":{"xbot":{"type":"stdio","command":…,"args":["--mcp"],"env":{…}}}}`), `--allowedTools mcp__xbot__*`, and `--settings <file>` with a `PreToolUse` hook (`matcher` `Bash\|mcp__.*`, exec form `XBot --hook`, `timeout` 660, `onFailure` `block`). Both files temporary, 0600, removed after the turn | `claude --help`; code.claude.com/docs: hooks (exit 0 allows, exit 2 blocks with stderr; 600 s default timeout; `onFailure` from 2.1.295), permissions (`mcp__<server>__*`), env-vars (stdio MCP calls have no per-request timer) |
+| Codex | `-c mcp_servers.xbot.command="…"`, `-c mcp_servers.xbot.args=["--mcp"]`, `-c mcp_servers.xbot.env.XBOT_TOOLS_TOKEN="…"` (and `…SOCKET`), `-c mcp_servers.xbot.tool_timeout_sec=900` (the default 60 s is shorter than an approval's 10 minutes) | `codex mcp add --help`; developers.openai.com/codex/mcp (`[mcp_servers.<name>]`: `command`, `args`, `env`, `tool_timeout_sec`) |
+| GitHub Copilot | `--additional-mcp-config <json>` (`{"mcpServers":{"xbot":{"type":"local","command":…,"args":["--mcp"],"tools":["*"],"env":{…},"timeout":900000}}}`, the shape `copilot mcp add --json` writes), plus `--allow-tool xbot` outside Full access | `copilot --help`, `copilot mcp add --help --json` |
+| Antigravity | No per-run flag. `agy mcp add xbot -- <XBot> --mcp` once, the first time an Antigravity turn has the tools (remembered with the binary's path in `agentic.antigravityMCP`; added again if the app moves); Settings › Agents › xBot tools removes it (`agy mcp remove xbot`). The token reaches the server through the `agy` process's environment | `agy mcp add --help` |
+
+Live-checked: a Claude Code turn and a Codex turn each called `xbot_crew` and `mac_apps` through
+the debug app; Claude Code's hook blocked a `git push` the scripted approval refused. Copilot and
+Antigravity attachment is checked by tests of their arguments only.
+
 ## Comparison
 
 | | Claude Code | Codex | Antigravity | GitHub Copilot |

@@ -11,6 +11,7 @@ Dependencies point one way:
 
 ```
 XBotApp ── XBotUI ── XBotCore ─┬─ XBotBrain     (Foundation only)
+                               ├─ XBotTools     (Foundation only; also linked by XBotApp)
                                ├─ XBotRemote    (Foundation + Network; also built for iOS)
                                └─ XBotWorld     (SwiftUI; also built for iOS)
 XBotMarkdown                                    (Foundation; used by the iOS app)
@@ -19,12 +20,13 @@ XBotMarkdown                                    (Foundation; used by the iOS app
 | Module | Owns |
 | --- | --- |
 | `XBotBrain` | `Brain`, `BrainEvent`, `TurnRequest`; `HarnessKind` (each CLI's arguments, permission flags and abilities); `HarnessBrain` (one process per turn); `HarnessLocator` (finding the CLIs and the login-shell `PATH`); the stream parsers (`ClaudeStream`, `CodexStream`, `MoreStreams` for Antigravity and Copilot, `SchemaTail`); `Effort`; `RateLimits` |
+| `XBotTools` | Agentic Mode's xbot MCP server as `XBot --mcp` speaks it: `JSONValue`, `MCPServer` (JSON-RPC 2.0: initialize, ping, tools/list, tools/call), `MCPStdio`, `ToolCatalog` (every tool and its schema), `ToolResult` and `ToolCall`, and the Unix socket (`ToolClient`, `ToolSocketListener`) |
 | `XBotRemote` | The wire to the phone: `HostMessage` and `ClientMessage`, the value types they carry, `Frame` (length-prefixed JSON), `PairingKey` and `PairingInvite`, `LocalTransport` (TLS-PSK listener and browser, `FramedConnection`) and `CloudTransport` (`CloudChannel` over a `CloudMailbox`; `CloudKitMailbox` is the real one) |
 | `XBotWorld` | The crew's look and home, shared with the phone: `AgentAvatar` and `AvatarSprite` (pixel avatars), `WorkplaceWorld` (who stands and walks where), the five realms and `WorkplaceBackdrop`, `WorldStage` (the drawn world, in tiers by rank), `OrgChart` (who reports to whom, suggested managers), `Motion` (the `motionPaused` environment value) |
 | `XBotMarkdown` | `MarkdownDocument` (a Markdown file as blocks that keep their exact source, so an edit changes only what was touched) and `InlineMarkdown` |
-| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite, schema v6); `Workspace`, the `@MainActor @Observable` object every view and the remote talk to, split by feature (`+Plan`, `+Edit`, `+Panels`, `+Home`, `+Abilities`, `Agents/`, `Automations/`); `Git/` (status, diffs, pull requests through `gh`, a folder watcher); `History/` (the profile, built from the CLIs' own history); `Abilities/` (connectors, plugins, skills and MCP servers through the CLIs); `Notes`; `Usage`; `Appearance` and `AsciiWallpaper`; `TerminalDeck` (each chat's terminal window and its tabs); `Onboarding/` (`OnboardingModel`: the welcome tour's steps and completion; `AgentSetup` and `AgentInstaller`: finding, installing and signing in to the CLIs; `FileAccess`: folder grants and Full Disk Access); `Remote/` (`RemoteService`: pairing, the lanes, keep-awake; `RemoteHost` and one extension per feature; `RemoteShell`). Re-exports `XBotBrain` and `XBotWorld` |
+| `XBotCore` | Models (`Project`, `Chat`, `ChatMessage`, `Part`); `Database` and `Store` (SQLite, schema v6); `Workspace`, the `@MainActor @Observable` object every view and the remote talk to, split by feature (`+Plan`, `+Edit`, `+Panels`, `+Home`, `+Abilities`, `Agents/`, `Automations/`); `Git/` (status, diffs, pull requests through `gh`, a folder watcher); `History/` (the profile, built from the CLIs' own history); `Abilities/` (connectors, plugins, skills and MCP servers through the CLIs); `Notes`; `Usage`; `Appearance` and `AsciiWallpaper`; `TerminalDeck` (each chat's terminal window and its tabs); `Onboarding/` (`OnboardingModel`: the welcome tour's steps and completion; `AgentSetup` and `AgentInstaller`: finding, installing and signing in to the CLIs; `FileAccess`: folder grants and Full Disk Access); `Remote/` (`RemoteService`: pairing, the lanes, keep-awake; `RemoteHost` and one extension per feature; `RemoteShell`); `Agentic/` (`ApprovalCenter`, `ExperienceStore`, `RiskRules`, `ToolHost` and its xbot and mac tools, `QuestionCenter`, `MacControlling` with `LiveMac` and `MacControlAccess`, `ToolHook`, `AntigravityMCP`) and `Workspace+Agentic`. Re-exports `XBotBrain` and `XBotWorld` |
 | `XBotUI` | The design system and every view: `Shell/` (root, sidebar, top bar, Home), `Chat/` (transcript, composer, plan cards, effort control), `Inspector/`, `Agents/`, `Abilities/`, `Notes/`, `Automations/`, `Profile/`, `Account/`, `Settings/`, `Terminal/` (SwiftTerm views), `Onboarding/` (the welcome tour, its step views, the install sheet, the Full Disk Access guide panel, and `Scenes/`), `Components/` |
-| `XBotApp` | `@main`, menus and commands, Sparkle, the app icon, quitting cleanly (`AppDelegate` stops running turns so their replies are saved), and the headless `--automations-tick` run for the automations helper |
+| `XBotApp` | `@main`, menus and commands, Sparkle, the app icon, quitting cleanly (`AppDelegate` stops running turns so their replies are saved), the headless `--automations-tick` run for the automations helper, and the headless `--mcp` (the xbot MCP server) and `--hook` (Claude Code's PreToolUse hook) |
 
 `XBotBrain` and `XBotRemote` never import SwiftUI. Views hold no logic: they read the workspace and
 call its methods. The remote calls the same methods, so the phone and the Mac's window can't
@@ -38,10 +40,15 @@ pairing keys in the Keychain. See [architecture](02-architecture.md#storage).
 
 ## Tests
 
-521 tests, Swift Testing, in six targets: `XBotBrainTests`, `XBotCoreTests`, `XBotRemoteTests`,
-`XBotWorldTests`, `XBotMarkdownTests` and `XBotUITests`. (`Tests/XBotRuntimeTests` is an empty
+633 tests, Swift Testing, in seven targets: `XBotBrainTests`, `XBotCoreTests`, `XBotToolsTests`,
+`XBotRemoteTests`, `XBotWorldTests`, `XBotMarkdownTests` and `XBotUITests`. (`Tests/XBotRuntimeTests` is an empty
 folder left from 1.x.)
 
+- **Agentic tools**: `RiskRules` both ways for every rule; the MCP server's JSON-RPC and a whole
+  stdio session against a fake app socket; the socket's mode, token and concurrency; every xbot and
+  mac tool against a scripted workspace and a `FakeMac` (no real click, key or screenshot);
+  approvals allowed, refused, expired and the Mac-alert path; each CLI's arguments with the tools
+  attached; the hook's exit codes.
 - **Stream parsers** are tested against lines recorded from real CLI runs
   (`Tests/XBotBrainTests/Fixtures`, personal paths removed). When a CLI changes its format, record a
   new fixture; never hand-write one from documentation.

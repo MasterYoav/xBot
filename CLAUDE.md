@@ -216,8 +216,9 @@ Treat these as invariants. A change that breaks one is wrong even if it passes C
 4. **A secret's value is never echoed.** Record that it was supplied and its length.
 5. **No listening ports, with one exception.** The phone's local lane listens on one TCP port,
    advertised over Bonjour, accepting only TLS with a pairing key, and only while a device is paired
-   (ADR-0009 › Since then). Nothing else listens: the future tool relay uses a Unix socket (0600), a
-   bot's VM uses vsock.
+   (ADR-0009 › Since then). Nothing else listens: xBot's tool server (`XBot --mcp`, Agentic Mode)
+   reaches the app over a Unix socket, `~/Library/Application Support/xBot/xbot.sock` (0600, this
+   user only, a per-turn token, removed on quit); a bot's VM will use vsock.
 9. **The phone is a remote.** Agents, files and sign-ins stay on the Mac. Every phone command goes
    through the same `Workspace` method the Mac's window calls, and is answered ok or refused with a
    reason. A pairing key is the key to the Mac: it never leaves the two Keychains.

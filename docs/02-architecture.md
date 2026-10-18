@@ -13,12 +13,16 @@ built yet, is the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-des
 | An agent CLI (`claude`, `codex`, `agy`, `copilot`) | for the length of one turn | its arguments, stdin, stdout and stderr |
 | A login shell | while a terminal window or tab is open (on the Mac or from the phone) | a pseudo-terminal |
 | `XBot --automations-tick` | once a minute, only if **Run when xBot is closed** is on and the app isn't open | the same SQLite file |
+| `XBot --mcp` | for one turn with xBot's tools, started by its CLI | stdio MCP to the CLI; the app's Unix socket |
+| `XBot --hook` | for a moment before each of Claude Code's shell commands, in a turn with xBot's tools | the app's Unix socket, only when the command is risky |
 | A bot's VM (Apple Containerization) | *not built yet* | — |
 
 The app listens on one TCP port, and only after an iPhone or iPad has been paired: the local lane
 of the [remote](14-iphone-and-ipad.md), advertised over Bonjour and accepting only TLS with a
 pairing key. Unpair the last device and the listener stops. The iCloud lane listens on nothing; it
-reads and writes records in your own CloudKit database.
+reads and writes records in your own CloudKit database. The app also opens one Unix-domain socket,
+`~/Library/Application Support/xBot/xbot.sock` (mode 0600, this user only), for its own tool server
+(below); it's removed when the app quits.
 
 ## How a message becomes a reply
 
@@ -143,10 +147,39 @@ the iCloud lane both sides read the mailbox every 2 seconds while a phone is att
 15 seconds otherwise), because pushes are best-effort. While a phone is attached or a turn runs, the
 Mac holds a power assertion against idle sleep.
 
+## Agentic tools
+
+Agents get xBot's own MCP server on thread turns (and on every turn with Settings › Agents ›
+**xBot tools in every chat**). How it fits together:
+
+1. `Workspace.send` builds the turn; `attachTools` asks `ToolHost` for a token (which names the
+   chat and agent), sets `TurnRequest.tools`, Full access for a thread, and appends the tools'
+   guidance to the agent's instructions.
+2. `HarnessKind.arguments` attaches the server the CLI's way (Claude Code `--mcp-config` +
+   `--allowedTools mcp__xbot__*` + a PreToolUse hook in `--settings`; Codex `-c mcp_servers.xbot.*`;
+   Copilot `--additional-mcp-config`; Antigravity once, in its own settings). `HarnessBrain` writes
+   Claude Code's two files for the turn and passes the token in the CLI's environment.
+3. The CLI starts `XBot --mcp` (`XBotTools`: JSON-RPC over stdio, the catalog, the socket client),
+   which forwards each `tools/call` as one JSON line `{token, tool, arguments}` to the app's socket.
+4. `ToolHost` (XBotCore) checks the token, the permission the tool needs, then `RiskRules`; a risky
+   call waits on `ApprovalCenter` (a card in the chat, answered on the phone or the Mac). Then it
+   acts: `xbot_*` through the same `Workspace` methods the window calls, `mac_*` through
+   `MacControlling` (`LiveMac`: NSWorkspace, ScreenCaptureKit, Accessibility, CGEvent).
+   Screenshots, lessons, questions and approval cards are posted in the chat as the agent's own
+   messages.
+5. `xbot_ask` posts the question and waits (`QuestionCenter`) for the person's next message in that
+   chat, which answers it instead of starting a turn.
+6. When the turn ends its token is closed.
+
+Claude Code's `XBot --hook` reads the hook event, lets safe calls through at once (exit 0), and
+asks the app about risky ones (exit 2 with the reason blocks). See [Security](10-security.md) for
+what each CLI's own tools are and aren't held to.
+
 ## Modules
 
 ```
 XBotApp ── XBotUI ── XBotCore ─┬─ XBotBrain     the CLIs: locating, running, parsing (Foundation only)
+                               ├─ XBotTools     the xbot MCP server's protocol and socket (Foundation only)
                                ├─ XBotRemote    the wire to the phone (also built for iOS)
                                ├─ XBotWorld     avatars, worlds, org chart, stage (also iOS)
                                └─ XBotMarkdown  Markdown documents as blocks (iOS's editor)
