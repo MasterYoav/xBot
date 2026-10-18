@@ -685,6 +685,107 @@ final class LiveRemoteUITests: XCTestCase {
     }
 
     /// Taps a tab, unfolding the bar first if scrolling folded it.
+    // MARK: Agentic Mode
+
+    /// Switches to Agentic Mode in Settings, asks HeadMaster for a one-word reply, and switches back.
+    func testAgenticMode() throws {
+        let app = try launchConnected()
+        mode(app, "Agentic")
+        attach(app, "1 agentic chats")
+
+        let head = app.buttons["thread-HeadMaster"].firstMatch
+        XCTAssertTrue(head.waitForExistence(timeout: 10), "HeadMaster isn't pinned in the list")
+        head.tap()
+        let composer = app.descendants(matching: .any)["agentic-composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 10))
+        attach(app, "2 thread")
+        composer.tap()
+        composer.typeText("Reply with exactly the word: pong")
+        app.buttons["Send"].firstMatch.tap()
+
+        // Typing, then the reply in their bubble.
+        let typing = app.descendants(matching: .any)["typing"].firstMatch
+        if typing.waitForExistence(timeout: 20) { attach(app, "3 typing") }
+        let pong = app.staticTexts.containing(NSPredicate(format: "label ==[c] 'pong' OR label ==[c] 'pong.'")).firstMatch
+        XCTAssertTrue(pong.waitForExistence(timeout: 180), "No reply from HeadMaster")
+        sleep(1)
+        attach(app, "4 pong")
+
+        // Back in the list: the last message and the time.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'pong'")).firstMatch.waitForExistence(timeout: 10))
+        attach(app, "5 list after")
+        mode(app, "Developer")
+    }
+
+    /// The cards, from the sandbox Mac's demo (`XBOT_AGENTIC_DEMO=1`): an approval answered here,
+    /// a screenshot opened full screen, a hand-off and a lesson.
+    func testAgenticCards() throws {
+        let app = try launchConnected()
+        mode(app, "Agentic")
+        app.buttons["thread-HeadMaster"].firstMatch.tap()
+        let composer = app.descendants(matching: .any)["agentic-composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 10))
+
+        composer.tap()
+        composer.typeText("/demo approval")
+        app.buttons["Send"].firstMatch.tap()
+        let allow = app.buttons["Allow"].firstMatch
+        XCTAssertTrue(allow.waitForExistence(timeout: 20), "No approval card")
+        attach(app, "1 approval")
+        allow.tap()
+        let allowed = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Allowed'")).firstMatch
+        XCTAssertTrue(allowed.waitForExistence(timeout: 20), "The answer didn't show")
+        attach(app, "2 allowed")
+
+        composer.tap()
+        composer.typeText("/demo screenshot")
+        app.buttons["Send"].firstMatch.tap()
+        let card = app.descendants(matching: .any)["screenshot-card"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 20), "No screenshot card")
+        XCTAssertTrue(app.descendants(matching: .any)["handoff-card"].firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["lesson"].firstMatch.exists)
+        sleep(1)
+        attach(app, "3 screenshot card")
+        card.tap()
+        let close = app.buttons["Close"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "No full-screen viewer")
+        attach(app, "4 viewer")
+        close.tap()
+
+        // The hand-off card opens Forge's thread.
+        app.descendants(matching: .any)["handoff-card"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Forge"].firstMatch.waitForExistence(timeout: 5))
+        attach(app, "5 forge")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        mode(app, "Developer")
+    }
+
+    private func launchConnected() throws -> XCUIApplication {
+        let link = try XCTUnwrap(ProcessInfo.processInfo.environment["XBOT_PAIR_URL"], "Set TEST_RUNNER_XBOT_PAIR_URL")
+        let app = XCUIApplication()
+        app.launchEnvironment["XBOT_PAIR_URL"] = link
+        app.launch()
+        let status = app.descendants(matching: .any)["link-status"].firstMatch
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'same Wi-Fi'").wait(for: status, timeout: 20), status.label)
+        return app
+    }
+
+    /// Settings › Mode, from either mode's gear.
+    private func mode(_ app: XCUIApplication, _ name: String) {
+        let settings = app.buttons["Settings"].firstMatch
+        for _ in 0..<3 where !settings.isHittable { app.swipeDown() }
+        settings.tap()
+        let picker = app.segmentedControls["mode-picker"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 5), "No Settings › Mode")
+        picker.buttons[name].tap()
+        sleep(1)
+        attach(app, "settings \(name)")
+        app.buttons["Done"].firstMatch.tap()
+    }
+
     private func tab(_ app: XCUIApplication, _ name: String) {
         let button = app.tabBars.buttons[name].firstMatch
         for _ in 0..<4 where !button.exists { app.swipeDown() }
