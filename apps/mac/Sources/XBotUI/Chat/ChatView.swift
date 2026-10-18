@@ -31,7 +31,8 @@ struct ChatView: View {
                                        retry: message.id == workspace.messages(in: chat.id).last?.id
                                            ? { workspace.retryLast(in: chat.id) } : nil,
                                        agent: agent, crew: workspace.agents,
-                                       openAgent: { workspace.openLatestChat(with: $0) })
+                                       openAgent: { workspace.openLatestChat(with: $0) },
+                                       answerApproval: { (id: UUID, allow: Bool) in workspace.answerApproval(id, allow: allow) })
                         }
                     }
                     if let live = workspace.live[chat.id] {

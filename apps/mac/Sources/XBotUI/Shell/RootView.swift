@@ -15,6 +15,29 @@ public struct RootView: View {
     public init(workspace: Workspace) { self.workspace = workspace }
 
     public var body: some View {
+        // DEBUG ONLY: XBOT_SCENE=<Name> shows one onboarding scene instead (Onboarding/Scenes/ScenePreviewHost.swift).
+        #if DEBUG
+        if let name = ScenePreviewHost.requested { ScenePreviewHost(name: name) } else { window }
+        #else
+        window
+        #endif
+    }
+
+    private var window: some View {
+        ZStack {
+            // The welcome tour, in place of the window's content until it's finished or skipped.
+            if let onboarding = workspace.onboarding, onboarding.isPresented {
+                OnboardingView(model: onboarding, workspace: workspace)
+                    .transition(.opacity)
+            } else {
+                main
+                    .transition(.opacity)
+            }
+        }
+        .motion(Motion.standard, value: workspace.onboarding?.isPresented == true)
+    }
+
+    private var main: some View {
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar(workspace: workspace, addProject: { addingProject = true },
                     hide: { withAnimation(Motion.panel) { columns = .detailOnly } })

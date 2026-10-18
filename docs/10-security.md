@@ -74,9 +74,9 @@ default (Settings › General › Default permission).
 
 ## What xBot reads of the CLIs' own files
 
-For usage, the profile page, the model lists and the Abilities page. No credential or token file
-is read: not Codex's `auth.json`, not Claude Code's Keychain item, nothing of Antigravity's or
-Copilot's.
+For usage, the profile page, the model lists, the Abilities page and the welcome tour. No credential
+or token file is read: not Codex's `auth.json` (the tour checks only that it **exists**), not Claude
+Code's Keychain item, nothing of Antigravity's or Copilot's.
 
 | File | What for | What is used |
 | --- | --- | --- |
@@ -88,7 +88,9 @@ Copilot's.
 | `~/.codex/config.toml` | Abilities | Configured MCP servers and switched-off skills. It is also **written** (below) |
 | `~/.claude/skills`, `~/.codex/skills`, a project's `.claude/skills`, plugin folders | Abilities | Each skill's `SKILL.md` |
 
-Antigravity's model list comes from running `agy` itself.
+Antigravity's model list comes from running `agy` itself. The tour's agents step also runs
+`codex login status` (only its exit code is used) when `auth.json` isn't there, because Codex can
+keep its login in the Keychain instead.
 
 **An MCP server's command line or URL can hold a token**, so before it's shown on the Abilities page
 or sent to a paired phone, xBot masks what looks like one (`SecretRedaction`): a URL's user name and
@@ -114,7 +116,7 @@ code the agent will run as you; xBot doesn't vet it.
 | `…/xBot/Inbox/` | The working folder for chats without a project |
 | `…/xBot/profile.png` | The account picture, if you set one |
 | `<project>/notes/*.md` | Notes, in the project |
-| User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names and installation ids, the identities of outstanding invites, iCloud change tokens and replay marks |
+| User defaults (`dev.xbot.app`) | Settings, appearance, the Mac's remote id, the paired devices' names and installation ids, the identities of outstanding invites, iCloud change tokens and replay marks; the welcome tour's state (`onboarding.completedVersion`, `onboarding.skipped`, `onboarding.reminderDismissed`, and which of Desktop, Documents and Downloads it has asked for, `onboarding.foldersAsked`) |
 | Keychain | Pairing keys, nothing else (below) |
 | `~/Library/LaunchAgents/dev.xbot.automations.plist` | Only while **Run when xBot is closed** is on |
 
@@ -245,6 +247,28 @@ on both lanes, and restarts the listener without the key. **Unpair this device**
 the pairing and the cached chat list there; it doesn't tell the Mac, so remove the device on the Mac
 too.
 
+## The welcome tour: installers and file access
+
+**Installers run the vendors' official commands, in a terminal you can see.** The agents step's
+**Install** and **Sign in** run one fixed command per CLI (`AgentInstaller`; the commands and their
+sources are in [First run](06-onboarding.md#step-2-your-agents)) in your login shell, as you, in a
+sheet that shows the command and a live terminal. Each install is `curl -fsSL <vendor URL> | bash`
+(or `| sh`): it runs whatever the vendor's server sends at that moment, over HTTPS, the same as
+pasting the vendor's documented command into Terminal. Nothing runs without a click; Cancel hangs
+the command up. xBot doesn't install npm, Homebrew or anything else on its own: if an installer
+needed a tool the Mac doesn't have, the card would offer that tool's download page. The commands
+are pinned by a test, so a change to one is a reviewed change to the code. In debug builds only,
+`XBOT_ONBOARDING_FAKE_COMMAND` swaps a harmless command in for all of them, to look at the sheet
+without installing anything; the code that reads it is inside `#if DEBUG`.
+
+**File access is asked for, not taken.** **Allow** lists Desktop, Documents or Downloads once from
+xBot itself, so macOS asks you there; xBot keeps no list of what's in them. A folder never asked
+about isn't touched, because touching it is what asks. **Full Disk Access is optional**, and only
+you can grant it, in System Settings. While the guide panel is up xBot checks for it once a second
+by listing `~/Library/Safari` (or `~/Library/Mail`), which macOS refuses without Full Disk Access;
+the names in it aren't kept. Full Disk Access lets xBot, and the agents and shells it starts, read
+what any app of yours can, including other apps' data such as Mail and Messages.
+
 ## The in-app terminal
 
 A floating window per chat, with tabs, each a login shell drawn by SwiftTerm, as you. It gets the
@@ -266,6 +290,79 @@ it has no more and no fewer rights than Terminal.app.
   sandboxed**: it starts CLIs and shells, which the App Sandbox forbids. See
   [Packaging and updates](11-packaging-and-updates.md).
 
+## Agentic Mode: xBot's tools for agents
+
+Agents in a thread (and in every chat, with Settings › Agents › **xBot tools in every chat**, off
+by default) get xBot's own MCP server: tools to run xBot itself (projects, chats, the crew,
+hand-offs, automations, notes, settings, lessons, a question to the person) and to see and use the
+Mac (screenshots, the screen's elements through Accessibility, clicks, typing, keys, scrolling,
+opening and quitting apps). A thread turn also runs in Full access. See the
+[Agentic Mode spec](superpowers/specs/2026-10-13-agentic-mode-design.md).
+
+### The server, the socket and the token
+
+- The server is the app's own binary, started by the CLI for the turn as `XBot --mcp`: MCP over
+  stdio (JSON-RPC 2.0), headless, no window. It holds no state and decides nothing; it forwards each
+  tool call to the running app and returns the answer.
+- It reaches the app over a **Unix-domain socket**,
+  `~/Library/Application Support/xBot/xbot.sock`, created by the app at launch with mode 0600 and
+  removed when it quits. No port. The app also checks each connecting process's user id
+  (`getpeereid`) and refuses any other user's. If the app isn't running, every tool says
+  "xBot isn't running" and does nothing.
+- Each turn gets a fresh random **token** (24 bytes), passed to the server and the CLI in the
+  environment (`XBOT_TOOLS_TOKEN`; the socket's path as `XBOT_TOOLS_SOCKET`). The app maps it to
+  the chat and the agent, so a tool knows who is asking, and forgets it when the turn ends; any
+  other token is refused. The token stops confusion between turns and calls from outside xBot; it
+  is not a defence against another process running as you, which could read the CLI's environment
+  or connect to the socket itself (your macOS account is the boundary, as everywhere in xBot).
+- Claude Code's server config and hook settings go in two temporary files (0600, in your temporary
+  folder), removed when the turn ends.
+
+### Approvals
+
+Every tool call is classified by `RiskRules` before it runs. **Deleting** (files, git's
+destructive commands, an `xbot_*` delete), **sending** (Mail, Messages, `mail`, an `osascript` that
+sends; ⌘↩ in Mail or Messages, Return in Messages, a click on a button called Send), **pushing**
+(`git push`), **buying** (Return or a click in a window or on a button that says checkout, buy, pay,
+order or purchase), **quitting apps** (`mac_quit`, `killall`, `pkill`) and **system settings**
+(any click, key or typing while System Settings is in front, `defaults write` outside xBot's own
+domain, `sudo`, `launchctl`, `pmset`…) wait for the person: a card in the chat (on the phone too,
+when one is attached; otherwise xBot brings the chat forward and bounces its Dock icon). Allow runs
+it; Don't Allow, or no answer in 10 minutes, doesn't, and the agent is told "The person didn't allow
+this." Everything else just runs.
+
+The rules are a seatbelt for an agent acting in good faith, not a sandbox. They match command
+names and screen text; a command can always be written so no rule sees it (a script file, an
+alias, `eval`). The CLI's permission mode still applies underneath.
+
+### What the rules cover, per CLI
+
+- **xBot's own tools**: always, in the app, for every CLI.
+- **Claude Code's own tools**: a PreToolUse hook, passed per turn with `--settings`, runs
+  `XBot --hook` before its shell (`Bash`) and other MCP servers' tools; it decides safe calls itself
+  and asks the app about risky ones. The hook is set to block if it fails or times out
+  (`onFailure: "block"`, timeout 660 s).
+- **Codex, GitHub Copilot and Antigravity**: no per-run hook exists, so their own shell and file
+  tools are **not** checked by xBot. They're covered only by their instructions ("before anything
+  destructive or outward, call `xbot_ask`") and their own permission mode, which in a thread is Full
+  access. Choose Claude Code for a thread whose shell you want held to the rules.
+- **Antigravity** has no per-run flag for an MCP server either: xBot adds its server to
+  Antigravity's own settings once (`agy mcp add xbot -- <XBot> --mcp`), the first time an Antigravity
+  turn has the tools, and Settings › Agents can remove it. Outside xBot that server has no token and
+  every tool refuses.
+
+### Permissions
+
+Mac control needs **Accessibility** (reading elements, clicks, keys, typing) and **Screen
+Recording** (screenshots). macOS grants both only in System Settings › Privacy & Security, to the
+app. The onboarding's files step and Settings › Agents › xBot tools each have a row per permission
+that opens the floating guide beside System Settings; when a tool needs one that's missing, the app
+opens the guide and the tool tells the agent "Allow xBot to see and use your Mac: on the Mac, a
+guide is open…" (the phone shows that as a card). Live checks: `AXIsProcessTrusted()` and
+`CGPreflightScreenCaptureAccess()`. A screenshot is one ScreenCaptureKit frame, at most 1600 px,
+saved as a JPEG in `~/Library/Application Support/xBot/Images/` and sent to the agent's model
+like anything else it reads.
+
 ## Not built
 
 The [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md) plans protections that
@@ -273,9 +370,10 @@ don't exist yet. Don't read this page as describing them.
 
 - **A bot's own computer.** An Apple Containerization VM per bot, with the project shared read-only
   by default and nothing listening on the Mac. Until it exists, agents run directly on the Mac.
-- **A policy gate.** Every tool call classified (read, write, execute, network, outbound message)
-  and allowed, asked about or denied per bot, with an approval card in the chat. Today the only
-  gate is the CLI's permission mode.
+- **A policy gate per bot.** Every tool call classified (read, write, execute, network, outbound
+  message) and allowed, asked about or denied per bot. Today only Agentic Mode's approvals exist
+  (above): fixed rules, xBot's tools always, Claude Code's own tools through its hook, and nothing
+  of xBot's for Codex's, Copilot's or Antigravity's own tools beyond their permission mode.
 - **An append-only audit trail.** A record of every tool call, written before its result returns.
   Today the record is the chat's transcript, which can be edited and deleted like any chat.
 - **API keys.** The native brain (API keys, Ollama) is planned, with keys in the Keychain only.
@@ -293,6 +391,9 @@ don't exist yet. Don't read this page as describing them.
 | Another process running as you on the Mac | Read `xbot.sqlite` and transcripts, the CLIs' own logs and credentials, Antigravity and Copilot prompts in process arguments | Nothing of xBot's. Your macOS account is the boundary, as for every app you run |
 | An MCP server or plugin you add | Run code as you when an agent uses it | You choosing it. xBot installs only what you ask, through the CLI |
 | A tampered update | Run code as you | EdDSA signatures, HTTPS-only feed, key only from the signed bundle in release. Inert until configured |
+| A compromised vendor install script | Run code as you, once, when you press Install | The vendor's own HTTPS URL; you see the command and its output; nothing runs without a click. The same trust as pasting the vendor's command into Terminal |
+| An agent with xBot's tools (a thread, or every chat when switched on) | Use xBot and the Mac as you would: click, type, open apps, take screenshots and send them to its model | Approvals for deleting, sending, pushing, buying, quitting and settings (xBot's tools; Claude Code's shell through the hook). Accessibility and Screen Recording only once you allow them. Stop (⌘.) |
+| Another process running as you, at the tool socket | Connect to `xbot.sock`; with a live turn's token (from that CLI's environment) call xBot's tools as that agent | 0600 socket, same-user check, tokens that end with the turn. Your macOS account is the boundary |
 | An automation running unattended | Anything you can, on a schedule, while the app is closed if the helper is on | Off by default; each run is a chat in its history; the helper is removed when the toggle is turned off |
 
 ## Known weaknesses
@@ -308,6 +409,11 @@ Found while writing this page and not fixed yet.
 - **The sequence number follows the phone's clock.** It starts from the time in milliseconds when
   the lane starts. A phone whose clock is set back has its iCloud batches refused as replays until
   the clock passes the last one the Mac read.
+- **The approval rules are pattern matches.** They read command names and screen text, so a risky
+  action spelled unusually (a script, an alias, a button labelled with an icon) runs without asking.
+  Codex's, Copilot's and Antigravity's own shells aren't checked at all.
+- **Accessibility and Screen Recording belong to the app as a whole.** Once allowed, any agent with
+  xBot's tools can read and use the screen, including other apps' windows and anything on them.
 - **MCP masking is a pattern match.** A token passed as a bare argument, with no flag or name
   in front of it, is shown on the Abilities page and sent to a paired phone as it is.
 

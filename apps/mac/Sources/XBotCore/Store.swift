@@ -95,12 +95,23 @@ public final class Store {
             if !columns.contains("manager_id") { try db.execute("ALTER TABLE agents ADD COLUMN manager_id TEXT") }
             try db.execute("PRAGMA user_version = 6")
         }
+        if version < 7 {
+            // Agentic Mode's threads (2026-10-18): one chat per agent, flagged. A fresh library gets
+            // the column here too, after the founding crew is seeded (seeding saves agents, not chats).
+            let columns = try db.rows("PRAGMA table_info(chats)").compactMap { $0[1].string }
+            if !columns.contains("thread") { try db.execute("ALTER TABLE chats ADD COLUMN thread INTEGER NOT NULL DEFAULT 0") }
+            try db.execute("PRAGMA user_version = 7")
+        }
     }
 
     /// `~/Library/Application Support/xBot/xbot.sqlite`.
     public static func live() throws -> Store {
         try Store(database: Database(url: supportDirectory.appending(path: "xbot.sqlite")))
     }
+
+    /// The folder the library's file is in; nil for one in memory. Things kept beside the library
+    /// (each agent's experience) follow it, so a test's library never touches the person's.
+    public var folder: URL? { db.url?.deletingLastPathComponent() }
 
     public static func inMemory() -> Store {
         // An in-memory database cannot fail to open or to take this schema.
@@ -260,19 +271,21 @@ public final class Store {
     public func chats() throws -> [Chat] {
         try db.rows("""
             SELECT id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan, effort, agent_id, automation_id
+              plan_mode, review_plan, effort, agent_id, automation_id, thread
             FROM chats ORDER BY updated_at DESC
             """).compactMap { r in
             // A row from a newer xBot with a harness this one does not know is skipped, not fatal.
             guard let id = r[0].uuid, let title = r[2].string,
                   let harness = r[3].string.flatMap(HarnessKind.init(rawValue:)),
                   let mode = r[5].string.flatMap(PermissionMode.init(rawValue:)) else { return nil }
-            return Chat(
+            var chat = Chat(
                 id: id, projectID: r[1].uuid, title: title, harness: harness, model: r[4].string,
                 mode: mode, sessionID: r[6].string, planMode: r[9].bool, reviewPlan: r[10].bool,
                 effort: r[11].string.flatMap(Effort.init(rawValue:)), agentID: r[12].uuid,
                 automationID: r[13].uuid, createdAt: r[7].date, updatedAt: r[8].date
             )
+            chat.isThread = r[14].bool
+            return chat
         }
     }
 
@@ -281,19 +294,19 @@ public final class Store {
     public func save(_ chat: Chat) throws {
         try db.execute("""
             INSERT INTO chats (id, project_id, title, harness, model, mode, session_id, created_at, updated_at,
-              plan_mode, review_plan, effort, agent_id, automation_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              plan_mode, review_plan, effort, agent_id, automation_id, thread)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET project_id = excluded.project_id, title = excluded.title,
               harness = excluded.harness, model = excluded.model, mode = excluded.mode,
               session_id = excluded.session_id, updated_at = excluded.updated_at,
               plan_mode = excluded.plan_mode, review_plan = excluded.review_plan, effort = excluded.effort,
-              agent_id = excluded.agent_id, automation_id = excluded.automation_id
+              agent_id = excluded.agent_id, automation_id = excluded.automation_id, thread = excluded.thread
             """, [
                 .text(chat.id.uuidString), (chat.projectID?.uuidString).sql, .text(chat.title),
                 .text(chat.harness.rawValue), chat.model.sql, .text(chat.mode.rawValue),
                 chat.sessionID.sql, .date(chat.createdAt), .date(chat.updatedAt),
                 .bool(chat.planMode), .bool(chat.reviewPlan), (chat.effort?.rawValue).sql,
-                (chat.agentID?.uuidString).sql, (chat.automationID?.uuidString).sql,
+                (chat.agentID?.uuidString).sql, (chat.automationID?.uuidString).sql, .bool(chat.isThread),
             ])
     }
 

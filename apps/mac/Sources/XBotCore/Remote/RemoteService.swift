@@ -288,6 +288,7 @@ public final class RemoteService {
     fileprivate func localHello(_ link: LocalLink, deviceID: String, name: String, installID: String?) -> Bool {
         guard admit(deviceID, installID: installID, name: name) else { return false }
         link.deviceID = deviceID
+        link.deviceName = name
         attached[deviceID] = .local
         host.attach(link)
         return true
@@ -392,6 +393,7 @@ public final class RemoteService {
 
     private func attachCloud(_ id: String, channel: CloudChannel<HostMessage, ClientMessage>) -> CloudLink {
         let link = CloudLink(deviceID: id, channel: channel, timeout: cloudTimeout)
+        link.deviceName = devices.first { $0.id == id }?.name
         link.onGone = { [weak self] in
             self?.cloudLinks[id] = nil
             if self?.attached[id] == .cloud { self?.attached[id] = nil }
@@ -429,6 +431,7 @@ public final class RemoteService {
     var onReceive: ((ClientMessage) -> Void)?
     var onClose: (() -> Void)?
     fileprivate(set) var deviceID: String?
+    fileprivate(set) var deviceName: String?
     private let connection: FramedConnection<ClientMessage>
     private var closed = false
 
@@ -463,6 +466,7 @@ public final class RemoteService {
     let id = UUID()
     let lane = RemoteLane.cloud
     let deviceID: String
+    var deviceName: String?
     var onReceive: ((ClientMessage) -> Void)?
     var onClose: (() -> Void)?
     var onGone: (() -> Void)?

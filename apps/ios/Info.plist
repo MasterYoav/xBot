@@ -37,6 +37,10 @@
 	<string>Scan the pairing code on your Mac.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>xBot connects straight to your Mac when you're on the same network.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dictate messages to your crew in Agentic Mode.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turn what you say into a message, on this device where it can.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

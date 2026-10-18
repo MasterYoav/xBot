@@ -4,6 +4,7 @@ import PackageDescription
 // Dependencies point one way only:
 //
 //   XBotApp ── XBotUI ── XBotCore ── XBotBrain   (Foundation only)
+//                           ├────── XBotTools   (Foundation only: the xbot MCP server's protocol and socket)
 //                           ├────── XBotRemote  (Foundation + Network; also builds for iOS)
 //                           └────── XBotWorld   (SwiftUI pixel art: avatars and worlds; also builds for iOS)
 //
@@ -37,7 +38,11 @@ let package = Package(
         .target(name: "XBotWorld", swiftSettings: strict),
         // Markdown files as editable blocks, written back as Markdown (Foundation only; for the phone).
         .target(name: "XBotMarkdown", swiftSettings: strict),
-        .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotRemote", "XBotWorld", .product(name: "SwiftTerm", package: "SwiftTerm")],
+        // Agentic Mode's xbot MCP server, as `XBot --mcp` speaks it: JSON-RPC over stdio, the tool
+        // catalog, and the Unix socket to the running app. Foundation only, so the headless server
+        // stays small.
+        .target(name: "XBotTools", swiftSettings: strict),
+        .target(name: "XBotCore", dependencies: ["XBotBrain", "XBotTools", "XBotRemote", "XBotWorld", .product(name: "SwiftTerm", package: "SwiftTerm")],
                 swiftSettings: strict),
         .target(
             name: "XBotUI",
@@ -50,6 +55,7 @@ let package = Package(
             dependencies: [
                 "XBotUI",
                 "XBotCore",
+                "XBotTools",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             resources: [
@@ -70,6 +76,7 @@ let package = Package(
         ),
         .testTarget(name: "XBotWorldTests", dependencies: ["XBotWorld"], swiftSettings: strict),
         .testTarget(name: "XBotMarkdownTests", dependencies: ["XBotMarkdown"], swiftSettings: strict),
+        .testTarget(name: "XBotToolsTests", dependencies: ["XBotTools"], swiftSettings: strict),
         .testTarget(name: "XBotRemoteTests", dependencies: ["XBotRemote"], swiftSettings: strict),
         .testTarget(name: "XBotUITests", dependencies: ["XBotUI"], swiftSettings: strict),
     ]

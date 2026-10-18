@@ -251,8 +251,9 @@ private struct ResidentCard: View {
     }
 }
 
-/// Someone you could hire: their look, what they'd do, and a one-tap Hire.
-private struct SuggestionCard: View {
+/// Someone you could hire: their look, what they'd do, and a one-tap Hire (also Agentic Mode's
+/// Hire sheet).
+struct SuggestionCard: View {
     let suggestion: SuggestedAgent
     let hiring: Bool
     let hire: () -> Void

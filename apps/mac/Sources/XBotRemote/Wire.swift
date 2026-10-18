@@ -49,14 +49,23 @@ public struct RemoteChat: Codable, Equatable, Sendable, Identifiable {
     public var isRunning: Bool
     /// Why it can't send right now ("Codex isn't installed…"), if it can't.
     public var blocked: String?
+    /// Agentic Mode: this is the crew member's thread (absent from older Macs: not a thread).
+    public var thread: Bool?
+    /// The crew member it's with, if any.
+    public var agentID: UUID?
+    /// A thread's last message in one line, for the phone's chat list (threads only).
+    public var preview: String?
+
+    public var isThread: Bool { thread == true }
 
     public init(id: UUID, title: String, projectID: UUID?, agent: String, agentName: String, model: String?,
                 mode: String, effort: String?, planMode: Bool, crewName: String?, updatedAt: Date,
-                isRunning: Bool, blocked: String?) {
+                isRunning: Bool, blocked: String?, thread: Bool? = nil, agentID: UUID? = nil, preview: String? = nil) {
         self.id = id; self.title = title; self.projectID = projectID; self.agent = agent
         self.agentName = agentName; self.model = model; self.mode = mode; self.effort = effort
         self.planMode = planMode; self.crewName = crewName; self.updatedAt = updatedAt
         self.isRunning = isRunning; self.blocked = blocked
+        self.thread = thread; self.agentID = agentID; self.preview = preview
     }
 }
 
@@ -104,6 +113,87 @@ public enum RemotePart: Codable, Equatable, Sendable {
     case notice(String)
     case failure(String)
     case plan(RemotePlan)
+    case image(RemoteImage)
+    case approval(RemoteApproval)
+    case lesson(String)
+    /// A part this side doesn't know (from a newer Mac or phone): shown as nothing.
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        do { self = try Known(from: decoder).part } catch { self = .unknown }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        guard let known = Known(self) else { return }
+        try known.encode(to: encoder)
+    }
+
+    /// The synthesised coding, wrapped so an unknown case decodes to `.unknown` instead of failing
+    /// the whole message.
+    private enum Known: Codable {
+        case text(String)
+        case tool(RemoteTool)
+        case notice(String)
+        case failure(String)
+        case plan(RemotePlan)
+        case image(RemoteImage)
+        case approval(RemoteApproval)
+        case lesson(String)
+
+        init?(_ part: RemotePart) {
+            switch part {
+            case .text(let v): self = .text(v)
+            case .tool(let v): self = .tool(v)
+            case .notice(let v): self = .notice(v)
+            case .failure(let v): self = .failure(v)
+            case .plan(let v): self = .plan(v)
+            case .image(let v): self = .image(v)
+            case .approval(let v): self = .approval(v)
+            case .lesson(let v): self = .lesson(v)
+            case .unknown: return nil
+            }
+        }
+
+        var part: RemotePart {
+            switch self {
+            case .text(let v): .text(v)
+            case .tool(let v): .tool(v)
+            case .notice(let v): .notice(v)
+            case .failure(let v): .failure(v)
+            case .plan(let v): .plan(v)
+            case .image(let v): .image(v)
+            case .approval(let v): .approval(v)
+            case .lesson(let v): .lesson(v)
+            }
+        }
+    }
+}
+
+/// A picture: small enough to send whole (a JPEG ≤ 1600 px, ≤ ~400 KB).
+public struct RemoteImage: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var jpeg: Data?
+    public var width: Int
+    public var height: Int
+    public var caption: String?
+    public init(id: UUID, jpeg: Data?, width: Int, height: Int, caption: String?) {
+        self.id = id; self.jpeg = jpeg; self.width = width; self.height = height; self.caption = caption
+    }
+}
+
+/// A risky action waiting for a yes or no. `state`: pending, allowed, refused, expired.
+public struct RemoteApproval: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var agent: String
+    public var summary: String
+    public var detail: String
+    public var risk: String
+    public var state: String
+    public var answeredBy: String?
+    public init(id: UUID, agent: String, summary: String, detail: String, risk: String, state: String, answeredBy: String?) {
+        self.id = id; self.agent = agent; self.summary = summary; self.detail = detail; self.risk = risk
+        self.state = state; self.answeredBy = answeredBy
+    }
 }
 
 public struct RemoteMessage: Codable, Equatable, Sendable, Identifiable {
@@ -288,6 +378,12 @@ public enum ClientMessage: Codable, Equatable, Sendable {
     case setWorld(requestID: UUID, setting: String)
     /// The phone is away from the Mac's network and reading through iCloud (a heartbeat).
     case away
+    // Agentic Mode.
+    /// A message to a crew member in their thread (started on the first message), with photos as
+    /// JPEGs (≤ 1600 px). Answered with a `reply` carrying the thread's chat.
+    case threadSend(requestID: UUID, memberID: UUID, text: String, images: [Data])
+    /// Allow or Don't allow on an approval card. Answered with a `reply` (refused once answered).
+    case answerApproval(requestID: UUID, approvalID: UUID, allow: Bool)
 }
 
 /// One frame on the wire. Messages a side doesn't know (a newer peer's) fail to decode and are

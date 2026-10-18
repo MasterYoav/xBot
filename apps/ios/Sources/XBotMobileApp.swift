@@ -41,6 +41,10 @@ struct XBotMobileApp: App {
                        let invite = PairingInvite(url: url), client.pairing?.key != invite.key {
                         client.pair(with: invite)
                     }
+                    // Screenshots: `SIMCTL_CHILD_XBOT_MODE=agentic` starts in that mode.
+                    if let mode = ProcessInfo.processInfo.environment["XBOT_MODE"], AppMode(rawValue: mode) != nil {
+                        UserDefaults.standard.set(mode, forKey: "mode")
+                    }
                     #endif
                 }
         }
@@ -160,61 +164,72 @@ struct RootView: View {
     let client: RemoteClient
     @State private var nav = Navigator()
     @Namespace private var tools
+    @AppStorage("mode") private var mode = AppMode.developer.rawValue
 
     var body: some View {
-        if client.pairing == nil {
-            PairView(client: client)
-        } else {
-            TabView(selection: $nav.tab) {
-                Tab(String(localized: "Home"), systemImage: "sparkles", value: AppTab.home) {
-                    stack(.home) { HomeScreen(client: client, nav: nav, tools: tools) }
-                }
-                Tab(String(localized: "Chats"), systemImage: "bubble.left.and.bubble.right.fill", value: AppTab.chats) {
-                    stack(.chats) { ChatListView(client: client, nav: nav) }
-                }
-                Tab(String(localized: "Agents"), systemImage: "person.3.fill", value: AppTab.agents) {
-                    stack(.agents) { AgentsWorldScreen(client: client, nav: nav) }
-                }
-                Tab(String(localized: "Projects"), systemImage: "folder.fill", value: AppTab.projects) {
-                    stack(.projects) { ProjectsScreen(client: client, nav: nav) }
-                }
-                Tab(value: AppTab.search, role: .search) {
-                    stack(.search) { SearchScreen(client: client, nav: nav) }
+        Group {
+            if client.pairing == nil {
+                PairView(client: client)
+            } else if mode == AppMode.agentic.rawValue {
+                AgenticRoot(client: client, settings: $nav.settings)
+            } else {
+                developer
+            }
+        }
+        // Here, not on either mode's root: switching modes in Settings swaps the root behind the
+        // sheet, which stays open.
+        .sheet(isPresented: $nav.settings) { SettingsSheet(client: client) }
+    }
+
+    private var developer: some View {
+        TabView(selection: $nav.tab) {
+            Tab(String(localized: "Home"), systemImage: "sparkles", value: AppTab.home) {
+                stack(.home) { HomeScreen(client: client, nav: nav, tools: tools) }
+            }
+            Tab(String(localized: "Chats"), systemImage: "bubble.left.and.bubble.right.fill", value: AppTab.chats) {
+                stack(.chats) { ChatListView(client: client, nav: nav) }
+            }
+            Tab(String(localized: "Agents"), systemImage: "person.3.fill", value: AppTab.agents) {
+                stack(.agents) { AgentsWorldScreen(client: client, nav: nav) }
+            }
+            Tab(String(localized: "Projects"), systemImage: "folder.fill", value: AppTab.projects) {
+                stack(.projects) { ProjectsScreen(client: client, nav: nav) }
+            }
+            Tab(value: AppTab.search, role: .search) {
+                stack(.search) { SearchScreen(client: client, nav: nav) }
+            }
+        }
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabViewStyle(.sidebarAdaptable)
+        .sheet(item: $nav.compose) { request in
+            NewChatSheet(client: client, initialProject: request.projectID, initialText: request.text) { id in
+                nav.compose = nil
+                nav.push(.chat(id))
+            }
+        }
+        .sheet(isPresented: $nav.addingProject) {
+            AddProjectSheet(client: client) { id in
+                nav.addingProject = false
+                if let id { nav.tab = .projects; nav.paths[.projects] = [.project(id)] }
+            }
+        }
+        .fullScreenCover(item: $nav.tool) { tool in
+            Group {
+                switch tool {
+                case .notes: NotesScreen(client: client)
+                case .automations: AutomationsScreen(client: client)
+                case .abilities: AbilitiesScreen(client: client)
+                case .profile: ProfileScreen(client: client)
+                case .terminal: NavigationStack { TerminalScreen(client: client, projectID: nil).closable() }
                 }
             }
-            .tabBarMinimizeBehavior(.onScrollDown)
-            .tabViewStyle(.sidebarAdaptable)
-            .sheet(isPresented: $nav.settings) { SettingsSheet(client: client) }
-            .sheet(item: $nav.compose) { request in
-                NewChatSheet(client: client, initialProject: request.projectID, initialText: request.text) { id in
-                    nav.compose = nil
-                    nav.push(.chat(id))
-                }
-            }
-            .sheet(isPresented: $nav.addingProject) {
-                AddProjectSheet(client: client) { id in
-                    nav.addingProject = false
-                    if let id { nav.tab = .projects; nav.paths[.projects] = [.project(id)] }
-                }
-            }
-            .fullScreenCover(item: $nav.tool) { tool in
-                Group {
-                    switch tool {
-                    case .notes: NotesScreen(client: client)
-                    case .automations: AutomationsScreen(client: client)
-                    case .abilities: AbilitiesScreen(client: client)
-                    case .profile: ProfileScreen(client: client)
-                    case .terminal: NavigationStack { TerminalScreen(client: client, projectID: nil).closable() }
-                    }
-                }
-                .environment(\.close, { nav.tool = nil })
-                .navigationTransition(.zoom(sourceID: tool, in: tools))
-            }
-            .alert(String(localized: "Your Mac said no"), isPresented: Binding(get: { client.notice != nil }, set: { if !$0 { client.notice = nil } })) {
-                Button(String(localized: "OK")) { client.notice = nil }
-            } message: {
-                Text(client.notice ?? "")
-            }
+            .environment(\.close, { nav.tool = nil })
+            .navigationTransition(.zoom(sourceID: tool, in: tools))
+        }
+        .alert(String(localized: "Your Mac said no"), isPresented: Binding(get: { client.notice != nil }, set: { if !$0 { client.notice = nil } })) {
+            Button(String(localized: "OK")) { client.notice = nil }
+        } message: {
+            Text(client.notice ?? "")
         }
     }
 
@@ -273,6 +288,25 @@ struct LinkStatus: View {
     }
 }
 
+/// Developer Mode is the whole remote (tabs, projects, files); Agentic Mode is only chats with the
+/// crew, who do the work on the Mac. Kept on this device.
+enum AppMode: String, CaseIterable, Identifiable {
+    case developer, agentic
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .developer: String(localized: "Developer")
+        case .agentic: String(localized: "Agentic")
+        }
+    }
+    var explanation: String {
+        switch self {
+        case .developer: String(localized: "Projects, files, chats and every tool, as on the Mac.")
+        case .agentic: String(localized: "Just chats with your crew. Ask for anything; they do it on your Mac.")
+        }
+    }
+}
+
 enum Appearance: String, CaseIterable, Identifiable {
     case system, light, dark
     var id: String { rawValue }
@@ -290,6 +324,7 @@ struct SettingsSheet: View {
     let client: RemoteClient
     @AppStorage("appearance") private var appearance = Appearance.system.rawValue
     @AppStorage("markdownAsCode") private var markdownAsCode = false
+    @AppStorage("mode") private var mode = AppMode.developer.rawValue
     @Environment(\.dismiss) private var dismiss
     @State private var confirming = false
 
@@ -301,6 +336,17 @@ struct SettingsSheet: View {
                     LinkStatus(client: client)
                 } footer: {
                     Text(String(localized: "The agents run on your Mac. Keep it on and awake; while this device is connected, xBot keeps it from sleeping."))
+                }
+                Section {
+                    Picker(String(localized: "Mode"), selection: $mode) {
+                        ForEach(AppMode.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("mode-picker")
+                } header: {
+                    Text(String(localized: "Mode"))
+                } footer: {
+                    Text(AppMode(rawValue: mode)?.explanation ?? "")
                 }
                 Section(String(localized: "Appearance")) {
                     Picker(String(localized: "Look"), selection: $appearance) {

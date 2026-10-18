@@ -162,20 +162,20 @@ struct Composer: View {
     @ViewBuilder private var sendButton: some View {
         let canSend = !text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && blockedReason == nil
         let button = Button {
-            if isRunning, case .chat(let id) = target { workspace.stop(id) } else { send() }
+            if showsStop, case .chat(let id) = target { workspace.stop(id) } else { send() }
         } label: {
-            Image(systemName: isRunning ? "stop.fill" : "arrow.up")
+            Image(systemName: showsStop ? "stop.fill" : "arrow.up")
                 .font(Typography.emphasis.weight(.bold))
                 .foregroundStyle(Palette.textInverse)
                 .frame(width: Metrics.sendButton, height: Metrics.sendButton)
-                .background(isRunning || canSend ? Palette.accent : Palette.textTertiary, in: Circle())
+                .background(showsStop || canSend ? Palette.accent : Palette.textTertiary, in: Circle())
         }
         .buttonStyle(XBotButtonStyle())
-        .disabled(!isRunning && !canSend)
-        .help(isRunning ? String(localized: "Stop (⌘.)") : String(localized: "Send"))
+        .disabled(!showsStop && !canSend)
+        .help(showsStop ? String(localized: "Stop (⌘.)") : String(localized: "Send"))
         .motion(Motion.quick, value: canSend)
         // ⏎ already sends through the field's onSubmit; the button only adds ⌘. while running.
-        if isRunning {
+        if showsStop {
             button.keyboardShortcut(".", modifiers: .command)
         } else {
             button
@@ -232,6 +232,10 @@ struct Composer: View {
     private var planMode: Bool { chat?.planMode ?? workspace.draft.planMode }
     private var reviewPlan: Bool { chat?.reviewPlan ?? workspace.draft.reviewPlan }
     private var isRunning: Bool { chat.map { workspace.isRunning($0.id) } ?? false }
+    /// The agent asked something (xbot_ask) and waits: what's typed is the answer, so the button
+    /// sends rather than stops.
+    private var isAnswering: Bool { chat.map { workspace.isAsking(in: $0.id) } ?? false }
+    private var showsStop: Bool { isRunning && !isAnswering }
 
     private var blockedReason: String? {
         if let chat { return workspace.sendBlockedReason(chat.id) }
@@ -240,6 +244,7 @@ struct Composer: View {
     }
 
     private var placeholder: String {
+        if isAnswering { return String(localized: "Answer…") }
         if !planMode, let agent = workspace.agent(chat?.agentID) {
             return String(localized: "Ask \(agent.name)…")
         }

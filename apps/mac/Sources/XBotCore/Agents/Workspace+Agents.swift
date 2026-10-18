@@ -133,9 +133,10 @@ extension Workspace {
         }
     }
 
-    /// Who the chat's agent is, the crew it works with, and its role instructions. Nil for a
-    /// chat that isn't with an agent.
-    func instructions(for chat: Chat) -> String? {
+    /// Who the chat's agent is, the crew it works with, its role instructions and what it has
+    /// learnt. Nil for a chat that isn't with an agent. `toolsAttached`: the turn has xBot's own
+    /// tools, so the agent is asked to write down what it learnt (`xbot_remember`).
+    func instructions(for chat: Chat, toolsAttached: Bool = false) -> String? {
         guard let agent = agent(chat.agentID) else { return nil }
         var text = "You are \(agent.name)"
         if !agent.role.isEmpty { text += ", \(agent.role.prefix(1).lowercased() + agent.role.dropFirst())" }
@@ -173,6 +174,12 @@ extension Workspace {
                 """
         }
         if !agent.instructions.isEmpty { text += "How you work:\n" + agent.instructions }
+        var sections: [String] = []
+        if let learnt = experienceSection(for: agent.id) { sections.append(learnt) }
+        if toolsAttached { sections.append(Self.reflection) }
+        if !sections.isEmpty {
+            text = text.trimmingCharacters(in: .newlines) + "\n\n" + sections.joined(separator: "\n\n")
+        }
         return text
     }
 

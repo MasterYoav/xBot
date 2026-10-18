@@ -23,6 +23,8 @@ public final class Workspace {
     public internal(set) var agents: [Agent] = []
     /// xBot on the iPhone and iPad; set by the app at launch (not in tests or the headless tick).
     public var remote: RemoteService?
+    /// The welcome tour; set by the app at launch (not in tests or the headless tick).
+    public var onboarding: OnboardingModel?
     /// Automations, in their order.
     public internal(set) var automations: [Automation] = []
     @ObservationIgnored var automationClock: Task<Void, Never>?
@@ -44,6 +46,24 @@ public final class Workspace {
     public let toasts = ToastCenter()
     /// Each chat's floating terminal windows.
     public let terminals = TerminalDeck()
+    /// Agentic Mode: risky actions waiting for the person's answer.
+    public let approvals = ApprovalCenter()
+    /// Agentic Mode: what each agent has learnt (Harness2's experience), beside the library (a
+    /// library in memory gets a folder of its own). Tests can point it elsewhere.
+    @ObservationIgnored public var experience: ExperienceStore {
+        didSet { lessonCache = [:]; experienceRevision += 1 }
+    }
+    /// Bumped when xBot changes someone's lessons, so the agent editor redraws.
+    var experienceRevision = 0
+    /// Each agent's lessons as last read, with the file's date: the crew card reads them every second.
+    @ObservationIgnored var lessonCache: [UUID: (date: Date?, lessons: [Lesson])] = [:]
+    /// Agentic Mode: agents' `xbot_ask` questions waiting for the person's reply.
+    public let questions = QuestionCenter()
+    /// xBot's own tools for agents (the xbot MCP server's app side); set by the app at launch, not
+    /// in the headless tick. Nil: no turn gets them.
+    @ObservationIgnored public var toolHost: ToolHost?
+    /// The tool token of each chat's running turn, closed when it ends.
+    @ObservationIgnored var toolTokens: [UUID: String] = [:]
     /// What Home's composer holds before a chat exists.
     public var draft = ChatDraft()
     /// Bumped to ask the sidebar's search field for focus (⌘K).
@@ -100,12 +120,18 @@ public final class Workspace {
         self.loadCodexModels = codexModels
         self.codexUsage = codexUsage
         self.defaults = defaults
+        experience = store.folder.map { ExperienceStore(folder: $0.appending(path: "Experience", directoryHint: .isDirectory)) }
+            ?? ExperienceStore(folder: FileManager.default.temporaryDirectory
+                .appending(path: "xBot-experience-\(UUID().uuidString)", directoryHint: .isDirectory))
         projects = attempt { try store.projects() } ?? []
         chats = attempt { try store.chats() } ?? []
         agents = attempt { try store.agents() } ?? []
+        // Once a launch: stale guesses go. A few small files, so it's done here, synchronously.
+        try? experience.decay()
         automations = attempt { try store.automations() } ?? []
         usage = attempt { try store.usage() } ?? [:]
         applyDraftDefaults()
+        wireApprovals()
     }
 
     public var availableHarnesses: [HarnessKind] { HarnessKind.allCases.filter { brains[$0] != nil } }
@@ -272,6 +298,12 @@ public final class Workspace {
     @discardableResult
     func send(_ text: String, in id: UUID, earlier: String?) -> Bool {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // An agent asked something (xbot_ask) and its turn is waiting: this is the answer.
+        if !prompt.isEmpty, questions.isWaiting(in: id) {
+            save(ChatMessage(chatID: id, role: .user, parts: [.text(prompt)]))
+            questions.answer(prompt, in: id)
+            return true
+        }
         guard !prompt.isEmpty, !isRunning(id), var chat = chat(id), let brain = brains[chat.harness] else {
             return false
         }
@@ -288,14 +320,16 @@ public final class Workspace {
             return true
         }
 
-        let request = TurnRequest(
+        var request = TurnRequest(
             prompt: turnPrompt, directory: directory(for: chat), model: turnModel(for: chat),
             mode: chat.mode, resumeID: chat.sessionID, effort: chat.effort,
             instructions: instructions(for: chat)
         )
+        let antigravity = attachTools(to: &request, for: chat)
         live[id] = []
         let harness = chat.harness
         launch(id) { workspace, token in
+            if let antigravity { await antigravity() }
             for await event in workspace.events(brain, request, harness: harness) {
                 workspace.receive(event, in: id, turn: token)
             }
@@ -316,6 +350,7 @@ public final class Workspace {
     }
 
     public func stop(_ id: UUID) {
+        questions.cancel(in: id)
         guard let turn = turns[id] else { return }
         end(id, turn: turn.token, stopped: true)
         turn.task.cancel()
@@ -347,6 +382,7 @@ public final class Workspace {
     func end(_ id: UUID, turn token: UUID, stopped: Bool) {
         guard turns[id]?.token == token else { return }
         turns[id] = nil
+        if let tools = toolTokens.removeValue(forKey: id) { toolHost?.close(tools) }
         if let messageID = planTurns.removeValue(forKey: id) {
             if stopped { haltPlan(messageID, in: id) }
             update(id) { $0.updatedAt = .now }

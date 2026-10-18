@@ -164,8 +164,8 @@ Homebrew, no xBot data, no agent CLI yet.
 6. Quit, drag xBot to the Trash, run `Uninstall xBot.command` from the DMG, and check nothing of
    xBot is left (the table in [packaging](11-packaging-and-updates.md#uninstall)).
 7. Time the whole thing, and write down every place you reached for something the app should have
-   done. There's no onboarding flow yet (the [roadmap](12-roadmap.md) has it after the native
-   brain), so this run is what shows how much one is needed.
+   done. Go through the welcome tour as a new user would: install one CLI from its agents step on
+   a Mac that doesn't have it, sign in, allow the three folders, and try the Full Disk Access guide.
 
 The live suites are worth a run on the development Mac at the same time:
 `XBOT_LIVE_HARNESS=1 swift test` in `apps/mac`, `scripts/e2e_automations.py` (xBot closed), and

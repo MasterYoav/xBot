@@ -13,11 +13,14 @@
 		19CF38B125EC2345106BDCA1 /* SuggestedAgents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184C22B9CAB7DCB30B92CE23 /* SuggestedAgents.swift */; };
 		22ADBB8F2523D798C45024B9 /* LiveRemoteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E527B4B364CD34AD7A71DEE3 /* LiveRemoteUITests.swift */; };
 		2CE93E9D0704A26BD67DB10C /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF031603ADB8FFF4984B948 /* HomeScreen.swift */; };
+		3284679C138140098AFFAB14 /* AgenticRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3465C81579C35052D43E93AC /* AgenticRoot.swift */; };
 		3717B2F278EF1BCD207AE7AA /* XBotMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A883A3922A318C099E51A12 /* XBotMobileApp.swift */; };
 		3F6C32D5E0611C68FCB2EE1C /* Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E84F0628CC1A5A8725A5B9E /* Glass.swift */; };
 		4501917AFCAE40FA96C89A66 /* XBotMacSigning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5413C960A83C6B9D79335838 /* XBotMacSigning.swift */; };
 		4BF8A0663AD2C34BA6F3EFCC /* ProjectsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9786224E2862DBB510C2416A /* ProjectsScreen.swift */; };
 		56CFEB8BF1FE4A3ACC24D71F /* CrewScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7482AE8AFDE95D3DCA1BB2A /* CrewScreen.swift */; };
+		5B96A53DF2D4BEA3674A0698 /* AgenticCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DF565D332B8BD2BC0C7FE7 /* AgenticCards.swift */; };
+		6BA0C9C94C56EBD3E3CA3817 /* AgenticThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0103AAFF706589172EEDB3 /* AgenticThreadView.swift */; };
 		76C27524FB392AAD83103A60 /* Composer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B0EAB5C062853D055579E01 /* Composer.swift */; };
 		868AADDC29A115E6576D7071 /* AutomationsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9017CA0C50D9D73A5DFD7399 /* AutomationsScreen.swift */; };
 		8891F13C347624BA68E89B72 /* ProjectScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB116660A0F17CC78A2A1AA /* ProjectScreen.swift */; };
@@ -28,6 +31,7 @@
 		9E255FAACAD3A0DDFE78F8CC /* RemoteClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */; };
 		9E8B818C85AA7B0CD2A76443 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 17B84BFA2CB7063ECDB8E94B /* SwiftTerm */; };
 		9FBEB32B75F9EF2F1DFD3E29 /* XBotWorld in Frameworks */ = {isa = PBXBuildFile; productRef = DCD2934EDAFC8E5D38A814BD /* XBotWorld */; };
+		ADF54A46CC8A9CB976D4C876 /* AgenticComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D721FC05691010BEFD491E31 /* AgenticComposer.swift */; };
 		C370272E29EF48D4D0D0DEA8 /* XBotRemote in Frameworks */ = {isa = PBXBuildFile; productRef = CFBABEF90EEA64CF4E933F25 /* XBotRemote */; };
 		CEA6EC2D9A2F2FE90309947F /* TerminalScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */; };
 		CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */; };
@@ -35,6 +39,7 @@
 		D8C7B67994EAA18365C2AF79 /* PairView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B152A45009833C7A36A3E078 /* PairView.swift */; };
 		E20B315433A17E2F6A32BB84 /* MarkdownEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6FC0ABA9AE2CBE06C4DA68 /* MarkdownEditor.swift */; };
 		EFDBC3A18E1BA6FC60EDB696 /* XBotMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = 1D13C595AB8352C4F2D29991 /* XBotMarkdown */; };
+		FDBA182EC341AE899168D88D /* AgenticChatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A2F8BE9EE8B8FEE8B13FE10 /* AgenticChatsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,19 +53,23 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		06DF565D332B8BD2BC0C7FE7 /* AgenticCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticCards.swift; sourceTree = "<group>"; };
 		0A883A3922A318C099E51A12 /* XBotMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMobileApp.swift; sourceTree = "<group>"; };
 		0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalScreen.swift; sourceTree = "<group>"; };
 		184C22B9CAB7DCB30B92CE23 /* SuggestedAgents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedAgents.swift; sourceTree = "<group>"; };
 		19AEA188BDDB67A6024A4602 /* AgentsWorldScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsWorldScreen.swift; sourceTree = "<group>"; };
 		27AAFDD406B0794B6D209FB8 /* XBotMacSigning.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = XBotMacSigning.entitlements; sourceTree = "<group>"; };
 		2AA6EA21750888078413BECD /* Accent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accent.swift; sourceTree = "<group>"; };
+		3465C81579C35052D43E93AC /* AgenticRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticRoot.swift; sourceTree = "<group>"; };
 		35D72027A9DC08F8F434E5E5 /* NotesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesScreen.swift; sourceTree = "<group>"; };
 		36FEEA105889A9A3FB9EAD00 /* XBotMobileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = XBotMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B0EAB5C062853D055579E01 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
 		3E84F0628CC1A5A8725A5B9E /* Glass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Glass.swift; sourceTree = "<group>"; };
 		5413C960A83C6B9D79335838 /* XBotMacSigning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMacSigning.swift; sourceTree = "<group>"; };
+		5C0103AAFF706589172EEDB3 /* AgenticThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticThreadView.swift; sourceTree = "<group>"; };
 		77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AbilitiesScreen.swift; sourceTree = "<group>"; };
 		78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatScreen.swift; sourceTree = "<group>"; };
+		7A2F8BE9EE8B8FEE8B13FE10 /* AgenticChatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticChatsView.swift; sourceTree = "<group>"; };
 		8718EE595CD1AD4B2DEC2CD9 /* RemoteClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClient.swift; sourceTree = "<group>"; };
 		894F7591A6E7774D0FDB41BD /* XBotMacSigning.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XBotMacSigning.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9017CA0C50D9D73A5DFD7399 /* AutomationsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationsScreen.swift; sourceTree = "<group>"; };
@@ -73,6 +82,7 @@
 		B152A45009833C7A36A3E078 /* PairView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairView.swift; sourceTree = "<group>"; };
 		BF6FC0ABA9AE2CBE06C4DA68 /* MarkdownEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownEditor.swift; sourceTree = "<group>"; };
 		C7482AE8AFDE95D3DCA1BB2A /* CrewScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrewScreen.swift; sourceTree = "<group>"; };
+		D721FC05691010BEFD491E31 /* AgenticComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticComposer.swift; sourceTree = "<group>"; };
 		D93054C07F278927F4859966 /* mac */ = {isa = PBXFileReference; lastKnownFileType = folder; name = mac; path = ../mac; sourceTree = SOURCE_ROOT; };
 		DE16AE4C9D778783F1CF8C3E /* xBot.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = xBot.icon; sourceTree = "<group>"; };
 		E527B4B364CD34AD7A71DEE3 /* LiveRemoteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveRemoteUITests.swift; sourceTree = "<group>"; };
@@ -99,6 +109,11 @@
 			children = (
 				77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */,
 				2AA6EA21750888078413BECD /* Accent.swift */,
+				06DF565D332B8BD2BC0C7FE7 /* AgenticCards.swift */,
+				7A2F8BE9EE8B8FEE8B13FE10 /* AgenticChatsView.swift */,
+				D721FC05691010BEFD491E31 /* AgenticComposer.swift */,
+				3465C81579C35052D43E93AC /* AgenticRoot.swift */,
+				5C0103AAFF706589172EEDB3 /* AgenticThreadView.swift */,
 				19AEA188BDDB67A6024A4602 /* AgentsWorldScreen.swift */,
 				9017CA0C50D9D73A5DFD7399 /* AutomationsScreen.swift */,
 				AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */,
@@ -322,6 +337,11 @@
 			files = (
 				CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */,
 				0D37C885450056066E914358 /* Accent.swift in Sources */,
+				5B96A53DF2D4BEA3674A0698 /* AgenticCards.swift in Sources */,
+				FDBA182EC341AE899168D88D /* AgenticChatsView.swift in Sources */,
+				ADF54A46CC8A9CB976D4C876 /* AgenticComposer.swift in Sources */,
+				3284679C138140098AFFAB14 /* AgenticRoot.swift in Sources */,
+				6BA0C9C94C56EBD3E3CA3817 /* AgenticThreadView.swift in Sources */,
 				D7D8149103FDFEB31417B776 /* AgentsWorldScreen.swift in Sources */,
 				868AADDC29A115E6576D7071 /* AutomationsScreen.swift in Sources */,
 				8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */,

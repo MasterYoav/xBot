@@ -64,8 +64,8 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
     /// with "-" would be read as a flag and argv has a length limit. Antigravity and Copilot read it
     /// only from a flag, so theirs is attached to it (`--print=…`, `--prompt=…`), which can't be
     /// taken for an option; the length limit stands for them. Codex reads a schema from a file,
-    /// which the caller writes.
-    public func arguments(for request: TurnRequest, schemaFile: URL? = nil) -> [String] {
+    /// which the caller writes, and Claude Code xBot's tools (`toolFiles`, with `request.tools`).
+    public func arguments(for request: TurnRequest, schemaFile: URL? = nil, toolFiles: ToolAttachment.Files? = nil) -> [String] {
         switch self {
         case .claude:
             let mode = switch (request.planning, request.mode) {
@@ -85,6 +85,11 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             if let resume = request.resumeID { arguments += ["--resume", resume] }
             if let schema = request.schema { arguments += ["--json-schema", schema] }
             if let instructions = request.instructions { arguments += ["--append-system-prompt", instructions] }
+            // Both flags take several values; the prompt is on stdin, so nothing positional follows.
+            if request.tools != nil, let toolFiles {
+                arguments += ["--mcp-config", toolFiles.mcpConfig.path, "--allowedTools", "mcp__xbot__*",
+                              "--settings", toolFiles.settings.path]
+            }
             return arguments
 
         case .codex:
@@ -103,6 +108,7 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             if let instructions = request.instructions {
                 arguments += ["-c", "developer_instructions=\(Self.tomlString(instructions))"]
             }
+            for override in request.tools?.codexOverrides ?? [] { arguments += ["-c", override] }
             if let resume = request.resumeID { arguments.append(resume) }
             arguments.append("-")
             return arguments
@@ -115,6 +121,11 @@ public enum HarnessKind: String, Codable, CaseIterable, Sendable {
             case (true, _), (false, .readOnly): break   // reads are allowed; anything else is denied headless
             case (false, .editFiles): arguments += ["--allow-tool", "write"]
             case (false, .fullAccess): arguments += ["--allow-all-tools", "--allow-all-paths"]
+            }
+            if let tools = request.tools {
+                arguments += ["--additional-mcp-config", tools.copilotMCPConfig]
+                // Headless, a tool that isn't allowed is denied; full access allows them all already.
+                if request.planning || request.mode != .fullAccess { arguments += ["--allow-tool", "xbot"] }
             }
             if let model = request.model { arguments += ["--model", model] }
             if let effort = request.effort { arguments += ["--reasoning-effort", effort.claudeValue] }

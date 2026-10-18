@@ -5,7 +5,7 @@ views live in `apps/mac/Sources/XBotUI`; the phone's in `apps/ios/Sources`. **Th
 of truth.** Where this document and the code disagree, the code wins, and this document is wrong.
 
 Nothing here is a plan. Features the redesign still owes — a bot's own computer, the native brain,
-checkpoints, worktrees, split panes, the Quick Composer, onboarding — are in the
+checkpoints, worktrees, split panes, the Quick Composer — are in the
 [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-design.md) and the
 [roadmap](12-roadmap.md), not here.
 
@@ -84,6 +84,58 @@ Open chats are tabs, in the title bar row.
 - With the sidebar hidden, the traffic lights sit at the strip's left with a button to show the
   sidebar again (⌃⌘S).
 
+## The welcome tour
+
+The first run (and **Help › Welcome Tour**) replaces the whole window's content with the tour
+(`OnboardingView`), over the wallpaper. Which steps, and what each does, is in
+[First run](06-onboarding.md#the-tour); this is how it looks.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ ● ● ●                     (drag area)                            │
+│                ┌──────────────────────────────┐                  │
+│                │    animated scene (16 : 9,   │                  │
+│                │    150–340 pt tall)          │                  │
+│                └──────────────────────────────┘                  │
+│   Title (hero)                       controls of the step,        │
+│   One sentence.                      when it has any (≤ 420 pt)  │
+│   ✓ up to three bullets                                          │
+│                                                                  │
+│ Skip               ● ━ ● ● ● ● ● ● ● ● ●          Back  Continue  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- The scene takes about 42 % of the height, between 150 and 340 pt; it is decoration (no clicks,
+  hidden from VoiceOver). Words and controls sit side by side under it; a step with no controls
+  centres its words. Ready centres **Start** under them.
+- **Your agents** puts four cards (196 × 176 pt; two by two when the window is too narrow) where
+  the scene would be. Each card: the CLI's colour dot and name, a status pill (LOOKING, NOT
+  INSTALLED, INSTALLING, NOT SIGNED IN, SIGNING IN, READY, NEEDS A TOOL, DIDN'T WORK), a sentence,
+  and its one button (Install, Sign in, Get npm, Try again; a green check when ready). Beside the
+  words: **Skip for now** (a checkbox) and **Look again**; once one CLI is ready, *"You're set:
+  continue whenever you like."*
+- **The install sheet** (640 × 500): an icon tile, *"Installing Claude Code"* or *"Signing in to
+  Claude Code"* with a line under it, ×; the command in mono on an inset strip; the terminal; then
+  the outcome (*"Claude Code is ready."*, *"Installed. Now sign in."*, or the failure in red) and
+  **Cancel** / **I've signed in** while it runs, **Done** after.
+- **Your files**: three rows (folder symbol, name, *"Not asked yet"* / *"Allowed"* / *"Not allowed:
+  change it in System Settings."*, and **Allow** / ✓ / **Open Settings**), then **Allow all** and
+  **Or give Full Disk Access…**.
+- **The Full Disk Access guide** is a 260 × 300 floating panel with only a close button, docked to
+  the right of System Settings' window 12 pt away and 56 pt below its top (to the left when there's
+  no room): xBot's icon over *DRAG INTO THE LIST*, a row with xBot's icon and name and a switch that
+  flips on every couple of seconds (still, and on, under Reduce Motion), and *"Turn xBot on under
+  Full Disk Access. Not in the list? Drag the icon above into it."* Granted, it shows a green check
+  and *"Full Disk Access is on."* and closes.
+- **Your iPhone**: **Show the code** and **Not now**; then a 150 pt QR on a white tile with two
+  lines beside it and **Hide the code**; *"Paired with <device>."* once a phone says hello.
+- **Make it yours**: the five worlds as chips in two columns (symbol and name; the chosen one in the
+  accent), then Dark · Light · Match System as a segmented control.
+- Dots: the current one is a 18 pt capsule, the rest 6 pt dots; each is a button.
+- A new step slides in from the side it's moving towards and the old one out the other side
+  (`Motion.standard`), cross-fading under Reduce Motion. The tour and the window's content
+  cross-fade into each other.
+
 ## The sidebar
 
 Top to bottom:
@@ -125,6 +177,10 @@ With no agent CLI found, Home says instead:
 
 with links **Get Claude Code**, **Get Codex**, **Get Antigravity** and **Get GitHub Copilot** (in a
 row, or a column when the window is too narrow), and **Look again**.
+
+While the welcome tour was skipped and not finished, a row sits above the composer: ✦ **Finish
+setting up** — *"Your agents, file access and your iPhone, in the welcome tour."* — with
+**Continue** (the tour, from the start) and × (dismissed for good).
 
 ## The composer
 
@@ -363,7 +419,7 @@ HeadMaster.
 **Below the world**: **Working now** (who, what, for how long; *"Nobody's working right now."*),
 **Just finished** (*"Finished — open to read"*; *"Nothing new for you."*), **Activity** (replies
 from the crew over 14 days, as bars), and **Crew** (face, name, *Founder* for HeadMaster, role,
-CLI, ✎ and **Talk**).
+a 💡 count of what they've learnt when there's anything, CLI, ✎ and **Talk**).
 
 **The editor** (a sheet, for hiring and editing):
 
@@ -376,6 +432,21 @@ CLI, ✎ and **Talk**).
   suggestion *(suggested)*. A new hire's manager follows the suggestion as the role is typed.
 - For HeadMaster, instead of Reports to: *"HeadMaster founded this place and runs it for you: it
   reports to you, hands work to the crew, and can't be let go."*
+- Beside the name (not for a new hire), a 💡 chip — *"2 lessons"*, or *Experience* — that scrolls
+  down to **Experience**. The sheet scrolls; its scrolling part is at most 540 pt, so with the
+  footer it fits the smallest window.
+- **Experience**, below both columns (not for a new hire): 💡 **Experience**, the count in mono
+  capitals, **Forget everything…** (red) and *"Lessons <name> wrote down after its tasks. The
+  surest and newest go into every turn it takes, up to 12."* Then a panel per lesson, surest and
+  newest first: the cue, *↳ the lesson*, a confidence pill (● HIGH green, ● MEDIUM blue, ● LOW
+  grey), the evidence in italics, and *LEARNT 3 DAYS AGO · USED 7 TIMES* (*NOT USED YET*), with ✎
+  and 🗑 beside it. ✎ turns the panel into fields — **When this happens**, **Do this**,
+  **Confidence** (Low / Medium / High) — with **Cancel** and **Save lesson** (Return saves, Esc
+  cancels; a blank cue or lesson can't be saved). 🗑 forgets it at once with a toast, *"Forgot
+  “<cue>”"* and **Undo**, shown inside the sheet. **Forget everything…** asks first (*"Forget
+  everything <name> has learnt?"* — *"N lessons will go. <name> starts learning again from its next
+  task in Agentic Mode."*), then offers **Undo** too. Changes here are saved at once, not on Save.
+  Empty: *"Nothing yet. In Agentic Mode, <name> writes down what it learns after each task."*
 - Footer: **Let go…** (not for HeadMaster), **Cancel**, **Hire** / **Save**. Letting someone go
   moves their team up to their manager, keeps their chats, and shows a toast with **Undo**.
 
@@ -448,7 +519,8 @@ problem shows under it.
 
 Beyond the standard ones: **About xBot**, **Check for Updates…** (Sparkle; inert until a release
 feed is configured), **File › New Chat** and **Close Tab**, **View › Files and Changes**,
-**Window › Tab 1…9**, **Edit › Search Chats**, **Help › xBot Documentation**.
+**Window › Tab 1…9**, **Edit › Search Chats**, **Help › Welcome Tour** and **Help › xBot
+Documentation**.
 
 ## Toasts and motion
 
@@ -475,6 +547,7 @@ Motion stills the worlds, text-art wallpapers and Galaxy.
 | ⏎ / ⌫ | Next plan step / remove an empty step |
 | Escape | Cancel an edit; close a diff; close the explorer's filter |
 | ⌘, | Settings |
+| ← → / ⏎ | In the welcome tour: previous / next step; Continue (Start on the last step) |
 
 ---
 
@@ -644,13 +717,61 @@ Full-screen pages from Home, each closed with ×.
   tasks per agent and *plans run*; **Plan usage** per provider with what is left and when it
   resets; top projects, tools and skills. With no history: *"No agent history yet"*.
 
+## Agentic Mode
+
+Settings › **Mode** › **Agentic** replaces the tab bar with one screen of chats with the crew. The
+spec is [the Agentic Mode design](superpowers/specs/2026-10-13-agentic-mode-design.md).
+
+### Chats
+
+- **Top bar**: ⚙ (Settings) at the leading edge; the Mac's name over a dot and *same Wi-Fi* /
+  *through iCloud* / *connecting…* / *offline* in the middle; a hire button (person with +) at the
+  trailing edge, which opens **Hire someone**: the suggested agents not on the crew yet, each with
+  **Hire**.
+- **Search** under the bar (pull down), matching names, roles and last messages.
+- **Rows** (Telegram-like): a 54 pt circle with the member's still pixel face on their colour; the
+  name (HeadMaster with a crown); the time of the last message (accent when unread); two lines of
+  the last message (*You: …* for yours, *Needs your OK: …*, *Screenshot*), or *typing…* in the
+  accent while a turn runs; an accent unread dot. HeadMaster is pinned first, with a pin, and
+  reads *"Ask me anything"* until there's a thread. Others with no thread show their role.
+- Before the Mac answers: *"Looking for your crew"*.
+
+### A thread
+
+- **Bar**: back, the name over the role (*typing…* in the accent while working), their face at the
+  trailing edge.
+- **Empty**: their face, name and *"Ask me anything. I can use your Mac like you do, and hand work
+  to the crew."* (HeadMaster) or their role, and for HeadMaster three starters (*What's on my screen
+  right now?*, *Tidy up my Desktop*, *What changed in my projects today?*) that fill the field.
+- **Bubbles**: yours right-aligned in the accent gradient, white text, photos above as rounded
+  thumbnails; theirs left-aligned on the card colour, Markdown, code blocks in a darker well.
+  Corner radius 20. New bubbles spring in from below (fade only under Reduce Motion); the view stays
+  at the bottom while a reply streams.
+- **While they work**: an activity line (gears + *"Running swift test…"*) changing in place, cards
+  as they arrive, and the typing dots (three, pulsing; still under Reduce Motion) until words
+  arrive, which then stream into their bubble.
+- **Did N things ›** above a finished reply: tap to list each tool (✓ or ✕, label, summary).
+- **Cards**: *Screenshot* (a rounded thumbnail up to 260 pt wide, the app as a caption; tap for full
+  screen on black, pinch or double-tap to zoom, ✕ to close). *Approval* (a hand icon, *"Forge wants
+  to"*, the summary, the command in a well, **Don't Allow** and **Allow**, *"Waits up to 10
+  minutes, then it won't run."*; once answered *Allowed on Yoav's iPhone* in green, *Not allowed on
+  …* in red, or *No answer in time, so it didn't run.*). *Hand-off* (their face, *Handed to Forge*,
+  the task, ›; opens Forge's thread). *Finished* (a green ✓ pill: *Forge finished: …*). Other notes
+  as grey pills. *Learnt: …* in caption size with a lightbulb.
+- **Long-press**: theirs — Copy, Retry, Share; yours — Copy, **Edit and resend** (a sheet).
+- **Composer**: **+** (Photos, up to four; previews above the field with ✕), the field *"Message
+  HeadMaster"* (1–6 lines) with the mic inside it (a waveform in the accent while listening), then
+  **Send** (accent glass) once there's something to send, or **Stop** while they work. A light tap
+  of haptics on send and on approve.
+
 ## Settings
 
-A sheet from Home's ⚙ or the Mac menu.
+A sheet from Home's ⚙ or the Mac menu (in Agentic Mode, the chat list's ⚙).
 
 | Section | Contents |
 | --- | --- |
 | *(top)* | **Mac** — its name, and the link state. *"The agents run on your Mac. Keep it on and awake; while this device is connected, xBot keeps it from sleeping."* |
+| **Mode** | *Developer* / *Agentic*, segmented; the line under it says what each is. Stays open while the app changes behind it |
 | **Appearance** | *Match the device*, *Light*, *Dark* |
 | **Accent colour** | Eight swatches — Orchid, Violet, Blue, Teal, Green, Amber, Coral, Graphite — and **Custom colour**. *"Used for buttons, highlights and Home's glow."* |
 | **Files** | **Show .md files as code** — opens Markdown as text instead of a document (each file can still switch from its menu) |

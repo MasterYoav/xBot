@@ -35,8 +35,13 @@ public enum HarnessLocator {
     }
 
     public static func find(_ kind: HarnessKind, in path: String) -> URL? {
+        find(executable: kind.executableName, in: path)
+    }
+
+    /// The first executable called `name` on `path` (an installer's npm or brew, say).
+    public static func find(executable name: String, in path: String) -> URL? {
         path.split(separator: ":")
-            .map { URL(filePath: String($0)).appending(path: kind.executableName) }
+            .map { URL(filePath: String($0)).appending(path: name) }
             .first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
 

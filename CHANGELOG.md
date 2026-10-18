@@ -6,6 +6,11 @@ xBot is now a native app that drives the agent CLIs you already have. See
 [ADR-0009](docs/decisions/0009-native-harness-redesign.md).
 
 ### Added
+- iPhone **Agentic Mode** (Settings › Mode): a Telegram-like chat with each crew member, HeadMaster
+  pinned as *Ask me anything*. Threads with typing dots, one live activity line folding into *Did N
+  things*, screenshot, approval, hand-off and lesson cards, on-device dictation and photos (sent as
+  JPEGs ≤ 1600 px). On the Mac each member's thread is one Full-access chat in the Inbox
+  (`chats.thread`, schema 7) that carries on in a new chat when its session can't be resumed.
 - Projects: add any folder; chats in it work in that folder.
 - Chats as tabs, with Claude Code or Codex answering on your own subscription, streamed live, with
   each tool call shown and its output a click away. Every chat continues its CLI session.
@@ -73,6 +78,27 @@ xBot is now a native app that drives the agent CLIs you already have. See
   with your choice of accent colour, a plan board for every provider you use, suggested agents to
   hire, and Markdown files you edit as documents.
 - Animations pause while xBot isn't the active app (idle CPU from about 19.6% to 0.0%).
+- A welcome tour on first run (and from **Help › Welcome Tour**): eleven steps with animated
+  scenes. It finds Claude Code, Codex, Antigravity and GitHub Copilot and installs or signs in to
+  a missing one with the vendor's official command, in a terminal shown in the app; asks for
+  Desktop, Documents and Downloads up front, or guides you to Full Disk Access with a panel docked
+  beside System Settings; pairs an iPhone; and sets the crew's world and the theme. Skip leaves a
+  **Finish setting up** row on Home. Libraries with chats or projects already count as done.
+- Experience (Agentic Mode, after Google's Harness²): agents write down what they learn after a
+  task — *when this happens, do this*, how sure they are and why — and the surest, newest lessons go
+  into their later turns (up to 12). Read, reword or forget them in the agent editor's
+  **Experience**, with Undo, or **Forget everything…**. Unused low-confidence lessons go after 30
+  days.
+
+- Agentic Mode's tools: agents in a thread (or in every chat, with Settings › Agents › **xBot tools
+  in every chat**) get xBot's own MCP server — projects, chats, the crew and hand-offs, automations,
+  notes, settings and worlds, lessons, a question to you (`xbot_ask`) — and the Mac: screenshots,
+  the screen through Accessibility, clicks, typing, keys, scrolling, opening and quitting apps.
+  Attached per turn to Claude Code, Codex and GitHub Copilot, and added once to Antigravity.
+  Deleting, sending, pushing, buying, quitting apps and changing system settings ask you first,
+  with a card in the chat you answer on the Mac or the phone; Claude Code's own shell is held to
+  the same rules by a hook. Accessibility and Screen Recording rows in the welcome tour and in
+  Settings open the floating guide beside System Settings.
 
 ### Changed
 - Automations replace the Inbox in the sidebar; loose chats are listed under Recent.

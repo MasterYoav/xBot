@@ -13,12 +13,16 @@ built yet, is the [redesign spec](superpowers/specs/2026-10-06-xbot-redesign-des
 | An agent CLI (`claude`, `codex`, `agy`, `copilot`) | for the length of one turn | its arguments, stdin, stdout and stderr |
 | A login shell | while a terminal window or tab is open (on the Mac or from the phone) | a pseudo-terminal |
 | `XBot --automations-tick` | once a minute, only if **Run when xBot is closed** is on and the app isn't open | the same SQLite file |
+| `XBot --mcp` | for one turn with xBot's tools, started by its CLI | stdio MCP to the CLI; the app's Unix socket |
+| `XBot --hook` | for a moment before each of Claude Code's shell commands, in a turn with xBot's tools | the app's Unix socket, only when the command is risky |
 | A bot's VM (Apple Containerization) | *not built yet* | — |
 
 The app listens on one TCP port, and only after an iPhone or iPad has been paired: the local lane
 of the [remote](14-iphone-and-ipad.md), advertised over Bonjour and accepting only TLS with a
 pairing key. Unpair the last device and the listener stops. The iCloud lane listens on nothing; it
-reads and writes records in your own CloudKit database.
+reads and writes records in your own CloudKit database. The app also opens one Unix-domain socket,
+`~/Library/Application Support/xBot/xbot.sock` (mode 0600, this user only), for its own tool server
+(below); it's removed when the app quits.
 
 ## How a message becomes a reply
 
@@ -49,6 +53,8 @@ How each CLI is run, its models and reasoning levels are in
   limits last read), `agents` (the crew, with each one's manager) and `automations`. WAL mode,
   schema version 6, migrated forward in place.
 - `Inbox/`: the working folder for chats that don't belong to a project.
+- `Experience/<agent-id>.json`: what each agent has learnt (below). Kept beside the library, so a
+  library in memory (tests, or one that couldn't open) gets a temporary folder of its own.
 
 Notes live in the project itself, as Markdown in `<project>/notes/`, so they travel with it.
 Settings and appearance are in the app's user defaults. Pairing keys are in the Keychain. Nothing
@@ -109,6 +115,24 @@ manager (at any depth) and sends them the task "From <manager>: …". A name out
 on the crew, is refused with a notice in the manager's reply. When the member's turn finishes,
 `reportBack` adds a notice to the manager's chat with the gist of what they did.
 
+**Experience.** From Google's [Harness²](https://github.com/google-research/harness2): each agent
+keeps evidence-backed lessons, *cue → lesson*, for later tasks (`ExperienceStore`, in
+`XBotCore/Agentic/Experience.swift`). A `Lesson` has a cue, the lesson, a confidence (low, medium,
+high), one line of evidence, when it was learnt and how many turns it was given to (`uses`). The
+agent writes them itself, at the end of its own turn, through the `xbot_remember` tool — one
+reflection per task and no second model run; `remember` replaces a lesson with the same cue
+(ignoring case, spacing and punctuation). On each turn, `instructions(for:toolsAttached:)` adds
+the agent's `selection` under *"What you've learnt (from earlier tasks; apply when the cue fits):"*,
+one line each (*"- When <cue>: <lesson> (high confidence)"*; the evidence stays out): ranked by
+confidence, then the newest, then the cue, at most 12 lines and 1,500 characters, skipping a line
+too long for what's left rather than stopping there. Each one sent counts a use. When the turn has
+xBot's tools attached, the instructions end with the reflection: *"When you finish a task, if you
+learnt something general that would help next time (not task-specific facts), call the
+xbot_remember tool once with the cue, the lesson, your confidence and the evidence."* When the
+library opens, `decay` drops low-confidence lessons more than 30 days old that were never used.
+The person reads, rewords and forgets them in the agent editor (`Workspace+Experience.swift`;
+forgetting returns an Undo).
+
 **The world.** `WorldStage` (in `XBotWorld`, shared with the phone) draws the crew in one of five
 pixel-art settings, in tiers by rank: HeadMaster on top, each team below its manager. Each agent
 has a slot of its own, walks within it and sits at its desk while one of its chats is running, with
@@ -143,10 +167,39 @@ the iCloud lane both sides read the mailbox every 2 seconds while a phone is att
 15 seconds otherwise), because pushes are best-effort. While a phone is attached or a turn runs, the
 Mac holds a power assertion against idle sleep.
 
+## Agentic tools
+
+Agents get xBot's own MCP server on thread turns (and on every turn with Settings › Agents ›
+**xBot tools in every chat**). How it fits together:
+
+1. `Workspace.send` builds the turn; `attachTools` asks `ToolHost` for a token (which names the
+   chat and agent), sets `TurnRequest.tools`, Full access for a thread, and appends the tools'
+   guidance to the agent's instructions.
+2. `HarnessKind.arguments` attaches the server the CLI's way (Claude Code `--mcp-config` +
+   `--allowedTools mcp__xbot__*` + a PreToolUse hook in `--settings`; Codex `-c mcp_servers.xbot.*`;
+   Copilot `--additional-mcp-config`; Antigravity once, in its own settings). `HarnessBrain` writes
+   Claude Code's two files for the turn and passes the token in the CLI's environment.
+3. The CLI starts `XBot --mcp` (`XBotTools`: JSON-RPC over stdio, the catalog, the socket client),
+   which forwards each `tools/call` as one JSON line `{token, tool, arguments}` to the app's socket.
+4. `ToolHost` (XBotCore) checks the token, the permission the tool needs, then `RiskRules`; a risky
+   call waits on `ApprovalCenter` (a card in the chat, answered on the phone or the Mac). Then it
+   acts: `xbot_*` through the same `Workspace` methods the window calls, `mac_*` through
+   `MacControlling` (`LiveMac`: NSWorkspace, ScreenCaptureKit, Accessibility, CGEvent).
+   Screenshots, lessons, questions and approval cards are posted in the chat as the agent's own
+   messages.
+5. `xbot_ask` posts the question and waits (`QuestionCenter`) for the person's next message in that
+   chat, which answers it instead of starting a turn.
+6. When the turn ends its token is closed.
+
+Claude Code's `XBot --hook` reads the hook event, lets safe calls through at once (exit 0), and
+asks the app about risky ones (exit 2 with the reason blocks). See [Security](10-security.md) for
+what each CLI's own tools are and aren't held to.
+
 ## Modules
 
 ```
 XBotApp ── XBotUI ── XBotCore ─┬─ XBotBrain     the CLIs: locating, running, parsing (Foundation only)
+                               ├─ XBotTools     the xbot MCP server's protocol and socket (Foundation only)
                                ├─ XBotRemote    the wire to the phone (also built for iOS)
                                ├─ XBotWorld     avatars, worlds, org chart, stage (also iOS)
                                └─ XBotMarkdown  Markdown documents as blocks (iOS's editor)

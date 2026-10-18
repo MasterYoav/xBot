@@ -14,6 +14,12 @@ public enum RemoteLane: Sendable { case local, cloud }
     func send(_ messages: [HostMessage])
     var onReceive: ((ClientMessage) -> Void)? { get set }
     var onClose: (() -> Void)? { get set }
+    /// The device's name as it said hello ("Yoav's iPhone"), for who answered an approval.
+    var deviceName: String? { get }
+}
+
+extension RemoteLink {
+    public var deviceName: String? { nil }
 }
 
 /**
@@ -328,6 +334,8 @@ public final class RemoteHost {
             handleProject(message, link: client.link)
         case .openShell, .shellInput, .shellResize, .closeShell:
             handleShell(message, client: id, link: client.link)
+        case .threadSend, .answerApproval:
+            handleAgentic(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
             if let reason = apply(settings, to: chatID) { return answer(client, request, refused: reason) }
@@ -391,7 +399,9 @@ public final class RemoteHost {
                        agentName: chat.harness.displayName, model: chat.model, mode: chat.mode.rawValue,
                        effort: chat.effort?.rawValue, planMode: chat.planMode, crewName: workspace.agent(chat.agentID)?.name,
                        updatedAt: chat.updatedAt, isRunning: workspace.isRunning(chat.id),
-                       blocked: workspace.isDiscovering ? nil : workspace.sendBlockedReason(chat.id))
+                       blocked: workspace.isDiscovering ? nil : workspace.sendBlockedReason(chat.id),
+                       thread: chat.isThread ? true : nil, agentID: chat.agentID,
+                       preview: chat.isThread ? threadPreview(chat.id) : nil)
         }
     }
 
@@ -417,6 +427,14 @@ public final class RemoteHost {
             .plan(RemotePlan(status: plan.status.rawValue, summary: plan.summary, note: plan.note,
                              steps: plan.steps.map { RemotePlanStep(id: $0.id, title: $0.title, status: $0.status.rawValue) },
                              problem: plan.problem, closing: plan.closing))
+        case .image(let image):
+            // The picture itself rides along: it's downscaled when it's made (≤ 1600 px).
+            .image(RemoteImage(id: image.id, jpeg: FileManager.default.contents(atPath: image.path),
+                               width: image.width, height: image.height, caption: image.caption))
+        case .approval(let a):
+            .approval(RemoteApproval(id: a.id, agent: a.agent, summary: a.summary, detail: a.detail, risk: a.risk,
+                                     state: a.state.rawValue, answeredBy: a.answeredBy))
+        case .lesson(let text): .lesson(text)
         }
     }
 
