@@ -55,6 +55,8 @@ public struct TurnRequest: Equatable, Sendable {
     public var planning: Bool
     /// Who the agent is and how it works, added to the CLI's own system prompt. Nil: none.
     public var instructions: String?
+    /// xBot's own MCP server for this turn (Agentic Mode). Nil: none.
+    public var tools: ToolAttachment?
 
     public init(
         prompt: String,
@@ -65,9 +67,11 @@ public struct TurnRequest: Equatable, Sendable {
         effort: Effort? = nil,
         schema: String? = nil,
         planning: Bool = false,
-        instructions: String? = nil
+        instructions: String? = nil,
+        tools: ToolAttachment? = nil
     ) {
         self.instructions = instructions
+        self.tools = tools
         self.prompt = prompt
         self.directory = directory
         self.model = model

@@ -43,11 +43,38 @@ public struct HarnessBrain: Brain {
             }
         }
 
+        // Claude Code takes xBot's server and hook from files: written for this turn, readable only
+        // by this user, removed when it ends.
+        var toolFiles: ToolAttachment.Files?
+        if kind == .claude, let tools = request.tools {
+            let folder = FileManager.default.temporaryDirectory
+            let files = ToolAttachment.Files(mcpConfig: folder.appending(path: "xbot-mcp-\(UUID().uuidString).json"),
+                                             settings: folder.appending(path: "xbot-hooks-\(UUID().uuidString).json"))
+            do {
+                for (file, text) in [(files.mcpConfig, tools.claudeMCPConfig), (files.settings, tools.claudeHookSettings)] {
+                    FileManager.default.createFile(atPath: file.path, contents: Data(text.utf8),
+                                                   attributes: [.posixPermissions: 0o600])
+                    guard FileManager.default.fileExists(atPath: file.path) else {
+                        throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: file.path])
+                    }
+                }
+                toolFiles = files
+            } catch {
+                for file in [files.mcpConfig, files.settings] { try? FileManager.default.removeItem(at: file) }
+                continuation.yield(.failed(String(localized: "xBot couldn't prepare this turn: \(error.localizedDescription)")))
+                continuation.finish()
+                return stream
+            }
+        }
+        let scratch = [schemaFile, toolFiles?.mcpConfig, toolFiles?.settings].compactMap { $0 }
+
         let process = Process()
         process.executableURL = executable
-        process.arguments = kind.arguments(for: request, schemaFile: schemaFile)
+        process.arguments = kind.arguments(for: request, schemaFile: schemaFile, toolFiles: toolFiles)
         process.currentDirectoryURL = request.directory
-        process.environment = environment
+        // The token goes to the CLI's own process too: Claude Code's hook and Antigravity's server
+        // (added once, with no per-run flag) inherit it from there.
+        process.environment = environment.merging(request.tools?.environment ?? [:]) { _, tool in tool }
         let input = Pipe(), output = Pipe(), errors = Pipe()
         process.standardInput = input
         process.standardOutput = output
@@ -72,7 +99,7 @@ public struct HarnessBrain: Brain {
             continuation.yield(.failed(String(
                 localized: "\(kind.displayName) could not start: \(error.localizedDescription)"
             )))
-            if let schemaFile { try? FileManager.default.removeItem(at: schemaFile) }
+            for file in scratch { try? FileManager.default.removeItem(at: file) }
             continuation.finish()
             return stream
         }
@@ -100,6 +127,7 @@ public struct HarnessBrain: Brain {
 
         let kind = self.kind
         let finishedSchema = schemaFile
+        let finishedScratch = scratch
         Task.detached {
             var ended = false
             var tail: SchemaTail? = finishedSchema == nil ? nil : SchemaTail()
@@ -127,7 +155,7 @@ public struct HarnessBrain: Brain {
             var status: Int32 = 0
             for await code in exit.stream { status = code }
             _ = await stderrReader.value
-            if let finishedSchema { try? FileManager.default.removeItem(at: finishedSchema) }
+            for file in finishedScratch { try? FileManager.default.removeItem(at: file) }
             if !ended {
                 let said = stderr.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 continuation.yield(.failed(said.isEmpty
