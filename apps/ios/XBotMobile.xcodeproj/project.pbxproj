@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FDBA182EC341AE899168D88D /* AgenticChatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A2F8BE9EE8B8FEE8B13FE10 /* AgenticChatsView.swift */; };
+		ADF54A46CC8A9CB976D4C876 /* AgenticComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D721FC05691010BEFD491E31 /* AgenticComposer.swift */; };
+		6BA0C9C94C56EBD3E3CA3817 /* AgenticThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0103AAFF706589172EEDB3 /* AgenticThreadView.swift */; };
+		5B96A53DF2D4BEA3674A0698 /* AgenticCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DF565D332B8BD2BC0C7FE7 /* AgenticCards.swift */; };
+		3284679C138140098AFFAB14 /* AgenticRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3465C81579C35052D43E93AC /* AgenticRoot.swift */; };
 		09CE436537C754C54945AAEA /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE658C7EDCEF1DD80AAE26E /* ProfileScreen.swift */; };
 		0AA3AC9BCD7CCBEDD0151A78 /* ChatScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */; };
 		0D37C885450056066E914358 /* Accent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA6EA21750888078413BECD /* Accent.swift */; };
@@ -48,6 +53,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D721FC05691010BEFD491E31 /* AgenticComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticComposer.swift; sourceTree = "<group>"; };
+		7A2F8BE9EE8B8FEE8B13FE10 /* AgenticChatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticChatsView.swift; sourceTree = "<group>"; };
+		5C0103AAFF706589172EEDB3 /* AgenticThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticThreadView.swift; sourceTree = "<group>"; };
+		3465C81579C35052D43E93AC /* AgenticRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticRoot.swift; sourceTree = "<group>"; };
+		06DF565D332B8BD2BC0C7FE7 /* AgenticCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgenticCards.swift; sourceTree = "<group>"; };
 		0A883A3922A318C099E51A12 /* XBotMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XBotMobileApp.swift; sourceTree = "<group>"; };
 		0E9A7908A0E7E0A5447451D4 /* TerminalScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalScreen.swift; sourceTree = "<group>"; };
 		184C22B9CAB7DCB30B92CE23 /* SuggestedAgents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedAgents.swift; sourceTree = "<group>"; };
@@ -100,6 +110,11 @@
 				77E85AECC74A3E2392285C57 /* AbilitiesScreen.swift */,
 				2AA6EA21750888078413BECD /* Accent.swift */,
 				19AEA188BDDB67A6024A4602 /* AgentsWorldScreen.swift */,
+				5C0103AAFF706589172EEDB3 /* AgenticThreadView.swift */,
+				3465C81579C35052D43E93AC /* AgenticRoot.swift */,
+				D721FC05691010BEFD491E31 /* AgenticComposer.swift */,
+				7A2F8BE9EE8B8FEE8B13FE10 /* AgenticChatsView.swift */,
+				06DF565D332B8BD2BC0C7FE7 /* AgenticCards.swift */,
 				9017CA0C50D9D73A5DFD7399 /* AutomationsScreen.swift */,
 				AF2A98F2DFE90AB5441E9588 /* ChatListView.swift */,
 				78E7EC7D8F2E2E30469A3305 /* ChatScreen.swift */,
@@ -323,6 +338,11 @@
 				CF0BFABE8D979D952316FDDC /* AbilitiesScreen.swift in Sources */,
 				0D37C885450056066E914358 /* Accent.swift in Sources */,
 				D7D8149103FDFEB31417B776 /* AgentsWorldScreen.swift in Sources */,
+				6BA0C9C94C56EBD3E3CA3817 /* AgenticThreadView.swift in Sources */,
+				3284679C138140098AFFAB14 /* AgenticRoot.swift in Sources */,
+				ADF54A46CC8A9CB976D4C876 /* AgenticComposer.swift in Sources */,
+				FDBA182EC341AE899168D88D /* AgenticChatsView.swift in Sources */,
+				5B96A53DF2D4BEA3674A0698 /* AgenticCards.swift in Sources */,
 				868AADDC29A115E6576D7071 /* AutomationsScreen.swift in Sources */,
 				8F64B701495AEBB6C82BAA78 /* ChatListView.swift in Sources */,
 				0AA3AC9BCD7CCBEDD0151A78 /* ChatScreen.swift in Sources */,

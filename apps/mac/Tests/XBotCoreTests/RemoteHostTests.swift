@@ -11,6 +11,7 @@ import XBotRemote
     var sent: [HostMessage] = []
     var onReceive: ((ClientMessage) -> Void)?
     var onClose: (() -> Void)?
+    var deviceName: String?
     init(_ lane: RemoteLane = .local) { self.lane = lane }
     func send(_ messages: [HostMessage]) { sent += messages }
     func say(_ message: ClientMessage) { onReceive?(message) }

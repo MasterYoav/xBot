@@ -14,6 +14,12 @@ public enum RemoteLane: Sendable { case local, cloud }
     func send(_ messages: [HostMessage])
     var onReceive: ((ClientMessage) -> Void)? { get set }
     var onClose: (() -> Void)? { get set }
+    /// The device's name as it said hello ("Yoav's iPhone"), for who answered an approval.
+    var deviceName: String? { get }
+}
+
+extension RemoteLink {
+    public var deviceName: String? { nil }
 }
 
 /**
@@ -328,6 +334,8 @@ public final class RemoteHost {
             handleProject(message, link: client.link)
         case .openShell, .shellInput, .shellResize, .closeShell:
             handleShell(message, client: id, link: client.link)
+        case .threadSend, .answerApproval:
+            handleAgentic(message, link: client.link)
         case .setChat(let request, let chatID, let settings):
             guard workspace.chat(chatID) != nil else { return answer(client, request, refused: notFound) }
             if let reason = apply(settings, to: chatID) { return answer(client, request, refused: reason) }
@@ -391,7 +399,9 @@ public final class RemoteHost {
                        agentName: chat.harness.displayName, model: chat.model, mode: chat.mode.rawValue,
                        effort: chat.effort?.rawValue, planMode: chat.planMode, crewName: workspace.agent(chat.agentID)?.name,
                        updatedAt: chat.updatedAt, isRunning: workspace.isRunning(chat.id),
-                       blocked: workspace.isDiscovering ? nil : workspace.sendBlockedReason(chat.id))
+                       blocked: workspace.isDiscovering ? nil : workspace.sendBlockedReason(chat.id),
+                       thread: chat.isThread ? true : nil, agentID: chat.agentID,
+                       preview: chat.isThread ? threadPreview(chat.id) : nil)
         }
     }
 

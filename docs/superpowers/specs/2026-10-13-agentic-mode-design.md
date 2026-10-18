@@ -202,6 +202,12 @@ last 200 messages in memory and pages older ones on scroll.
 - Host: `.approval(chatID, RemoteApproval)` pushes, `.permissions(accessibility, screen)`.
 - Old phones ignore unknown parts; the phone shows an unknown part as nothing.
 
+As built on the phone branch: `RemoteChat` also carries `agentID` and, for threads, `preview` (the
+last message in a line, for the chat list). Approvals reach the phone as their card in the thread's
+messages (a chat update), so there's no separate `.approval` push; threads are derived from the
+chat list, so there's no `threads` request; the activity line is derived on the phone from the live
+tool rows (`AgenticDigest`), so there's no `.activity` part. `.permissions` isn't sent yet.
+
 ## Tests
 
 - `RiskRules`: every rule, both ways (a `git status` runs, `git push` asks; `rm -rf` asks; Mail

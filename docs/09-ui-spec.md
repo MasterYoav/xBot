@@ -702,13 +702,61 @@ Full-screen pages from Home, each closed with ×.
   tasks per agent and *plans run*; **Plan usage** per provider with what is left and when it
   resets; top projects, tools and skills. With no history: *"No agent history yet"*.
 
+## Agentic Mode
+
+Settings › **Mode** › **Agentic** replaces the tab bar with one screen of chats with the crew. The
+spec is [the Agentic Mode design](superpowers/specs/2026-10-13-agentic-mode-design.md).
+
+### Chats
+
+- **Top bar**: ⚙ (Settings) at the leading edge; the Mac's name over a dot and *same Wi-Fi* /
+  *through iCloud* / *connecting…* / *offline* in the middle; a hire button (person with +) at the
+  trailing edge, which opens **Hire someone**: the suggested agents not on the crew yet, each with
+  **Hire**.
+- **Search** under the bar (pull down), matching names, roles and last messages.
+- **Rows** (Telegram-like): a 54 pt circle with the member's still pixel face on their colour; the
+  name (HeadMaster with a crown); the time of the last message (accent when unread); two lines of
+  the last message (*You: …* for yours, *Needs your OK: …*, *Screenshot*), or *typing…* in the
+  accent while a turn runs; an accent unread dot. HeadMaster is pinned first, with a pin, and
+  reads *"Ask me anything"* until there's a thread. Others with no thread show their role.
+- Before the Mac answers: *"Looking for your crew"*.
+
+### A thread
+
+- **Bar**: back, the name over the role (*typing…* in the accent while working), their face at the
+  trailing edge.
+- **Empty**: their face, name and *"Ask me anything. I can use your Mac like you do, and hand work
+  to the crew."* (HeadMaster) or their role, and for HeadMaster three starters (*What's on my screen
+  right now?*, *Tidy up my Desktop*, *What changed in my projects today?*) that fill the field.
+- **Bubbles**: yours right-aligned in the accent gradient, white text, photos above as rounded
+  thumbnails; theirs left-aligned on the card colour, Markdown, code blocks in a darker well.
+  Corner radius 20. New bubbles spring in from below (fade only under Reduce Motion); the view stays
+  at the bottom while a reply streams.
+- **While they work**: an activity line (gears + *"Running swift test…"*) changing in place, cards
+  as they arrive, and the typing dots (three, pulsing; still under Reduce Motion) until words
+  arrive, which then stream into their bubble.
+- **Did N things ›** above a finished reply: tap to list each tool (✓ or ✕, label, summary).
+- **Cards**: *Screenshot* (a rounded thumbnail up to 260 pt wide, the app as a caption; tap for full
+  screen on black, pinch or double-tap to zoom, ✕ to close). *Approval* (a hand icon, *"Forge wants
+  to"*, the summary, the command in a well, **Don't Allow** and **Allow**, *"Waits up to 10
+  minutes, then it won't run."*; once answered *Allowed on Yoav's iPhone* in green, *Not allowed on
+  …* in red, or *No answer in time, so it didn't run.*). *Hand-off* (their face, *Handed to Forge*,
+  the task, ›; opens Forge's thread). *Finished* (a green ✓ pill: *Forge finished: …*). Other notes
+  as grey pills. *Learnt: …* in caption size with a lightbulb.
+- **Long-press**: theirs — Copy, Retry, Share; yours — Copy, **Edit and resend** (a sheet).
+- **Composer**: **+** (Photos, up to four; previews above the field with ✕), the field *"Message
+  HeadMaster"* (1–6 lines) with the mic inside it (a waveform in the accent while listening), then
+  **Send** (accent glass) once there's something to send, or **Stop** while they work. A light tap
+  of haptics on send and on approve.
+
 ## Settings
 
-A sheet from Home's ⚙ or the Mac menu.
+A sheet from Home's ⚙ or the Mac menu (in Agentic Mode, the chat list's ⚙).
 
 | Section | Contents |
 | --- | --- |
 | *(top)* | **Mac** — its name, and the link state. *"The agents run on your Mac. Keep it on and awake; while this device is connected, xBot keeps it from sleeping."* |
+| **Mode** | *Developer* / *Agentic*, segmented; the line under it says what each is. Stays open while the app changes behind it |
 | **Appearance** | *Match the device*, *Light*, *Dark* |
 | **Accent colour** | Eight swatches — Orchid, Violet, Blue, Teal, Green, Amber, Coral, Graphite — and **Custom colour**. *"Used for buttons, highlights and Home's glow."* |
 | **Files** | **Show .md files as code** — opens Markdown as text instead of a document (each file can still switch from its menu) |
