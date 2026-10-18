@@ -40,6 +40,7 @@ import XBotTools
         #expect(request.instructions?.hasPrefix("You are HeadMaster") == true, "who the agent is comes first")
         #expect(request.instructions?.contains("mac_ui") == true)
         #expect(request.instructions?.contains("xbot_ask") == true)
+        #expect(request.instructions?.contains("checked by xBot the same way") == true, "Claude Code's shell has the hook")
         // While it runs the token works; once it ends it's refused.
         await settle(w)
         let after = await host.handle(ToolCall(token: tools.token, tool: "xbot_crew", arguments: [:]))
@@ -60,6 +61,13 @@ import XBotTools
         let request = try #require(brain.requests.withLock { $0.last })
         #expect(request.tools != nil)
         #expect(request.mode == .editFiles, "every chat gets the tools, not full access")
+    }
+
+    @Test func withoutTheHookTheAgentIsToldToAskFirst() {
+        for harness in [HarnessKind.codex, .copilot, .antigravity] {
+            #expect(Workspace.toolGuidance(for: harness).contains("not checked by xBot"), "\(harness)")
+        }
+        #expect(!Workspace.toolGuidance(for: .claude).contains("not checked by xBot"))
     }
 
     @Test func withoutAToolHostNothingIsAttached() async throws {

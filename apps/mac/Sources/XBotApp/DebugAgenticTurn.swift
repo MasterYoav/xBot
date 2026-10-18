@@ -8,7 +8,7 @@ import XBotCore
 /// How the MCP server and the hook are checked end to end with a real CLI. Point it at a sandboxed
 /// library (CFFIXED_USER_HOME), never a real one. `XBOT_DEBUG_AGENTIC_HARNESS` picks the CLI
 /// (claude by default); `XBOT_DEBUG_AGENTIC_APPROVE=allow|deny` answers approvals as a script;
-/// `XBOT_DEBUG_AGENTIC_QUIT=1` quits when done.
+/// `XBOT_DEBUG_AGENTIC_REPLY="…"` answers an `xbot_ask`; `XBOT_DEBUG_AGENTIC_QUIT=1` quits when done.
 @MainActor
 enum DebugAgenticTurn {
     static func startIfAsked(_ workspace: Workspace) {
@@ -17,6 +17,7 @@ enum DebugAgenticTurn {
         let out = URL(filePath: env["XBOT_DEBUG_AGENTIC_OUT"] ?? NSTemporaryDirectory() + "xbot-agentic.txt")
         let harness = env["XBOT_DEBUG_AGENTIC_HARNESS"].flatMap(HarnessKind.init(rawValue:)) ?? .claude
         let answer = env["XBOT_DEBUG_AGENTIC_APPROVE"]
+        let reply = env["XBOT_DEBUG_AGENTIC_REPLY"]
         Task {
             await workspace.refreshHarnesses()
             guard let head = workspace.headMaster, let chat = workspace.talk(to: head.id) else {
@@ -35,6 +36,10 @@ enum DebugAgenticTurn {
                 if let answer, let pending = workspace.approvals.pending.first(where: { $0.chatID == chat.id }) {
                     workspace.approvals.answer(pending.approval.id, allow: answer == "allow", by: "debug script")
                     answered.append("\(answer): \(pending.approval.summary) — \(pending.approval.detail)")
+                }
+                if let reply, workspace.isAsking(in: chat.id) {
+                    try? await Task.sleep(for: .seconds(1))
+                    _ = workspace.send(reply, in: chat.id)
                 }
                 try? await Task.sleep(for: .milliseconds(500))
             }

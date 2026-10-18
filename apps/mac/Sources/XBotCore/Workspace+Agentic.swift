@@ -62,7 +62,7 @@ extension Workspace {
         toolTokens[chat.id] = tools.token
         request.tools = tools
         if chat.isThread { request.mode = .fullAccess }
-        request.instructions = (request.instructions.map { $0 + "\n\n" } ?? "") + Self.toolGuidance
+        request.instructions = (request.instructions.map { $0 + "\n\n" } ?? "") + Self.toolGuidance(for: chat.harness)
         guard chat.harness == .antigravity, let agy = brains[.antigravity] as? HarnessBrain else { return nil }
         return { await host.antigravity.ensureInstalled(agy: agy.executable, xbot: host.executable, environment: agy.environment) }
     }
@@ -87,6 +87,15 @@ extension Workspace {
 
     /// Tool guidance for a turn with xBot's tools (Harness2's term): what there is, how to use it
     /// well, and the guardrails the agent's own shell isn't held to by xBot.
+    static func toolGuidance(for harness: HarnessKind) -> String {
+        // Claude Code's own shell goes through xBot's hook, which asks the person itself; asking
+        // first as well would ask twice. The others' shells aren't checked by xBot at all.
+        let shell = harness == .claude
+            ? "- Your own shell commands are checked by xBot the same way: run them, and xBot asks the person when one needs it."
+            : "- Your own shell and file tools are not checked by xBot: before anything destructive or outward with them (deleting files, sending, publishing, pushing, purchases), call xbot_ask and wait for a yes."
+        return toolGuidance + "\n" + shell
+    }
+
     static let toolGuidance = """
         xBot tools: you have xBot's own MCP server, "xbot". Its xbot_* tools run xBot itself (projects, \
         chats, the crew and hand-offs, automations, notes, settings, your lessons, and xbot_ask to ask \
@@ -97,8 +106,6 @@ extension Workspace {
         when there's no element. After an action that matters, take a mac_screenshot to check it worked.
         - Deleting, sending, pushing, buying, quitting apps and changing system settings ask the person \
         first. If they don't allow something, don't look for another way to do it.
-        - Before anything destructive or outward with your own shell or tools (deleting files, sending, \
-        publishing, pushing, purchases), call xbot_ask and wait for a yes.
         - When you finish a task, if you learnt something general that would help next time (not \
         task-specific facts), call xbot_remember once with the cue, the lesson, your confidence and \
         the evidence.

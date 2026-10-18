@@ -198,6 +198,8 @@ final class AXRefs: @unchecked Sendable {
 
 /// Reading Accessibility attributes, with limits: a big app has tens of thousands of elements.
 enum AXRead {
+    static let subroleNames = ["AXCloseButton": "close", "AXMinimizeButton": "minimise", "AXZoomButton": "zoom",
+                               "AXFullScreenButton": "full screen"]
     static let maxNodes = 1500
     static let maxDepth = 30
 
@@ -235,10 +237,10 @@ enum AXRead {
         guard count < maxNodes else { return nil }
         count += 1
         let names = [kAXRoleAttribute, kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute, kAXEnabledAttribute,
-                     kAXChildrenAttribute] as CFArray
+                     kAXChildrenAttribute, kAXSubroleAttribute] as CFArray
         var values: CFArray?
         guard AXUIElementCopyMultipleAttributeValues(element, names, AXCopyMultipleAttributeOptions(rawValue: 0), &values) == .success,
-              let list = values as? [AnyObject], list.count == 6 else { return nil }
+              let list = values as? [AnyObject], list.count == 7 else { return nil }
         func ok(_ value: AnyObject) -> CFTypeRef? {
             // A missing attribute comes back as an AXValue holding an error.
             if CFGetTypeID(value) == AXValueGetTypeID(), AXValueGetType(value as! AXValue) == .axError { return nil }
@@ -246,7 +248,9 @@ enum AXRead {
         }
         let role = (ok(list[0]) as? String) ?? "AXUnknown"
         let children = depth < maxDepth ? ((ok(list[5]) as? [AXUIElement]) ?? []) : []
-        var node = UINode(role: role, title: ok(list[1]) as? String, label: ok(list[2]) as? String,
+        // A window's close, minimise and zoom buttons have no title, only a subrole.
+        let subrole = (ok(list[6]) as? String).flatMap(subroleNames.index(forKey:)).map { subroleNames.values[$0] }
+        var node = UINode(role: role, title: ok(list[1]) as? String, label: (ok(list[2]) as? String) ?? subrole,
                           value: role == "AXSecureTextField" ? nil : text(ok(list[3])), frame: frame(element),
                           enabled: (ok(list[4]) as? Bool) ?? true, ref: refs.keep(element))
         node.children = children.compactMap { self.node($0, depth: depth + 1, count: &count, refs: refs) }
