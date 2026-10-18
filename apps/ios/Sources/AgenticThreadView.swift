@@ -60,6 +60,10 @@ struct AgenticThreadView: View {
             .scrollEdgeEffectStyle(.soft, for: .all)
             .background(Color(.systemGroupedBackground))
             .onChange(of: items.count) { proxy.scrollTo("end", anchor: .bottom) }
+            // A turn starting or a new card or tool row: back to the bottom. (Words streaming into the
+            // last bubble keep it there through the size-change anchor.)
+            .onChange(of: running) { withAnimation(.smooth) { proxy.scrollTo("end", anchor: .bottom) } }
+            .onChange(of: live.count) { withAnimation(.smooth) { proxy.scrollTo("end", anchor: .bottom) } }
             .onChange(of: focused) { if focused { withAnimation(.smooth) { proxy.scrollTo("end", anchor: .bottom) } } }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -177,7 +181,8 @@ enum ThreadItem: Identifiable {
         for (index, part) in parts.enumerated() {
             switch part {
             case .text(let t): text.append(t)
-            case .tool: continue
+            // Words either side of a tool are separate thoughts: a paragraph break, not run together.
+            case .tool: if let last = text.last, !last.hasSuffix("\n\n") { text.append("\n\n") }
             case .image(let image): flush(index); out.append(.image("\(key)-\(index)", image))
             case .approval(let approval): flush(index); out.append(.approval("\(key)-\(index)", approval))
             case .notice(let notice):
